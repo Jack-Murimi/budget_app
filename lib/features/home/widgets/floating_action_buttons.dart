@@ -102,7 +102,20 @@ class HomeFloatingActionButtons extends ConsumerWidget {
       return;
     }
 
-    await _handleParseResult(context, ref, result);
+    try {
+      await _handleParseResult(context, ref, result);
+    } catch (e, st) {
+      debugPrint('Parse error: $e\n$st');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 
   void _showPasteDialog(BuildContext context, WidgetRef ref) {
@@ -137,7 +150,20 @@ class HomeFloatingActionButtons extends ConsumerWidget {
                 );
                 return;
               }
-              await _handleParseResult(context, ref, result);
+              try {
+                await _handleParseResult(context, ref, result);
+              } catch (e, st) {
+                debugPrint('Parse error: $e\n$st');
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Parse'),
           ),
