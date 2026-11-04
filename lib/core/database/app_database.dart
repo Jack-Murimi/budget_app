@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -33,6 +33,16 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(transactions, transactions.fulizaAmount);
         await m.addColumn(transactions, transactions.fulizaFee);
         await m.createTable(fulizaRecords);
+      }
+      if (from < 4) {
+        // Remove duplicate fuliza rows keeping latest per ref
+        await customStatement(
+          'DELETE FROM fuliza_records WHERE id NOT IN (SELECT MAX(id) FROM fuliza_records GROUP BY mpesa_ref)',
+        );
+        // Add unique index
+        await m.createIndex(
+          Index('fuliza_records', 'CREATE UNIQUE INDEX IF NOT EXISTS idx_fuliza_records_mpesa_ref ON fuliza_records (mpesa_ref)'),
+        );
       }
     },
   );

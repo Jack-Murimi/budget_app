@@ -29,7 +29,12 @@ class FulizaRepository {
   }
 
   /// Get record by M-Pesa ref.
-  Future<FulizaRecord?> getByRef(String ref) =>
-      (db.select(db.fulizaRecords)..where((f) => f.mpesaRef.equals(ref)))
-          .getSingleOrNull();
+  Future<FulizaRecord?> getByRef(String ref) async {
+    final rows = await (db.select(db.fulizaRecords)
+          ..where((f) => f.mpesaRef.equals(ref))
+          ..orderBy([(f) => OrderingTerm.desc(f.createdAt)])
+          ..limit(1))
+        .get();
+    return rows.isEmpty ? null : rows.first;
+  }
 }
