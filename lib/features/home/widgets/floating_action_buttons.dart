@@ -16,8 +16,7 @@ class HomeFloatingActionButtons extends ConsumerWidget {
   Future<void> _handleParseResult(
       BuildContext context, WidgetRef ref, MpesaParseResult result) async {
     if (result.type == MpesaTransactionType.fulizaDrawdown) {
-      // 1. Always save to FulizaRecords
-      await ref.read(fulizaRepositoryProvider).insertDrawdown(
+      final isDuplicate = await ref.read(fulizaRepositoryProvider).insertDrawdown(
         FulizaRecordsCompanion.insert(
           mpesaRef: result.mpesaRef,
           fulizaAmount: result.fulizaAmount,
@@ -27,7 +26,21 @@ class HomeFloatingActionButtons extends ConsumerWidget {
         ),
       );
 
-      // 2. If paired transaction already saved, update its Fuliza fields
+      if (!context.mounted) return;
+
+      if (isDuplicate) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Already recorded — this Fuliza was saved before.'),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(bottom: 600, left: 16, right: 16), // push to top
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+
+      // New record — also update paired transaction if already saved
       final updated = await ref.read(transactionRepositoryProvider).updateFulizaFields(
         mpesaRef: result.mpesaRef,
         fulizaAmount: result.fulizaAmount,

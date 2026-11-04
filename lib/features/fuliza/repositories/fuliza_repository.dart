@@ -5,9 +5,13 @@ class FulizaRepository {
   final AppDatabase db;
   const FulizaRepository(this.db);
 
-  /// Save a Fuliza drawdown record.
-  Future<int> insertDrawdown(FulizaRecordsCompanion record) =>
-      db.into(db.fulizaRecords).insertOnConflictUpdate(record);
+  /// Insert a Fuliza drawdown. Returns true if already recorded (duplicate), false if new.
+  Future<bool> insertDrawdown(FulizaRecordsCompanion record) async {
+    final existing = await getByRef(record.mpesaRef.value);
+    if (existing != null) return true; // duplicate
+    await db.into(db.fulizaRecords).insert(record);
+    return false;
+  }
 
   /// All Fuliza records, newest first.
   Stream<List<FulizaRecord>> watchAll() =>

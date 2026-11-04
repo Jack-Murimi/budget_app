@@ -274,6 +274,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
                     const SnackBar(
                       content: Text('Already saved — this M-Pesa transaction was recorded before.'),
                       behavior: SnackBarBehavior.floating,
+                      margin: EdgeInsets.only(bottom: 600, left: 16, right: 16),
                     ),
                   );
                   Navigator.of(context).pop();
