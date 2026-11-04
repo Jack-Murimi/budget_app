@@ -1,0 +1,157 @@
+import 'package:drift/drift.dart' show Value;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/database/app_database.dart';
+import '../../add_transaction/screens/add_transaction_screen.dart';
+import '../../fuliza/providers/fuliza_providers.dart';
+import '../../transactions/models/mpesa_parse_result.dart';
+import '../../transactions/providers/transaction_providers.dart';
+import '../../transactions/services/mpesa_parser.dart';
+
+class HomeFloatingActionButtons extends ConsumerWidget {
+  const HomeFloatingActionButtons({super.key});
+
+  Future<void> _handleParseResult(
+      BuildContext context, WidgetRef ref, MpesaParseResult result) async {
+    if (result.type == MpesaTransactionType.fulizaDrawdown) {
+      // 1. Always save to FulizaRecords
+      await ref.read(fulizaRepositoryProvider).insertDrawdown(
+        FulizaRecordsCompanion.insert(
+          mpesaRef: result.mpesaRef,
+          fulizaAmount: result.fulizaAmount,
+          accessFee: Value(result.fulizaAccessFee),
+          outstandingTotal: Value(result.outstandingTotal),
+          dueDate: Value(result.fulizaDueDate),
+        ),
+      );
+
+      // 2. If paired transaction already saved, update its Fuliza fields
+      final updated = await ref.read(transactionRepositoryProvider).updateFulizaFields(
+        mpesaRef: result.mpesaRef,
+        fulizaAmount: result.fulizaAmount,
+        fulizaFee: result.fulizaAccessFee,
+      );
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            updated
+                ? 'Fuliza linked ✓  Transaction updated with Fuliza details.'
+                : 'Fuliza recorded ✓  Paste the paired M-Pesa send message next.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // Normal transaction — check if Fuliza record already saved for this ref
+    final fulizaRecord =
+        await ref.read(fulizaRepositoryProvider).getByRef(result.mpesaRef);
+    final enrichedResult = fulizaRecord != null
+        ? result.copyWith(
+            fulizaAmount: fulizaRecord.fulizaAmount,
+            fulizaAccessFee: fulizaRecord.accessFee,
+          )
+        : result;
+
+    if (!context.mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AddTransactionScreen(parseResult: enrichedResult),
+      ),
+    );
+  }
+
+  Future<void> _onPasteAndParse(BuildContext context, WidgetRef ref) async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim() ?? '';
+    if (!context.mounted) return;
+
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Clipboard is empty. Copy an M-Pesa SMS first.')),
+      );
+      return;
+    }
+
+    final result = MpesaParser.parse(text);
+
+    if (!result.isValid) {
+      _showPasteDialog(context, ref);
+      return;
+    }
+
+    await _handleParseResult(context, ref, result);
+  }
+
+  void _showPasteDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Paste M-Pesa SMS'),
+        content: TextField(
+          controller: controller,
+          maxLines: 6,
+          decoration: const InputDecoration(
+            hintText: 'Paste your M-Pesa message here...',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final text = controller.text.trim();
+              if (text.isEmpty) return;
+              final result = MpesaParser.parse(text);
+              if (!result.isValid) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Could not parse: ${result.errorMessage}')),
+                );
+                return;
+              }
+              await _handleParseResult(context, ref, result);
+            },
+            child: const Text('Parse'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        FloatingActionButton.small(
+          heroTag: 'fab_add_manual',
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AddTransactionScreen()),
+          ),
+          tooltip: 'Add Manually',
+          child: const Icon(Icons.edit_note),
+        ),
+        const SizedBox(height: 12),
+        FloatingActionButton.extended(
+          heroTag: 'fab_parse',
+          onPressed: () => _onPasteAndParse(context, ref),
+          icon: const Icon(Icons.content_paste_rounded),
+          label: const Text('Paste M-Pesa'),
+          tooltip: 'Paste & Parse M-Pesa SMS',
+        ),
+      ],
+    );
+  }
+}
