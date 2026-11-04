@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
+import '../../../shared/utils/currency_formatter.dart';
 import '../../add_transaction/screens/add_transaction_screen.dart';
 import '../../fuliza/providers/fuliza_providers.dart';
 import '../../transactions/models/mpesa_parse_result.dart';
@@ -43,6 +44,22 @@ class HomeFloatingActionButtons extends ConsumerWidget {
           ),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // Fuliza repayment — auto-deducted by M-Pesa, not a manual transaction
+    if (result.type == MpesaTransactionType.fulizaRepayment) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Fuliza repaid: ${CurrencyFormatter.format(result.amount)}  •  New balance: ${CurrencyFormatter.format(result.newBalance)}',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+          backgroundColor: Colors.green.shade700,
         ),
       );
       return;
