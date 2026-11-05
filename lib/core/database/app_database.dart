@@ -1,12 +1,14 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'tables/accounts_table.dart';
+import 'tables/budgets_table.dart';
 import 'tables/categories_table.dart';
 import 'tables/fuliza_records_table.dart';
 import 'tables/transactions_table.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Transactions, Categories, FulizaRecords])
+@DriftDatabase(tables: [Transactions, Categories, FulizaRecords, Accounts, Budgets])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -14,13 +16,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
       await m.createAll();
       await _seedDefaultCategories();
+      await _seedDefaultAccounts();
     },
     onUpgrade: (m, from, to) async {
       if (from < 2) {
@@ -43,6 +46,49 @@ class AppDatabase extends _$AppDatabase {
         await m.createIndex(
           Index('fuliza_records', 'CREATE UNIQUE INDEX IF NOT EXISTS idx_fuliza_records_mpesa_ref ON fuliza_records (mpesa_ref)'),
         );
+      }
+      if (from < 5) {
+        await m.addColumn(categories, categories.isArchived);
+        await m.addColumn(categories, categories.sortOrder);
+      }
+      if (from < 6) {
+        await m.createTable(accounts);
+        await m.addColumn(transactions, transactions.accountId);
+        await m.addColumn(transactions, transactions.toAccountId);
+        final mpesaId = await into(accounts).insert(
+          AccountsCompanion.insert(
+            name: 'M-Pesa',
+            type: const Value('mpesa'),
+            colorHex: const Value('#1B5E20'),
+            icon: const Value('phone_android'),
+            isDefault: const Value(true),
+          ),
+        );
+        await into(accounts).insert(
+          AccountsCompanion.insert(
+            name: 'Cash',
+            type: const Value('cash'),
+            colorHex: const Value('#4CAF50'),
+            icon: const Value('payments'),
+          ),
+        );
+        await into(accounts).insert(
+          AccountsCompanion.insert(
+            name: 'Bank',
+            type: const Value('bank'),
+            colorHex: const Value('#1976D2'),
+            icon: const Value('account_balance'),
+          ),
+        );
+        await customUpdate(
+          'UPDATE transactions SET account_id = ? WHERE account_id IS NULL',
+          variables: [Variable.withInt(mpesaId)],
+          updates: {transactions},
+        );
+      }
+      if (from < 7) {
+        await m.createTable(budgets);
+        await m.addColumn(transactions, transactions.excludeFromBudget);
       }
     },
   );
@@ -147,5 +193,35 @@ class AppDatabase extends _$AppDatabase {
     await addCat('Send Money', 'send', '#546E7A', parentId: transfer);
     await addCat('Agent Deposit', 'account_balance', '#546E7A', parentId: transfer);
     await addCat('Fuliza Repayment', 'sync', '#546E7A', parentId: transfer);
+  }
+
+  Future<void> _seedDefaultAccounts() async {
+    final existing = await (select(accounts)..limit(1)).get();
+    if (existing.isNotEmpty) return;
+    await into(accounts).insert(
+      AccountsCompanion.insert(
+        name: 'M-Pesa',
+        type: const Value('mpesa'),
+        colorHex: const Value('#1B5E20'),
+        icon: const Value('phone_android'),
+        isDefault: const Value(true),
+      ),
+    );
+    await into(accounts).insert(
+      AccountsCompanion.insert(
+        name: 'Cash',
+        type: const Value('cash'),
+        colorHex: const Value('#4CAF50'),
+        icon: const Value('payments'),
+      ),
+    );
+    await into(accounts).insert(
+      AccountsCompanion.insert(
+        name: 'Bank',
+        type: const Value('bank'),
+        colorHex: const Value('#1976D2'),
+        icon: const Value('account_balance'),
+      ),
+    );
   }
 }

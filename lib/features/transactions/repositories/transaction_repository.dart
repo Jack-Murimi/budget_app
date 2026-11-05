@@ -1,24 +1,27 @@
 import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
+import '../models/transaction_model.dart';
 
 // ponytail: direct drift entities; add domain mapper when schema diverges
 class TransactionRepository {
   final AppDatabase db;
   const TransactionRepository(this.db);
 
-  Stream<List<Transaction>> watchRecent({int limit = 50}) =>
+  Stream<List<TransactionModel>> watchRecent({int limit = 50}) =>
       (db.select(db.transactions)
             ..orderBy([(t) => OrderingTerm.desc(t.transactionDate)])
             ..limit(limit))
+          .map((row) => row.toModel())
           .watch();
 
-  Stream<List<Transaction>> watchMonthSummary({required int year, required int month}) {
+  Stream<List<TransactionModel>> watchMonthSummary({required int year, required int month}) {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 1);
     return (db.select(db.transactions)
           ..where((t) =>
               t.transactionDate.isBiggerOrEqualValue(start) &
               t.transactionDate.isSmallerThanValue(end)))
+        .map((row) => row.toModel())
         .watch();
   }
 
@@ -61,10 +64,25 @@ class TransactionRepository {
     return true;
   }
 
-  Future<Transaction?> getByRef(String mpesaRef) =>
-      (db.select(db.transactions)..where((t) => t.mpesaRef.equals(mpesaRef)))
-          .getSingleOrNull();
+  Future<TransactionModel?> getByRef(String mpesaRef) async {
+    final row = await (db.select(db.transactions)..where((t) => t.mpesaRef.equals(mpesaRef)))
+        .getSingleOrNull();
+    return row?.toModel();
+  }
 
   Future<void> delete(int id) =>
       (db.delete(db.transactions)..where((t) => t.id.equals(id))).go();
+
+  Stream<List<TransactionModel>> watchAll() =>
+      (db.select(db.transactions)
+            ..orderBy([(t) => OrderingTerm.desc(t.transactionDate)]))
+          .map((row) => row.toModel())
+          .watch();
+
+  Future<bool> updateTransaction(TransactionsCompanion transaction) async {
+    final count = await (db.update(db.transactions)
+          ..where((t) => t.id.equals(transaction.id.value)))
+        .write(transaction);
+    return count > 0;
+  }
 }

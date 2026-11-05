@@ -104,6 +104,18 @@ class $TransactionsTable extends Transactions
           type: DriftSqlType.string,
           requiredDuringInsert: false,
           defaultValue: const Constant(''));
+  static const VerificationMeta _accountIdMeta =
+      const VerificationMeta('accountId');
+  @override
+  late final GeneratedColumn<int> accountId = GeneratedColumn<int>(
+      'account_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _toAccountIdMeta =
+      const VerificationMeta('toAccountId');
+  @override
+  late final GeneratedColumn<int> toAccountId = GeneratedColumn<int>(
+      'to_account_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   static const VerificationMeta _isParsedMeta =
       const VerificationMeta('isParsed');
   @override
@@ -113,6 +125,16 @@ class $TransactionsTable extends Transactions
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_parsed" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _excludeFromBudgetMeta =
+      const VerificationMeta('excludeFromBudget');
+  @override
+  late final GeneratedColumn<bool> excludeFromBudget = GeneratedColumn<bool>(
+      'exclude_from_budget', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("exclude_from_budget" IN (0, 1))'),
       defaultValue: const Constant(false));
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
@@ -137,7 +159,10 @@ class $TransactionsTable extends Transactions
         mpesaRef,
         counterpartyName,
         counterpartyAccount,
+        accountId,
+        toAccountId,
         isParsed,
+        excludeFromBudget,
         createdAt
       ];
   @override
@@ -221,9 +246,25 @@ class $TransactionsTable extends Transactions
           counterpartyAccount.isAcceptableOrUnknown(
               data['counterparty_account']!, _counterpartyAccountMeta));
     }
+    if (data.containsKey('account_id')) {
+      context.handle(_accountIdMeta,
+          accountId.isAcceptableOrUnknown(data['account_id']!, _accountIdMeta));
+    }
+    if (data.containsKey('to_account_id')) {
+      context.handle(
+          _toAccountIdMeta,
+          toAccountId.isAcceptableOrUnknown(
+              data['to_account_id']!, _toAccountIdMeta));
+    }
     if (data.containsKey('is_parsed')) {
       context.handle(_isParsedMeta,
           isParsed.isAcceptableOrUnknown(data['is_parsed']!, _isParsedMeta));
+    }
+    if (data.containsKey('exclude_from_budget')) {
+      context.handle(
+          _excludeFromBudgetMeta,
+          excludeFromBudget.isAcceptableOrUnknown(
+              data['exclude_from_budget']!, _excludeFromBudgetMeta));
     }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
@@ -268,8 +309,14 @@ class $TransactionsTable extends Transactions
           DriftSqlType.string, data['${effectivePrefix}counterparty_name'])!,
       counterpartyAccount: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}counterparty_account'])!,
+      accountId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}account_id']),
+      toAccountId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}to_account_id']),
       isParsed: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_parsed'])!,
+      excludeFromBudget: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}exclude_from_budget'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
     );
@@ -295,7 +342,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   final String? mpesaRef;
   final String counterpartyName;
   final String counterpartyAccount;
+  final int? accountId;
+  final int? toAccountId;
   final bool isParsed;
+  final bool excludeFromBudget;
   final DateTime createdAt;
   const Transaction(
       {required this.id,
@@ -311,7 +361,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       this.mpesaRef,
       required this.counterpartyName,
       required this.counterpartyAccount,
+      this.accountId,
+      this.toAccountId,
       required this.isParsed,
+      required this.excludeFromBudget,
       required this.createdAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -333,7 +386,14 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     }
     map['counterparty_name'] = Variable<String>(counterpartyName);
     map['counterparty_account'] = Variable<String>(counterpartyAccount);
+    if (!nullToAbsent || accountId != null) {
+      map['account_id'] = Variable<int>(accountId);
+    }
+    if (!nullToAbsent || toAccountId != null) {
+      map['to_account_id'] = Variable<int>(toAccountId);
+    }
     map['is_parsed'] = Variable<bool>(isParsed);
+    map['exclude_from_budget'] = Variable<bool>(excludeFromBudget);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -357,7 +417,14 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           : Value(mpesaRef),
       counterpartyName: Value(counterpartyName),
       counterpartyAccount: Value(counterpartyAccount),
+      accountId: accountId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(accountId),
+      toAccountId: toAccountId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(toAccountId),
       isParsed: Value(isParsed),
+      excludeFromBudget: Value(excludeFromBudget),
       createdAt: Value(createdAt),
     );
   }
@@ -380,7 +447,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       counterpartyName: serializer.fromJson<String>(json['counterpartyName']),
       counterpartyAccount:
           serializer.fromJson<String>(json['counterpartyAccount']),
+      accountId: serializer.fromJson<int?>(json['accountId']),
+      toAccountId: serializer.fromJson<int?>(json['toAccountId']),
       isParsed: serializer.fromJson<bool>(json['isParsed']),
+      excludeFromBudget: serializer.fromJson<bool>(json['excludeFromBudget']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -401,7 +471,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       'mpesaRef': serializer.toJson<String?>(mpesaRef),
       'counterpartyName': serializer.toJson<String>(counterpartyName),
       'counterpartyAccount': serializer.toJson<String>(counterpartyAccount),
+      'accountId': serializer.toJson<int?>(accountId),
+      'toAccountId': serializer.toJson<int?>(toAccountId),
       'isParsed': serializer.toJson<bool>(isParsed),
+      'excludeFromBudget': serializer.toJson<bool>(excludeFromBudget),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -420,7 +493,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           Value<String?> mpesaRef = const Value.absent(),
           String? counterpartyName,
           String? counterpartyAccount,
+          Value<int?> accountId = const Value.absent(),
+          Value<int?> toAccountId = const Value.absent(),
           bool? isParsed,
+          bool? excludeFromBudget,
           DateTime? createdAt}) =>
       Transaction(
         id: id ?? this.id,
@@ -436,7 +512,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
         mpesaRef: mpesaRef.present ? mpesaRef.value : this.mpesaRef,
         counterpartyName: counterpartyName ?? this.counterpartyName,
         counterpartyAccount: counterpartyAccount ?? this.counterpartyAccount,
+        accountId: accountId.present ? accountId.value : this.accountId,
+        toAccountId: toAccountId.present ? toAccountId.value : this.toAccountId,
         isParsed: isParsed ?? this.isParsed,
+        excludeFromBudget: excludeFromBudget ?? this.excludeFromBudget,
         createdAt: createdAt ?? this.createdAt,
       );
   Transaction copyWithCompanion(TransactionsCompanion data) {
@@ -466,7 +545,13 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       counterpartyAccount: data.counterpartyAccount.present
           ? data.counterpartyAccount.value
           : this.counterpartyAccount,
+      accountId: data.accountId.present ? data.accountId.value : this.accountId,
+      toAccountId:
+          data.toAccountId.present ? data.toAccountId.value : this.toAccountId,
       isParsed: data.isParsed.present ? data.isParsed.value : this.isParsed,
+      excludeFromBudget: data.excludeFromBudget.present
+          ? data.excludeFromBudget.value
+          : this.excludeFromBudget,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -487,7 +572,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           ..write('mpesaRef: $mpesaRef, ')
           ..write('counterpartyName: $counterpartyName, ')
           ..write('counterpartyAccount: $counterpartyAccount, ')
+          ..write('accountId: $accountId, ')
+          ..write('toAccountId: $toAccountId, ')
           ..write('isParsed: $isParsed, ')
+          ..write('excludeFromBudget: $excludeFromBudget, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -508,7 +596,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       mpesaRef,
       counterpartyName,
       counterpartyAccount,
+      accountId,
+      toAccountId,
       isParsed,
+      excludeFromBudget,
       createdAt);
   @override
   bool operator ==(Object other) =>
@@ -527,7 +618,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           other.mpesaRef == this.mpesaRef &&
           other.counterpartyName == this.counterpartyName &&
           other.counterpartyAccount == this.counterpartyAccount &&
+          other.accountId == this.accountId &&
+          other.toAccountId == this.toAccountId &&
           other.isParsed == this.isParsed &&
+          other.excludeFromBudget == this.excludeFromBudget &&
           other.createdAt == this.createdAt);
 }
 
@@ -545,7 +639,10 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   final Value<String?> mpesaRef;
   final Value<String> counterpartyName;
   final Value<String> counterpartyAccount;
+  final Value<int?> accountId;
+  final Value<int?> toAccountId;
   final Value<bool> isParsed;
+  final Value<bool> excludeFromBudget;
   final Value<DateTime> createdAt;
   const TransactionsCompanion({
     this.id = const Value.absent(),
@@ -561,7 +658,10 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     this.mpesaRef = const Value.absent(),
     this.counterpartyName = const Value.absent(),
     this.counterpartyAccount = const Value.absent(),
+    this.accountId = const Value.absent(),
+    this.toAccountId = const Value.absent(),
     this.isParsed = const Value.absent(),
+    this.excludeFromBudget = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   TransactionsCompanion.insert({
@@ -578,7 +678,10 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     this.mpesaRef = const Value.absent(),
     this.counterpartyName = const Value.absent(),
     this.counterpartyAccount = const Value.absent(),
+    this.accountId = const Value.absent(),
+    this.toAccountId = const Value.absent(),
     this.isParsed = const Value.absent(),
+    this.excludeFromBudget = const Value.absent(),
     this.createdAt = const Value.absent(),
   })  : header = Value(header),
         amount = Value(amount),
@@ -597,7 +700,10 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     Expression<String>? mpesaRef,
     Expression<String>? counterpartyName,
     Expression<String>? counterpartyAccount,
+    Expression<int>? accountId,
+    Expression<int>? toAccountId,
     Expression<bool>? isParsed,
+    Expression<bool>? excludeFromBudget,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -615,7 +721,10 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       if (counterpartyName != null) 'counterparty_name': counterpartyName,
       if (counterpartyAccount != null)
         'counterparty_account': counterpartyAccount,
+      if (accountId != null) 'account_id': accountId,
+      if (toAccountId != null) 'to_account_id': toAccountId,
       if (isParsed != null) 'is_parsed': isParsed,
+      if (excludeFromBudget != null) 'exclude_from_budget': excludeFromBudget,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -634,7 +743,10 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       Value<String?>? mpesaRef,
       Value<String>? counterpartyName,
       Value<String>? counterpartyAccount,
+      Value<int?>? accountId,
+      Value<int?>? toAccountId,
       Value<bool>? isParsed,
+      Value<bool>? excludeFromBudget,
       Value<DateTime>? createdAt}) {
     return TransactionsCompanion(
       id: id ?? this.id,
@@ -650,7 +762,10 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       mpesaRef: mpesaRef ?? this.mpesaRef,
       counterpartyName: counterpartyName ?? this.counterpartyName,
       counterpartyAccount: counterpartyAccount ?? this.counterpartyAccount,
+      accountId: accountId ?? this.accountId,
+      toAccountId: toAccountId ?? this.toAccountId,
       isParsed: isParsed ?? this.isParsed,
+      excludeFromBudget: excludeFromBudget ?? this.excludeFromBudget,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -697,8 +812,17 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     if (counterpartyAccount.present) {
       map['counterparty_account'] = Variable<String>(counterpartyAccount.value);
     }
+    if (accountId.present) {
+      map['account_id'] = Variable<int>(accountId.value);
+    }
+    if (toAccountId.present) {
+      map['to_account_id'] = Variable<int>(toAccountId.value);
+    }
     if (isParsed.present) {
       map['is_parsed'] = Variable<bool>(isParsed.value);
+    }
+    if (excludeFromBudget.present) {
+      map['exclude_from_budget'] = Variable<bool>(excludeFromBudget.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -722,7 +846,10 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
           ..write('mpesaRef: $mpesaRef, ')
           ..write('counterpartyName: $counterpartyName, ')
           ..write('counterpartyAccount: $counterpartyAccount, ')
+          ..write('accountId: $accountId, ')
+          ..write('toAccountId: $toAccountId, ')
           ..write('isParsed: $isParsed, ')
+          ..write('excludeFromBudget: $excludeFromBudget, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -783,6 +910,24 @@ class $CategoriesTable extends Categories
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_default" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _isArchivedMeta =
+      const VerificationMeta('isArchived');
+  @override
+  late final GeneratedColumn<bool> isArchived = GeneratedColumn<bool>(
+      'is_archived', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_archived" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _sortOrderMeta =
+      const VerificationMeta('sortOrder');
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+      'sort_order', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -792,8 +937,17 @@ class $CategoriesTable extends Categories
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, name, icon, colorHex, parentId, isDefault, createdAt];
+  List<GeneratedColumn> get $columns => [
+        id,
+        name,
+        icon,
+        colorHex,
+        parentId,
+        isDefault,
+        isArchived,
+        sortOrder,
+        createdAt
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -829,6 +983,16 @@ class $CategoriesTable extends Categories
       context.handle(_isDefaultMeta,
           isDefault.isAcceptableOrUnknown(data['is_default']!, _isDefaultMeta));
     }
+    if (data.containsKey('is_archived')) {
+      context.handle(
+          _isArchivedMeta,
+          isArchived.isAcceptableOrUnknown(
+              data['is_archived']!, _isArchivedMeta));
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(_sortOrderMeta,
+          sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -854,6 +1018,10 @@ class $CategoriesTable extends Categories
           .read(DriftSqlType.int, data['${effectivePrefix}parent_id']),
       isDefault: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_default'])!,
+      isArchived: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_archived'])!,
+      sortOrder: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}sort_order'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
     );
@@ -872,6 +1040,8 @@ class Category extends DataClass implements Insertable<Category> {
   final String colorHex;
   final int? parentId;
   final bool isDefault;
+  final bool isArchived;
+  final int sortOrder;
   final DateTime createdAt;
   const Category(
       {required this.id,
@@ -880,6 +1050,8 @@ class Category extends DataClass implements Insertable<Category> {
       required this.colorHex,
       this.parentId,
       required this.isDefault,
+      required this.isArchived,
+      required this.sortOrder,
       required this.createdAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -892,6 +1064,8 @@ class Category extends DataClass implements Insertable<Category> {
       map['parent_id'] = Variable<int>(parentId);
     }
     map['is_default'] = Variable<bool>(isDefault);
+    map['is_archived'] = Variable<bool>(isArchived);
+    map['sort_order'] = Variable<int>(sortOrder);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -906,6 +1080,8 @@ class Category extends DataClass implements Insertable<Category> {
           ? const Value.absent()
           : Value(parentId),
       isDefault: Value(isDefault),
+      isArchived: Value(isArchived),
+      sortOrder: Value(sortOrder),
       createdAt: Value(createdAt),
     );
   }
@@ -920,6 +1096,8 @@ class Category extends DataClass implements Insertable<Category> {
       colorHex: serializer.fromJson<String>(json['colorHex']),
       parentId: serializer.fromJson<int?>(json['parentId']),
       isDefault: serializer.fromJson<bool>(json['isDefault']),
+      isArchived: serializer.fromJson<bool>(json['isArchived']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -933,6 +1111,8 @@ class Category extends DataClass implements Insertable<Category> {
       'colorHex': serializer.toJson<String>(colorHex),
       'parentId': serializer.toJson<int?>(parentId),
       'isDefault': serializer.toJson<bool>(isDefault),
+      'isArchived': serializer.toJson<bool>(isArchived),
+      'sortOrder': serializer.toJson<int>(sortOrder),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -944,6 +1124,8 @@ class Category extends DataClass implements Insertable<Category> {
           String? colorHex,
           Value<int?> parentId = const Value.absent(),
           bool? isDefault,
+          bool? isArchived,
+          int? sortOrder,
           DateTime? createdAt}) =>
       Category(
         id: id ?? this.id,
@@ -952,6 +1134,8 @@ class Category extends DataClass implements Insertable<Category> {
         colorHex: colorHex ?? this.colorHex,
         parentId: parentId.present ? parentId.value : this.parentId,
         isDefault: isDefault ?? this.isDefault,
+        isArchived: isArchived ?? this.isArchived,
+        sortOrder: sortOrder ?? this.sortOrder,
         createdAt: createdAt ?? this.createdAt,
       );
   Category copyWithCompanion(CategoriesCompanion data) {
@@ -962,6 +1146,9 @@ class Category extends DataClass implements Insertable<Category> {
       colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
       parentId: data.parentId.present ? data.parentId.value : this.parentId,
       isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
+      isArchived:
+          data.isArchived.present ? data.isArchived.value : this.isArchived,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -975,14 +1162,16 @@ class Category extends DataClass implements Insertable<Category> {
           ..write('colorHex: $colorHex, ')
           ..write('parentId: $parentId, ')
           ..write('isDefault: $isDefault, ')
+          ..write('isArchived: $isArchived, ')
+          ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, icon, colorHex, parentId, isDefault, createdAt);
+  int get hashCode => Object.hash(id, name, icon, colorHex, parentId, isDefault,
+      isArchived, sortOrder, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -993,6 +1182,8 @@ class Category extends DataClass implements Insertable<Category> {
           other.colorHex == this.colorHex &&
           other.parentId == this.parentId &&
           other.isDefault == this.isDefault &&
+          other.isArchived == this.isArchived &&
+          other.sortOrder == this.sortOrder &&
           other.createdAt == this.createdAt);
 }
 
@@ -1003,6 +1194,8 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
   final Value<String> colorHex;
   final Value<int?> parentId;
   final Value<bool> isDefault;
+  final Value<bool> isArchived;
+  final Value<int> sortOrder;
   final Value<DateTime> createdAt;
   const CategoriesCompanion({
     this.id = const Value.absent(),
@@ -1011,6 +1204,8 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     this.colorHex = const Value.absent(),
     this.parentId = const Value.absent(),
     this.isDefault = const Value.absent(),
+    this.isArchived = const Value.absent(),
+    this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   CategoriesCompanion.insert({
@@ -1020,6 +1215,8 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     this.colorHex = const Value.absent(),
     this.parentId = const Value.absent(),
     this.isDefault = const Value.absent(),
+    this.isArchived = const Value.absent(),
+    this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
   }) : name = Value(name);
   static Insertable<Category> custom({
@@ -1029,6 +1226,8 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     Expression<String>? colorHex,
     Expression<int>? parentId,
     Expression<bool>? isDefault,
+    Expression<bool>? isArchived,
+    Expression<int>? sortOrder,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -1038,6 +1237,8 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       if (colorHex != null) 'color_hex': colorHex,
       if (parentId != null) 'parent_id': parentId,
       if (isDefault != null) 'is_default': isDefault,
+      if (isArchived != null) 'is_archived': isArchived,
+      if (sortOrder != null) 'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -1049,6 +1250,8 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       Value<String>? colorHex,
       Value<int?>? parentId,
       Value<bool>? isDefault,
+      Value<bool>? isArchived,
+      Value<int>? sortOrder,
       Value<DateTime>? createdAt}) {
     return CategoriesCompanion(
       id: id ?? this.id,
@@ -1057,6 +1260,8 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       colorHex: colorHex ?? this.colorHex,
       parentId: parentId ?? this.parentId,
       isDefault: isDefault ?? this.isDefault,
+      isArchived: isArchived ?? this.isArchived,
+      sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -1082,6 +1287,12 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     if (isDefault.present) {
       map['is_default'] = Variable<bool>(isDefault.value);
     }
+    if (isArchived.present) {
+      map['is_archived'] = Variable<bool>(isArchived.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1097,6 +1308,8 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
           ..write('colorHex: $colorHex, ')
           ..write('parentId: $parentId, ')
           ..write('isDefault: $isDefault, ')
+          ..write('isArchived: $isArchived, ')
+          ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -1494,18 +1707,1019 @@ class FulizaRecordsCompanion extends UpdateCompanion<FulizaRecord> {
   }
 }
 
+class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AccountsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 100),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+      'type', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('mpesa'));
+  static const VerificationMeta _initialBalanceMeta =
+      const VerificationMeta('initialBalance');
+  @override
+  late final GeneratedColumn<double> initialBalance = GeneratedColumn<double>(
+      'initial_balance', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _currencyMeta =
+      const VerificationMeta('currency');
+  @override
+  late final GeneratedColumn<String> currency = GeneratedColumn<String>(
+      'currency', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('KES'));
+  static const VerificationMeta _colorHexMeta =
+      const VerificationMeta('colorHex');
+  @override
+  late final GeneratedColumn<String> colorHex = GeneratedColumn<String>(
+      'color_hex', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('#1B5E20'));
+  static const VerificationMeta _iconMeta = const VerificationMeta('icon');
+  @override
+  late final GeneratedColumn<String> icon = GeneratedColumn<String>(
+      'icon', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('account_balance_wallet'));
+  static const VerificationMeta _isDefaultMeta =
+      const VerificationMeta('isDefault');
+  @override
+  late final GeneratedColumn<bool> isDefault = GeneratedColumn<bool>(
+      'is_default', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_default" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _isArchivedMeta =
+      const VerificationMeta('isArchived');
+  @override
+  late final GeneratedColumn<bool> isArchived = GeneratedColumn<bool>(
+      'is_archived', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_archived" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        name,
+        type,
+        initialBalance,
+        currency,
+        colorHex,
+        icon,
+        isDefault,
+        isArchived,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'accounts';
+  @override
+  VerificationContext validateIntegrity(Insertable<Account> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+          _typeMeta, type.isAcceptableOrUnknown(data['type']!, _typeMeta));
+    }
+    if (data.containsKey('initial_balance')) {
+      context.handle(
+          _initialBalanceMeta,
+          initialBalance.isAcceptableOrUnknown(
+              data['initial_balance']!, _initialBalanceMeta));
+    }
+    if (data.containsKey('currency')) {
+      context.handle(_currencyMeta,
+          currency.isAcceptableOrUnknown(data['currency']!, _currencyMeta));
+    }
+    if (data.containsKey('color_hex')) {
+      context.handle(_colorHexMeta,
+          colorHex.isAcceptableOrUnknown(data['color_hex']!, _colorHexMeta));
+    }
+    if (data.containsKey('icon')) {
+      context.handle(
+          _iconMeta, icon.isAcceptableOrUnknown(data['icon']!, _iconMeta));
+    }
+    if (data.containsKey('is_default')) {
+      context.handle(_isDefaultMeta,
+          isDefault.isAcceptableOrUnknown(data['is_default']!, _isDefaultMeta));
+    }
+    if (data.containsKey('is_archived')) {
+      context.handle(
+          _isArchivedMeta,
+          isArchived.isAcceptableOrUnknown(
+              data['is_archived']!, _isArchivedMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Account map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Account(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      type: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}type'])!,
+      initialBalance: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}initial_balance'])!,
+      currency: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}currency'])!,
+      colorHex: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}color_hex'])!,
+      icon: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}icon'])!,
+      isDefault: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_default'])!,
+      isArchived: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_archived'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $AccountsTable createAlias(String alias) {
+    return $AccountsTable(attachedDatabase, alias);
+  }
+}
+
+class Account extends DataClass implements Insertable<Account> {
+  final int id;
+  final String name;
+  final String type;
+  final double initialBalance;
+  final String currency;
+  final String colorHex;
+  final String icon;
+  final bool isDefault;
+  final bool isArchived;
+  final DateTime createdAt;
+  const Account(
+      {required this.id,
+      required this.name,
+      required this.type,
+      required this.initialBalance,
+      required this.currency,
+      required this.colorHex,
+      required this.icon,
+      required this.isDefault,
+      required this.isArchived,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['type'] = Variable<String>(type);
+    map['initial_balance'] = Variable<double>(initialBalance);
+    map['currency'] = Variable<String>(currency);
+    map['color_hex'] = Variable<String>(colorHex);
+    map['icon'] = Variable<String>(icon);
+    map['is_default'] = Variable<bool>(isDefault);
+    map['is_archived'] = Variable<bool>(isArchived);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  AccountsCompanion toCompanion(bool nullToAbsent) {
+    return AccountsCompanion(
+      id: Value(id),
+      name: Value(name),
+      type: Value(type),
+      initialBalance: Value(initialBalance),
+      currency: Value(currency),
+      colorHex: Value(colorHex),
+      icon: Value(icon),
+      isDefault: Value(isDefault),
+      isArchived: Value(isArchived),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory Account.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Account(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      type: serializer.fromJson<String>(json['type']),
+      initialBalance: serializer.fromJson<double>(json['initialBalance']),
+      currency: serializer.fromJson<String>(json['currency']),
+      colorHex: serializer.fromJson<String>(json['colorHex']),
+      icon: serializer.fromJson<String>(json['icon']),
+      isDefault: serializer.fromJson<bool>(json['isDefault']),
+      isArchived: serializer.fromJson<bool>(json['isArchived']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'type': serializer.toJson<String>(type),
+      'initialBalance': serializer.toJson<double>(initialBalance),
+      'currency': serializer.toJson<String>(currency),
+      'colorHex': serializer.toJson<String>(colorHex),
+      'icon': serializer.toJson<String>(icon),
+      'isDefault': serializer.toJson<bool>(isDefault),
+      'isArchived': serializer.toJson<bool>(isArchived),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  Account copyWith(
+          {int? id,
+          String? name,
+          String? type,
+          double? initialBalance,
+          String? currency,
+          String? colorHex,
+          String? icon,
+          bool? isDefault,
+          bool? isArchived,
+          DateTime? createdAt}) =>
+      Account(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        type: type ?? this.type,
+        initialBalance: initialBalance ?? this.initialBalance,
+        currency: currency ?? this.currency,
+        colorHex: colorHex ?? this.colorHex,
+        icon: icon ?? this.icon,
+        isDefault: isDefault ?? this.isDefault,
+        isArchived: isArchived ?? this.isArchived,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  Account copyWithCompanion(AccountsCompanion data) {
+    return Account(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      type: data.type.present ? data.type.value : this.type,
+      initialBalance: data.initialBalance.present
+          ? data.initialBalance.value
+          : this.initialBalance,
+      currency: data.currency.present ? data.currency.value : this.currency,
+      colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
+      icon: data.icon.present ? data.icon.value : this.icon,
+      isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
+      isArchived:
+          data.isArchived.present ? data.isArchived.value : this.isArchived,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Account(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('type: $type, ')
+          ..write('initialBalance: $initialBalance, ')
+          ..write('currency: $currency, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('icon: $icon, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('isArchived: $isArchived, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, type, initialBalance, currency,
+      colorHex, icon, isDefault, isArchived, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Account &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.type == this.type &&
+          other.initialBalance == this.initialBalance &&
+          other.currency == this.currency &&
+          other.colorHex == this.colorHex &&
+          other.icon == this.icon &&
+          other.isDefault == this.isDefault &&
+          other.isArchived == this.isArchived &&
+          other.createdAt == this.createdAt);
+}
+
+class AccountsCompanion extends UpdateCompanion<Account> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<String> type;
+  final Value<double> initialBalance;
+  final Value<String> currency;
+  final Value<String> colorHex;
+  final Value<String> icon;
+  final Value<bool> isDefault;
+  final Value<bool> isArchived;
+  final Value<DateTime> createdAt;
+  const AccountsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.type = const Value.absent(),
+    this.initialBalance = const Value.absent(),
+    this.currency = const Value.absent(),
+    this.colorHex = const Value.absent(),
+    this.icon = const Value.absent(),
+    this.isDefault = const Value.absent(),
+    this.isArchived = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  AccountsCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.type = const Value.absent(),
+    this.initialBalance = const Value.absent(),
+    this.currency = const Value.absent(),
+    this.colorHex = const Value.absent(),
+    this.icon = const Value.absent(),
+    this.isDefault = const Value.absent(),
+    this.isArchived = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<Account> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<String>? type,
+    Expression<double>? initialBalance,
+    Expression<String>? currency,
+    Expression<String>? colorHex,
+    Expression<String>? icon,
+    Expression<bool>? isDefault,
+    Expression<bool>? isArchived,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (type != null) 'type': type,
+      if (initialBalance != null) 'initial_balance': initialBalance,
+      if (currency != null) 'currency': currency,
+      if (colorHex != null) 'color_hex': colorHex,
+      if (icon != null) 'icon': icon,
+      if (isDefault != null) 'is_default': isDefault,
+      if (isArchived != null) 'is_archived': isArchived,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  AccountsCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? name,
+      Value<String>? type,
+      Value<double>? initialBalance,
+      Value<String>? currency,
+      Value<String>? colorHex,
+      Value<String>? icon,
+      Value<bool>? isDefault,
+      Value<bool>? isArchived,
+      Value<DateTime>? createdAt}) {
+    return AccountsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      type: type ?? this.type,
+      initialBalance: initialBalance ?? this.initialBalance,
+      currency: currency ?? this.currency,
+      colorHex: colorHex ?? this.colorHex,
+      icon: icon ?? this.icon,
+      isDefault: isDefault ?? this.isDefault,
+      isArchived: isArchived ?? this.isArchived,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (initialBalance.present) {
+      map['initial_balance'] = Variable<double>(initialBalance.value);
+    }
+    if (currency.present) {
+      map['currency'] = Variable<String>(currency.value);
+    }
+    if (colorHex.present) {
+      map['color_hex'] = Variable<String>(colorHex.value);
+    }
+    if (icon.present) {
+      map['icon'] = Variable<String>(icon.value);
+    }
+    if (isDefault.present) {
+      map['is_default'] = Variable<bool>(isDefault.value);
+    }
+    if (isArchived.present) {
+      map['is_archived'] = Variable<bool>(isArchived.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AccountsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('type: $type, ')
+          ..write('initialBalance: $initialBalance, ')
+          ..write('currency: $currency, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('icon: $icon, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('isArchived: $isArchived, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $BudgetsTable extends Budgets with TableInfo<$BudgetsTable, Budget> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BudgetsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 100),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+      'amount', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _periodMeta = const VerificationMeta('period');
+  @override
+  late final GeneratedColumn<String> period = GeneratedColumn<String>(
+      'period', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('monthly'));
+  static const VerificationMeta _categoryIdMeta =
+      const VerificationMeta('categoryId');
+  @override
+  late final GeneratedColumn<int> categoryId = GeneratedColumn<int>(
+      'category_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _startDateMeta =
+      const VerificationMeta('startDate');
+  @override
+  late final GeneratedColumn<DateTime> startDate = GeneratedColumn<DateTime>(
+      'start_date', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _endDateMeta =
+      const VerificationMeta('endDate');
+  @override
+  late final GeneratedColumn<DateTime> endDate = GeneratedColumn<DateTime>(
+      'end_date', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _rolloverMeta =
+      const VerificationMeta('rollover');
+  @override
+  late final GeneratedColumn<bool> rollover = GeneratedColumn<bool>(
+      'rollover', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("rollover" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _isArchivedMeta =
+      const VerificationMeta('isArchived');
+  @override
+  late final GeneratedColumn<bool> isArchived = GeneratedColumn<bool>(
+      'is_archived', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_archived" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        name,
+        amount,
+        period,
+        categoryId,
+        startDate,
+        endDate,
+        rollover,
+        isArchived,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'budgets';
+  @override
+  VerificationContext validateIntegrity(Insertable<Budget> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('amount')) {
+      context.handle(_amountMeta,
+          amount.isAcceptableOrUnknown(data['amount']!, _amountMeta));
+    } else if (isInserting) {
+      context.missing(_amountMeta);
+    }
+    if (data.containsKey('period')) {
+      context.handle(_periodMeta,
+          period.isAcceptableOrUnknown(data['period']!, _periodMeta));
+    }
+    if (data.containsKey('category_id')) {
+      context.handle(
+          _categoryIdMeta,
+          categoryId.isAcceptableOrUnknown(
+              data['category_id']!, _categoryIdMeta));
+    }
+    if (data.containsKey('start_date')) {
+      context.handle(_startDateMeta,
+          startDate.isAcceptableOrUnknown(data['start_date']!, _startDateMeta));
+    } else if (isInserting) {
+      context.missing(_startDateMeta);
+    }
+    if (data.containsKey('end_date')) {
+      context.handle(_endDateMeta,
+          endDate.isAcceptableOrUnknown(data['end_date']!, _endDateMeta));
+    }
+    if (data.containsKey('rollover')) {
+      context.handle(_rolloverMeta,
+          rollover.isAcceptableOrUnknown(data['rollover']!, _rolloverMeta));
+    }
+    if (data.containsKey('is_archived')) {
+      context.handle(
+          _isArchivedMeta,
+          isArchived.isAcceptableOrUnknown(
+              data['is_archived']!, _isArchivedMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Budget map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Budget(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      amount: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}amount'])!,
+      period: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}period'])!,
+      categoryId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}category_id']),
+      startDate: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}start_date'])!,
+      endDate: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}end_date']),
+      rollover: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}rollover'])!,
+      isArchived: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_archived'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $BudgetsTable createAlias(String alias) {
+    return $BudgetsTable(attachedDatabase, alias);
+  }
+}
+
+class Budget extends DataClass implements Insertable<Budget> {
+  final int id;
+  final String name;
+  final double amount;
+  final String period;
+  final int? categoryId;
+  final DateTime startDate;
+  final DateTime? endDate;
+  final bool rollover;
+  final bool isArchived;
+  final DateTime createdAt;
+  const Budget(
+      {required this.id,
+      required this.name,
+      required this.amount,
+      required this.period,
+      this.categoryId,
+      required this.startDate,
+      this.endDate,
+      required this.rollover,
+      required this.isArchived,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['amount'] = Variable<double>(amount);
+    map['period'] = Variable<String>(period);
+    if (!nullToAbsent || categoryId != null) {
+      map['category_id'] = Variable<int>(categoryId);
+    }
+    map['start_date'] = Variable<DateTime>(startDate);
+    if (!nullToAbsent || endDate != null) {
+      map['end_date'] = Variable<DateTime>(endDate);
+    }
+    map['rollover'] = Variable<bool>(rollover);
+    map['is_archived'] = Variable<bool>(isArchived);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  BudgetsCompanion toCompanion(bool nullToAbsent) {
+    return BudgetsCompanion(
+      id: Value(id),
+      name: Value(name),
+      amount: Value(amount),
+      period: Value(period),
+      categoryId: categoryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categoryId),
+      startDate: Value(startDate),
+      endDate: endDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endDate),
+      rollover: Value(rollover),
+      isArchived: Value(isArchived),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory Budget.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Budget(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      amount: serializer.fromJson<double>(json['amount']),
+      period: serializer.fromJson<String>(json['period']),
+      categoryId: serializer.fromJson<int?>(json['categoryId']),
+      startDate: serializer.fromJson<DateTime>(json['startDate']),
+      endDate: serializer.fromJson<DateTime?>(json['endDate']),
+      rollover: serializer.fromJson<bool>(json['rollover']),
+      isArchived: serializer.fromJson<bool>(json['isArchived']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'amount': serializer.toJson<double>(amount),
+      'period': serializer.toJson<String>(period),
+      'categoryId': serializer.toJson<int?>(categoryId),
+      'startDate': serializer.toJson<DateTime>(startDate),
+      'endDate': serializer.toJson<DateTime?>(endDate),
+      'rollover': serializer.toJson<bool>(rollover),
+      'isArchived': serializer.toJson<bool>(isArchived),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  Budget copyWith(
+          {int? id,
+          String? name,
+          double? amount,
+          String? period,
+          Value<int?> categoryId = const Value.absent(),
+          DateTime? startDate,
+          Value<DateTime?> endDate = const Value.absent(),
+          bool? rollover,
+          bool? isArchived,
+          DateTime? createdAt}) =>
+      Budget(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        amount: amount ?? this.amount,
+        period: period ?? this.period,
+        categoryId: categoryId.present ? categoryId.value : this.categoryId,
+        startDate: startDate ?? this.startDate,
+        endDate: endDate.present ? endDate.value : this.endDate,
+        rollover: rollover ?? this.rollover,
+        isArchived: isArchived ?? this.isArchived,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  Budget copyWithCompanion(BudgetsCompanion data) {
+    return Budget(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      amount: data.amount.present ? data.amount.value : this.amount,
+      period: data.period.present ? data.period.value : this.period,
+      categoryId:
+          data.categoryId.present ? data.categoryId.value : this.categoryId,
+      startDate: data.startDate.present ? data.startDate.value : this.startDate,
+      endDate: data.endDate.present ? data.endDate.value : this.endDate,
+      rollover: data.rollover.present ? data.rollover.value : this.rollover,
+      isArchived:
+          data.isArchived.present ? data.isArchived.value : this.isArchived,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Budget(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('amount: $amount, ')
+          ..write('period: $period, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('startDate: $startDate, ')
+          ..write('endDate: $endDate, ')
+          ..write('rollover: $rollover, ')
+          ..write('isArchived: $isArchived, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, amount, period, categoryId,
+      startDate, endDate, rollover, isArchived, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Budget &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.amount == this.amount &&
+          other.period == this.period &&
+          other.categoryId == this.categoryId &&
+          other.startDate == this.startDate &&
+          other.endDate == this.endDate &&
+          other.rollover == this.rollover &&
+          other.isArchived == this.isArchived &&
+          other.createdAt == this.createdAt);
+}
+
+class BudgetsCompanion extends UpdateCompanion<Budget> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<double> amount;
+  final Value<String> period;
+  final Value<int?> categoryId;
+  final Value<DateTime> startDate;
+  final Value<DateTime?> endDate;
+  final Value<bool> rollover;
+  final Value<bool> isArchived;
+  final Value<DateTime> createdAt;
+  const BudgetsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.period = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.endDate = const Value.absent(),
+    this.rollover = const Value.absent(),
+    this.isArchived = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  BudgetsCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    required double amount,
+    this.period = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    required DateTime startDate,
+    this.endDate = const Value.absent(),
+    this.rollover = const Value.absent(),
+    this.isArchived = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  })  : name = Value(name),
+        amount = Value(amount),
+        startDate = Value(startDate);
+  static Insertable<Budget> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<double>? amount,
+    Expression<String>? period,
+    Expression<int>? categoryId,
+    Expression<DateTime>? startDate,
+    Expression<DateTime>? endDate,
+    Expression<bool>? rollover,
+    Expression<bool>? isArchived,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (amount != null) 'amount': amount,
+      if (period != null) 'period': period,
+      if (categoryId != null) 'category_id': categoryId,
+      if (startDate != null) 'start_date': startDate,
+      if (endDate != null) 'end_date': endDate,
+      if (rollover != null) 'rollover': rollover,
+      if (isArchived != null) 'is_archived': isArchived,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  BudgetsCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? name,
+      Value<double>? amount,
+      Value<String>? period,
+      Value<int?>? categoryId,
+      Value<DateTime>? startDate,
+      Value<DateTime?>? endDate,
+      Value<bool>? rollover,
+      Value<bool>? isArchived,
+      Value<DateTime>? createdAt}) {
+    return BudgetsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      amount: amount ?? this.amount,
+      period: period ?? this.period,
+      categoryId: categoryId ?? this.categoryId,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      rollover: rollover ?? this.rollover,
+      isArchived: isArchived ?? this.isArchived,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
+    }
+    if (period.present) {
+      map['period'] = Variable<String>(period.value);
+    }
+    if (categoryId.present) {
+      map['category_id'] = Variable<int>(categoryId.value);
+    }
+    if (startDate.present) {
+      map['start_date'] = Variable<DateTime>(startDate.value);
+    }
+    if (endDate.present) {
+      map['end_date'] = Variable<DateTime>(endDate.value);
+    }
+    if (rollover.present) {
+      map['rollover'] = Variable<bool>(rollover.value);
+    }
+    if (isArchived.present) {
+      map['is_archived'] = Variable<bool>(isArchived.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BudgetsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('amount: $amount, ')
+          ..write('period: $period, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('startDate: $startDate, ')
+          ..write('endDate: $endDate, ')
+          ..write('rollover: $rollover, ')
+          ..write('isArchived: $isArchived, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $TransactionsTable transactions = $TransactionsTable(this);
   late final $CategoriesTable categories = $CategoriesTable(this);
   late final $FulizaRecordsTable fulizaRecords = $FulizaRecordsTable(this);
+  late final $AccountsTable accounts = $AccountsTable(this);
+  late final $BudgetsTable budgets = $BudgetsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [transactions, categories, fulizaRecords];
+      [transactions, categories, fulizaRecords, accounts, budgets];
 }
 
 typedef $$TransactionsTableCreateCompanionBuilder = TransactionsCompanion
@@ -1523,7 +2737,10 @@ typedef $$TransactionsTableCreateCompanionBuilder = TransactionsCompanion
   Value<String?> mpesaRef,
   Value<String> counterpartyName,
   Value<String> counterpartyAccount,
+  Value<int?> accountId,
+  Value<int?> toAccountId,
   Value<bool> isParsed,
+  Value<bool> excludeFromBudget,
   Value<DateTime> createdAt,
 });
 typedef $$TransactionsTableUpdateCompanionBuilder = TransactionsCompanion
@@ -1541,7 +2758,10 @@ typedef $$TransactionsTableUpdateCompanionBuilder = TransactionsCompanion
   Value<String?> mpesaRef,
   Value<String> counterpartyName,
   Value<String> counterpartyAccount,
+  Value<int?> accountId,
+  Value<int?> toAccountId,
   Value<bool> isParsed,
+  Value<bool> excludeFromBudget,
   Value<DateTime> createdAt,
 });
 
@@ -1597,8 +2817,18 @@ class $$TransactionsTableFilterComposer
       column: $table.counterpartyAccount,
       builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<int> get accountId => $composableBuilder(
+      column: $table.accountId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get toAccountId => $composableBuilder(
+      column: $table.toAccountId, builder: (column) => ColumnFilters(column));
+
   ColumnFilters<bool> get isParsed => $composableBuilder(
       column: $table.isParsed, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get excludeFromBudget => $composableBuilder(
+      column: $table.excludeFromBudget,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -1657,8 +2887,18 @@ class $$TransactionsTableOrderingComposer
       column: $table.counterpartyAccount,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get accountId => $composableBuilder(
+      column: $table.accountId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get toAccountId => $composableBuilder(
+      column: $table.toAccountId, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get isParsed => $composableBuilder(
       column: $table.isParsed, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get excludeFromBudget => $composableBuilder(
+      column: $table.excludeFromBudget,
+      builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
@@ -1712,8 +2952,17 @@ class $$TransactionsTableAnnotationComposer
   GeneratedColumn<String> get counterpartyAccount => $composableBuilder(
       column: $table.counterpartyAccount, builder: (column) => column);
 
+  GeneratedColumn<int> get accountId =>
+      $composableBuilder(column: $table.accountId, builder: (column) => column);
+
+  GeneratedColumn<int> get toAccountId => $composableBuilder(
+      column: $table.toAccountId, builder: (column) => column);
+
   GeneratedColumn<bool> get isParsed =>
       $composableBuilder(column: $table.isParsed, builder: (column) => column);
+
+  GeneratedColumn<bool> get excludeFromBudget => $composableBuilder(
+      column: $table.excludeFromBudget, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -1758,7 +3007,10 @@ class $$TransactionsTableTableManager extends RootTableManager<
             Value<String?> mpesaRef = const Value.absent(),
             Value<String> counterpartyName = const Value.absent(),
             Value<String> counterpartyAccount = const Value.absent(),
+            Value<int?> accountId = const Value.absent(),
+            Value<int?> toAccountId = const Value.absent(),
             Value<bool> isParsed = const Value.absent(),
+            Value<bool> excludeFromBudget = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
           }) =>
               TransactionsCompanion(
@@ -1775,7 +3027,10 @@ class $$TransactionsTableTableManager extends RootTableManager<
             mpesaRef: mpesaRef,
             counterpartyName: counterpartyName,
             counterpartyAccount: counterpartyAccount,
+            accountId: accountId,
+            toAccountId: toAccountId,
             isParsed: isParsed,
+            excludeFromBudget: excludeFromBudget,
             createdAt: createdAt,
           ),
           createCompanionCallback: ({
@@ -1792,7 +3047,10 @@ class $$TransactionsTableTableManager extends RootTableManager<
             Value<String?> mpesaRef = const Value.absent(),
             Value<String> counterpartyName = const Value.absent(),
             Value<String> counterpartyAccount = const Value.absent(),
+            Value<int?> accountId = const Value.absent(),
+            Value<int?> toAccountId = const Value.absent(),
             Value<bool> isParsed = const Value.absent(),
+            Value<bool> excludeFromBudget = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
           }) =>
               TransactionsCompanion.insert(
@@ -1809,7 +3067,10 @@ class $$TransactionsTableTableManager extends RootTableManager<
             mpesaRef: mpesaRef,
             counterpartyName: counterpartyName,
             counterpartyAccount: counterpartyAccount,
+            accountId: accountId,
+            toAccountId: toAccountId,
             isParsed: isParsed,
+            excludeFromBudget: excludeFromBudget,
             createdAt: createdAt,
           ),
           withReferenceMapper: (p0) => p0
@@ -1841,6 +3102,8 @@ typedef $$CategoriesTableCreateCompanionBuilder = CategoriesCompanion Function({
   Value<String> colorHex,
   Value<int?> parentId,
   Value<bool> isDefault,
+  Value<bool> isArchived,
+  Value<int> sortOrder,
   Value<DateTime> createdAt,
 });
 typedef $$CategoriesTableUpdateCompanionBuilder = CategoriesCompanion Function({
@@ -1850,6 +3113,8 @@ typedef $$CategoriesTableUpdateCompanionBuilder = CategoriesCompanion Function({
   Value<String> colorHex,
   Value<int?> parentId,
   Value<bool> isDefault,
+  Value<bool> isArchived,
+  Value<int> sortOrder,
   Value<DateTime> createdAt,
 });
 
@@ -1879,6 +3144,12 @@ class $$CategoriesTableFilterComposer
 
   ColumnFilters<bool> get isDefault => $composableBuilder(
       column: $table.isDefault, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isArchived => $composableBuilder(
+      column: $table.isArchived, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+      column: $table.sortOrder, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -1911,6 +3182,12 @@ class $$CategoriesTableOrderingComposer
   ColumnOrderings<bool> get isDefault => $composableBuilder(
       column: $table.isDefault, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get isArchived => $composableBuilder(
+      column: $table.isArchived, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+      column: $table.sortOrder, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 }
@@ -1941,6 +3218,12 @@ class $$CategoriesTableAnnotationComposer
 
   GeneratedColumn<bool> get isDefault =>
       $composableBuilder(column: $table.isDefault, builder: (column) => column);
+
+  GeneratedColumn<bool> get isArchived => $composableBuilder(
+      column: $table.isArchived, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -1975,6 +3258,8 @@ class $$CategoriesTableTableManager extends RootTableManager<
             Value<String> colorHex = const Value.absent(),
             Value<int?> parentId = const Value.absent(),
             Value<bool> isDefault = const Value.absent(),
+            Value<bool> isArchived = const Value.absent(),
+            Value<int> sortOrder = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
           }) =>
               CategoriesCompanion(
@@ -1984,6 +3269,8 @@ class $$CategoriesTableTableManager extends RootTableManager<
             colorHex: colorHex,
             parentId: parentId,
             isDefault: isDefault,
+            isArchived: isArchived,
+            sortOrder: sortOrder,
             createdAt: createdAt,
           ),
           createCompanionCallback: ({
@@ -1993,6 +3280,8 @@ class $$CategoriesTableTableManager extends RootTableManager<
             Value<String> colorHex = const Value.absent(),
             Value<int?> parentId = const Value.absent(),
             Value<bool> isDefault = const Value.absent(),
+            Value<bool> isArchived = const Value.absent(),
+            Value<int> sortOrder = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
           }) =>
               CategoriesCompanion.insert(
@@ -2002,6 +3291,8 @@ class $$CategoriesTableTableManager extends RootTableManager<
             colorHex: colorHex,
             parentId: parentId,
             isDefault: isDefault,
+            isArchived: isArchived,
+            sortOrder: sortOrder,
             createdAt: createdAt,
           ),
           withReferenceMapper: (p0) => p0
@@ -2223,6 +3514,476 @@ typedef $$FulizaRecordsTableProcessedTableManager = ProcessedTableManager<
     ),
     FulizaRecord,
     PrefetchHooks Function()>;
+typedef $$AccountsTableCreateCompanionBuilder = AccountsCompanion Function({
+  Value<int> id,
+  required String name,
+  Value<String> type,
+  Value<double> initialBalance,
+  Value<String> currency,
+  Value<String> colorHex,
+  Value<String> icon,
+  Value<bool> isDefault,
+  Value<bool> isArchived,
+  Value<DateTime> createdAt,
+});
+typedef $$AccountsTableUpdateCompanionBuilder = AccountsCompanion Function({
+  Value<int> id,
+  Value<String> name,
+  Value<String> type,
+  Value<double> initialBalance,
+  Value<String> currency,
+  Value<String> colorHex,
+  Value<String> icon,
+  Value<bool> isDefault,
+  Value<bool> isArchived,
+  Value<DateTime> createdAt,
+});
+
+class $$AccountsTableFilterComposer
+    extends Composer<_$AppDatabase, $AccountsTable> {
+  $$AccountsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get initialBalance => $composableBuilder(
+      column: $table.initialBalance,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get currency => $composableBuilder(
+      column: $table.currency, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get colorHex => $composableBuilder(
+      column: $table.colorHex, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get icon => $composableBuilder(
+      column: $table.icon, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDefault => $composableBuilder(
+      column: $table.isDefault, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isArchived => $composableBuilder(
+      column: $table.isArchived, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$AccountsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AccountsTable> {
+  $$AccountsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get initialBalance => $composableBuilder(
+      column: $table.initialBalance,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get currency => $composableBuilder(
+      column: $table.currency, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get colorHex => $composableBuilder(
+      column: $table.colorHex, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get icon => $composableBuilder(
+      column: $table.icon, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isDefault => $composableBuilder(
+      column: $table.isDefault, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isArchived => $composableBuilder(
+      column: $table.isArchived, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$AccountsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AccountsTable> {
+  $$AccountsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<double> get initialBalance => $composableBuilder(
+      column: $table.initialBalance, builder: (column) => column);
+
+  GeneratedColumn<String> get currency =>
+      $composableBuilder(column: $table.currency, builder: (column) => column);
+
+  GeneratedColumn<String> get colorHex =>
+      $composableBuilder(column: $table.colorHex, builder: (column) => column);
+
+  GeneratedColumn<String> get icon =>
+      $composableBuilder(column: $table.icon, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDefault =>
+      $composableBuilder(column: $table.isDefault, builder: (column) => column);
+
+  GeneratedColumn<bool> get isArchived => $composableBuilder(
+      column: $table.isArchived, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$AccountsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $AccountsTable,
+    Account,
+    $$AccountsTableFilterComposer,
+    $$AccountsTableOrderingComposer,
+    $$AccountsTableAnnotationComposer,
+    $$AccountsTableCreateCompanionBuilder,
+    $$AccountsTableUpdateCompanionBuilder,
+    (Account, BaseReferences<_$AppDatabase, $AccountsTable, Account>),
+    Account,
+    PrefetchHooks Function()> {
+  $$AccountsTableTableManager(_$AppDatabase db, $AccountsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AccountsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AccountsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AccountsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String> type = const Value.absent(),
+            Value<double> initialBalance = const Value.absent(),
+            Value<String> currency = const Value.absent(),
+            Value<String> colorHex = const Value.absent(),
+            Value<String> icon = const Value.absent(),
+            Value<bool> isDefault = const Value.absent(),
+            Value<bool> isArchived = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              AccountsCompanion(
+            id: id,
+            name: name,
+            type: type,
+            initialBalance: initialBalance,
+            currency: currency,
+            colorHex: colorHex,
+            icon: icon,
+            isDefault: isDefault,
+            isArchived: isArchived,
+            createdAt: createdAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String name,
+            Value<String> type = const Value.absent(),
+            Value<double> initialBalance = const Value.absent(),
+            Value<String> currency = const Value.absent(),
+            Value<String> colorHex = const Value.absent(),
+            Value<String> icon = const Value.absent(),
+            Value<bool> isDefault = const Value.absent(),
+            Value<bool> isArchived = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              AccountsCompanion.insert(
+            id: id,
+            name: name,
+            type: type,
+            initialBalance: initialBalance,
+            currency: currency,
+            colorHex: colorHex,
+            icon: icon,
+            isDefault: isDefault,
+            isArchived: isArchived,
+            createdAt: createdAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$AccountsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $AccountsTable,
+    Account,
+    $$AccountsTableFilterComposer,
+    $$AccountsTableOrderingComposer,
+    $$AccountsTableAnnotationComposer,
+    $$AccountsTableCreateCompanionBuilder,
+    $$AccountsTableUpdateCompanionBuilder,
+    (Account, BaseReferences<_$AppDatabase, $AccountsTable, Account>),
+    Account,
+    PrefetchHooks Function()>;
+typedef $$BudgetsTableCreateCompanionBuilder = BudgetsCompanion Function({
+  Value<int> id,
+  required String name,
+  required double amount,
+  Value<String> period,
+  Value<int?> categoryId,
+  required DateTime startDate,
+  Value<DateTime?> endDate,
+  Value<bool> rollover,
+  Value<bool> isArchived,
+  Value<DateTime> createdAt,
+});
+typedef $$BudgetsTableUpdateCompanionBuilder = BudgetsCompanion Function({
+  Value<int> id,
+  Value<String> name,
+  Value<double> amount,
+  Value<String> period,
+  Value<int?> categoryId,
+  Value<DateTime> startDate,
+  Value<DateTime?> endDate,
+  Value<bool> rollover,
+  Value<bool> isArchived,
+  Value<DateTime> createdAt,
+});
+
+class $$BudgetsTableFilterComposer
+    extends Composer<_$AppDatabase, $BudgetsTable> {
+  $$BudgetsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get amount => $composableBuilder(
+      column: $table.amount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get period => $composableBuilder(
+      column: $table.period, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get categoryId => $composableBuilder(
+      column: $table.categoryId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get startDate => $composableBuilder(
+      column: $table.startDate, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get endDate => $composableBuilder(
+      column: $table.endDate, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get rollover => $composableBuilder(
+      column: $table.rollover, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isArchived => $composableBuilder(
+      column: $table.isArchived, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$BudgetsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BudgetsTable> {
+  $$BudgetsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+      column: $table.amount, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get period => $composableBuilder(
+      column: $table.period, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get categoryId => $composableBuilder(
+      column: $table.categoryId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get startDate => $composableBuilder(
+      column: $table.startDate, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get endDate => $composableBuilder(
+      column: $table.endDate, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get rollover => $composableBuilder(
+      column: $table.rollover, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isArchived => $composableBuilder(
+      column: $table.isArchived, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$BudgetsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BudgetsTable> {
+  $$BudgetsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumn<String> get period =>
+      $composableBuilder(column: $table.period, builder: (column) => column);
+
+  GeneratedColumn<int> get categoryId => $composableBuilder(
+      column: $table.categoryId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get startDate =>
+      $composableBuilder(column: $table.startDate, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get endDate =>
+      $composableBuilder(column: $table.endDate, builder: (column) => column);
+
+  GeneratedColumn<bool> get rollover =>
+      $composableBuilder(column: $table.rollover, builder: (column) => column);
+
+  GeneratedColumn<bool> get isArchived => $composableBuilder(
+      column: $table.isArchived, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$BudgetsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $BudgetsTable,
+    Budget,
+    $$BudgetsTableFilterComposer,
+    $$BudgetsTableOrderingComposer,
+    $$BudgetsTableAnnotationComposer,
+    $$BudgetsTableCreateCompanionBuilder,
+    $$BudgetsTableUpdateCompanionBuilder,
+    (Budget, BaseReferences<_$AppDatabase, $BudgetsTable, Budget>),
+    Budget,
+    PrefetchHooks Function()> {
+  $$BudgetsTableTableManager(_$AppDatabase db, $BudgetsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BudgetsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BudgetsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BudgetsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<double> amount = const Value.absent(),
+            Value<String> period = const Value.absent(),
+            Value<int?> categoryId = const Value.absent(),
+            Value<DateTime> startDate = const Value.absent(),
+            Value<DateTime?> endDate = const Value.absent(),
+            Value<bool> rollover = const Value.absent(),
+            Value<bool> isArchived = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              BudgetsCompanion(
+            id: id,
+            name: name,
+            amount: amount,
+            period: period,
+            categoryId: categoryId,
+            startDate: startDate,
+            endDate: endDate,
+            rollover: rollover,
+            isArchived: isArchived,
+            createdAt: createdAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String name,
+            required double amount,
+            Value<String> period = const Value.absent(),
+            Value<int?> categoryId = const Value.absent(),
+            required DateTime startDate,
+            Value<DateTime?> endDate = const Value.absent(),
+            Value<bool> rollover = const Value.absent(),
+            Value<bool> isArchived = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              BudgetsCompanion.insert(
+            id: id,
+            name: name,
+            amount: amount,
+            period: period,
+            categoryId: categoryId,
+            startDate: startDate,
+            endDate: endDate,
+            rollover: rollover,
+            isArchived: isArchived,
+            createdAt: createdAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$BudgetsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $BudgetsTable,
+    Budget,
+    $$BudgetsTableFilterComposer,
+    $$BudgetsTableOrderingComposer,
+    $$BudgetsTableAnnotationComposer,
+    $$BudgetsTableCreateCompanionBuilder,
+    $$BudgetsTableUpdateCompanionBuilder,
+    (Budget, BaseReferences<_$AppDatabase, $BudgetsTable, Budget>),
+    Budget,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2233,4 +3994,8 @@ class $AppDatabaseManager {
       $$CategoriesTableTableManager(_db, _db.categories);
   $$FulizaRecordsTableTableManager get fulizaRecords =>
       $$FulizaRecordsTableTableManager(_db, _db.fulizaRecords);
+  $$AccountsTableTableManager get accounts =>
+      $$AccountsTableTableManager(_db, _db.accounts);
+  $$BudgetsTableTableManager get budgets =>
+      $$BudgetsTableTableManager(_db, _db.budgets);
 }

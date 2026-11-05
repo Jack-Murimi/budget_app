@@ -107,4 +107,156 @@ void main() {
     expect(record!.fulizaAmount, 150.0);
     expect(record.fulizaFee, 1.50);
   });
+
+  test('watchRecent returns transactions ordered by date descending', () async {
+    final now = DateTime.now();
+    await repo.insert(TransactionsCompanion.insert(
+      header: 'Old',
+      amount: 100.0,
+      transactionDate: now.subtract(const Duration(days: 10)),
+    ));
+    await repo.insert(TransactionsCompanion.insert(
+      header: 'Recent',
+      amount: 200.0,
+      transactionDate: now,
+    ));
+    await repo.insert(TransactionsCompanion.insert(
+      header: 'Middle',
+      amount: 150.0,
+      transactionDate: now.subtract(const Duration(days: 5)),
+    ));
+
+    final stream = repo.watchRecent(limit: 10);
+    final transactions = await stream.first;
+
+    expect(transactions.length, 3);
+    expect(transactions[0].header, 'Recent');
+    expect(transactions[1].header, 'Middle');
+    expect(transactions[2].header, 'Old');
+  });
+
+  test('watchMonthSummary returns only transactions in specified month', () async {
+    await repo.insert(TransactionsCompanion.insert(
+      header: 'Nov 2026',
+      amount: 100.0,
+      transactionDate: DateTime(2026, 11, 15),
+    ));
+    await repo.insert(TransactionsCompanion.insert(
+      header: 'Oct 2026',
+      amount: 200.0,
+      transactionDate: DateTime(2026, 10, 20),
+    ));
+    await repo.insert(TransactionsCompanion.insert(
+      header: 'Nov 2026 Again',
+      amount: 150.0,
+      transactionDate: DateTime(2026, 11, 25),
+    ));
+
+    final stream = repo.watchMonthSummary(year: 2026, month: 11);
+    final transactions = await stream.first;
+
+    expect(transactions.length, 2);
+    expect(transactions.every((t) => t.transactionDate.month == 11), true);
+    expect(transactions.every((t) => t.transactionDate.year == 2026), true);
+  });
+
+  test('getByRef returns transaction with matching mpesaRef', () async {
+    await repo.insert(TransactionsCompanion.insert(
+      header: 'Test',
+      amount: 100.0,
+      transactionDate: DateTime.now(),
+      mpesaRef: const Value('TESTREF123'),
+    ));
+
+    final result = await repo.getByRef('TESTREF123');
+    expect(result, isNotNull);
+    expect(result!.mpesaRef, 'TESTREF123');
+    expect(result.header, 'Test');
+  });
+
+  test('getByRef returns null when ref not found', () async {
+    final result = await repo.getByRef('NONEXISTENT');
+    expect(result, isNull);
+  });
+
+  test('delete removes transaction by id', () async {
+    final id = await repo.insert(TransactionsCompanion.insert(
+      header: 'To Delete',
+      amount: 100.0,
+      transactionDate: DateTime.now(),
+      mpesaRef: const Value('DELREF'),
+    ));
+
+    final beforeDelete = await repo.getByRef('DELREF');
+    expect(beforeDelete, isNotNull);
+
+    await repo.delete(id);
+
+    final afterDelete = await repo.getByRef('DELREF');
+    expect(afterDelete, isNull);
+  });
+
+  test('watchAll returns all transactions ordered by date descending', () async {
+    final now = DateTime.now();
+    await repo.insert(TransactionsCompanion.insert(
+      header: 'Old',
+      amount: 100.0,
+      transactionDate: now.subtract(const Duration(days: 10)),
+    ));
+    await repo.insert(TransactionsCompanion.insert(
+      header: 'Recent',
+      amount: 200.0,
+      transactionDate: now,
+    ));
+    await repo.insert(TransactionsCompanion.insert(
+      header: 'Middle',
+      amount: 150.0,
+      transactionDate: now.subtract(const Duration(days: 5)),
+    ));
+
+    final stream = repo.watchAll();
+    final transactions = await stream.first;
+
+    expect(transactions.length, 3);
+    expect(transactions[0].header, 'Recent');
+    expect(transactions[1].header, 'Middle');
+    expect(transactions[2].header, 'Old');
+  });
+
+  test('updateTransaction updates existing transaction and returns false when id not found', () async {
+    final updatedMissing = await repo.updateTransaction(
+      TransactionsCompanion(
+        id: const Value(999),
+        header: const Value('Updated'),
+        amount: const Value(500.0),
+        transactionDate: Value(DateTime.now()),
+      ),
+    );
+    expect(updatedMissing, isFalse);
+
+    final insertResult = await repo.insert(
+      TransactionsCompanion.insert(
+        header: 'To Update',
+        amount: 100.0,
+        transactionDate: DateTime.now(),
+        mpesaRef: const Value('UPDREF'),
+      ),
+    );
+    expect(insertResult, isNotNull);
+
+    final updated = await repo.updateTransaction(
+      TransactionsCompanion(
+        id: Value(insertResult),
+        header: const Value('Updated'),
+        amount: const Value(300.0),
+        transactionDate: Value(DateTime.now()),
+      ),
+    );
+    expect(updated, isTrue);
+
+    final record = await repo.getByRef('UPDREF');
+    expect(record, isNotNull);
+    expect(record!.header, 'Updated');
+    expect(record.amount, 300.0);
+  });
 }

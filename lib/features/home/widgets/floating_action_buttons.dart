@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/utils/date_formatter.dart';
 import '../../add_transaction/screens/add_transaction_screen.dart';
 import '../../fuliza/providers/fuliza_providers.dart';
 import '../../transactions/models/mpesa_parse_result.dart';
@@ -78,7 +79,24 @@ class HomeFloatingActionButtons extends ConsumerWidget {
       return;
     }
 
-    // Normal transaction — check if Fuliza record already saved for this ref
+    // Normal transaction — check duplicate FIRST before opening form
+    if (result.mpesaRef.isNotEmpty) {
+      final existingTxn = await ref.read(transactionRepositoryProvider).getByRef(result.mpesaRef);
+      if (existingTxn != null) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Already recorded — ${result.mpesaRef} was saved on ${DateFormatter.formatDate(existingTxn.transactionDate)}.'),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(bottom: 600, left: 16, right: 16),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+    }
+
+    // Check if Fuliza record already saved for this ref (to enrich the form)
     final fulizaRecord =
         await ref.read(fulizaRepositoryProvider).getByRef(result.mpesaRef);
     final enrichedResult = fulizaRecord != null

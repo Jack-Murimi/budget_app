@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/database/app_database.dart';
-import 'features/home/screens/home_screen.dart';
+import 'features/home/screens/main_navigation_screen.dart';
 import 'shared/theme/app_theme.dart';
 
 final dbProvider = Provider<AppDatabase>((ref) {
@@ -25,7 +25,7 @@ class BudgetApp extends ConsumerWidget {
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+      home: const MainNavigationScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

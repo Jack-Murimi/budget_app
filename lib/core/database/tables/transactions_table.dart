@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'accounts_table.dart';
 import 'categories_table.dart';
 
 class Transactions extends Table {
@@ -15,7 +16,10 @@ class Transactions extends Table {
   TextColumn get mpesaRef => text().nullable()(); // M-Pesa transaction code
   TextColumn get counterpartyName => text().withDefault(const Constant(''))(); // Naivas, John Doe, etc.
   TextColumn get counterpartyAccount => text().withDefault(const Constant(''))(); // phone or paybill
+  IntColumn get accountId => integer().nullable().references(Accounts, #id)();
+  IntColumn get toAccountId => integer().nullable().references(Accounts, #id)();
   BoolColumn get isParsed => boolean().withDefault(const Constant(false))(); // came from SMS parse
+  BoolColumn get excludeFromBudget => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override

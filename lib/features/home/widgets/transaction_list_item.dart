@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../core/database/app_database.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/utils/date_formatter.dart';
+import '../../transactions/models/transaction_model.dart';
 
 class TransactionListItem extends StatelessWidget {
-  final Transaction transaction;
+  final TransactionModel transaction;
 
   const TransactionListItem({super.key, required this.transaction});
 
