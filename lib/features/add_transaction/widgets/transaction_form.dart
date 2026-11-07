@@ -114,7 +114,10 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
     }
 
     final defaultAccount = accounts.where((a) => a.isDefault).firstOrNull ?? accounts.firstOrNull;
-    _selectedAccountId ??= defaultAccount?.id ?? accounts.first.id;
+    _selectedAccountId ??= defaultAccount?.id;
+
+    final fromVal = accounts.any((a) => a.id == _selectedAccountId) ? _selectedAccountId : null;
+    final toVal = accounts.any((a) => a.id == _selectedToAccountId) ? _selectedToAccountId : null;
 
     if (_type == 'transfer') {
       return Column(
@@ -126,7 +129,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.arrow_left),
             ),
-            initialValue: _selectedAccountId,
+            value: fromVal,
             hint: const Text('Select source account'),
             items: accounts.map((a) => DropdownMenuItem(
               value: a.id,
@@ -141,7 +144,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.arrow_right),
             ),
-            initialValue: _selectedToAccountId,
+            value: toVal,
             hint: const Text('Select destination account'),
             items: accounts.map((a) => DropdownMenuItem(
               value: a.id,
@@ -158,7 +161,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
           border: OutlineInputBorder(),
           prefixIcon: Icon(Icons.account_balance_wallet_outlined),
         ),
-        initialValue: _selectedAccountId,
+        value: fromVal,
         hint: const Text('Select account'),
         items: accounts.map((a) => DropdownMenuItem(
           value: a.id,

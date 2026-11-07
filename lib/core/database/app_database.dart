@@ -4,11 +4,12 @@ import 'tables/accounts_table.dart';
 import 'tables/budgets_table.dart';
 import 'tables/categories_table.dart';
 import 'tables/fuliza_records_table.dart';
+import 'tables/recurring_transactions_table.dart';
 import 'tables/transactions_table.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Transactions, Categories, FulizaRecords, Accounts, Budgets])
+@DriftDatabase(tables: [Transactions, Categories, FulizaRecords, Accounts, Budgets, RecurringTransactions])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -16,18 +17,44 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
       await m.createAll();
+      await customStatement('''
+        CREATE TABLE IF NOT EXISTS recurring_transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          account_id INTEGER REFERENCES accounts(id),
+          category_id INTEGER REFERENCES categories(id),
+          amount REAL NOT NULL,
+          type TEXT NOT NULL DEFAULT 'expense',
+          payee TEXT NOT NULL DEFAULT '',
+          notes TEXT NOT NULL DEFAULT '',
+          frequency TEXT NOT NULL DEFAULT 'monthly',
+          interval_count INTEGER NOT NULL DEFAULT 1,
+          start_date INTEGER NOT NULL,
+          end_date INTEGER,
+          next_due_date INTEGER NOT NULL,
+          auto_record INTEGER NOT NULL DEFAULT 0,
+          notify INTEGER NOT NULL DEFAULT 1,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+      try {
+        await customStatement('ALTER TABLE transactions ADD COLUMN recurrence_id INTEGER REFERENCES recurring_transactions(id)');
+      } catch (_) {}
+      try {
+        await customStatement('ALTER TABLE transactions ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0');
+      } catch (_) {}
       await _seedDefaultCategories();
       await _seedDefaultAccounts();
     },
     onUpgrade: (m, from, to) async {
       if (from < 2) {
-        // Add unique index on mpesaRef (nullable — NULLs are distinct in SQLite)
         await m.createIndex(
           Index('transactions', 'CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_mpesa_ref ON transactions (mpesa_ref) WHERE mpesa_ref IS NOT NULL'),
         );
@@ -38,11 +65,9 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(fulizaRecords);
       }
       if (from < 4) {
-        // Remove duplicate fuliza rows keeping latest per ref
         await customStatement(
           'DELETE FROM fuliza_records WHERE id NOT IN (SELECT MAX(id) FROM fuliza_records GROUP BY mpesa_ref)',
         );
-        // Add unique index
         await m.createIndex(
           Index('fuliza_records', 'CREATE UNIQUE INDEX IF NOT EXISTS idx_fuliza_records_mpesa_ref ON fuliza_records (mpesa_ref)'),
         );
@@ -89,6 +114,35 @@ class AppDatabase extends _$AppDatabase {
       if (from < 7) {
         await m.createTable(budgets);
         await m.addColumn(transactions, transactions.excludeFromBudget);
+      }
+      if (from < 8) {
+        await customStatement('''
+          CREATE TABLE IF NOT EXISTS recurring_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id INTEGER REFERENCES accounts(id),
+            category_id INTEGER REFERENCES categories(id),
+            amount REAL NOT NULL,
+            type TEXT NOT NULL DEFAULT 'expense',
+            payee TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            frequency TEXT NOT NULL DEFAULT 'monthly',
+            interval_count INTEGER NOT NULL DEFAULT 1,
+            start_date INTEGER NOT NULL,
+            end_date INTEGER,
+            next_due_date INTEGER NOT NULL,
+            auto_record INTEGER NOT NULL DEFAULT 0,
+            notify INTEGER NOT NULL DEFAULT 1,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+          )
+        ''');
+        try {
+          await customStatement('ALTER TABLE transactions ADD COLUMN recurrence_id INTEGER REFERENCES recurring_transactions(id)');
+        } catch (_) {}
+        try {
+          await customStatement('ALTER TABLE transactions ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0');
+        } catch (_) {}
       }
     },
   );

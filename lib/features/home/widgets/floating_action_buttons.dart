@@ -210,20 +210,19 @@ class HomeFloatingActionButtons extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         FloatingActionButton.small(
+          heroTag: 'fab_parse',
+          onPressed: () => _onPasteAndParse(context, ref),
+          tooltip: 'Paste M-Pesa SMS',
+          child: const Icon(Icons.content_paste_rounded),
+        ),
+        const SizedBox(height: 12),
+        FloatingActionButton(
           heroTag: 'fab_add_manual',
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const AddTransactionScreen()),
           ),
           tooltip: 'Add Manually',
-          child: const Icon(Icons.edit_note),
-        ),
-        const SizedBox(height: 12),
-        FloatingActionButton.extended(
-          heroTag: 'fab_parse',
-          onPressed: () => _onPasteAndParse(context, ref),
-          icon: const Icon(Icons.content_paste_rounded),
-          label: const Text('Paste M-Pesa'),
-          tooltip: 'Paste & Parse M-Pesa SMS',
+          child: const Icon(Icons.add),
         ),
       ],
     );

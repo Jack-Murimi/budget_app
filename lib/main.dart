@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'core/database/app_database.dart';
 import 'features/home/screens/main_navigation_screen.dart';
+import 'shared/providers/theme_provider.dart';
 import 'shared/theme/app_theme.dart';
 
 final dbProvider = Provider<AppDatabase>((ref) {
@@ -10,9 +12,17 @@ final dbProvider = Provider<AppDatabase>((ref) {
   return db;
 });
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: BudgetApp()));
+  final prefs = await SharedPreferences.getInstance();
+  runApp(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+      ],
+      child: const BudgetApp(),
+    ),
+  );
 }
 
 class BudgetApp extends ConsumerWidget {
@@ -24,7 +34,7 @@ class BudgetApp extends ConsumerWidget {
       title: 'Budget KE',
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
+      themeMode: ref.watch(themeModeProvider),
       home: const MainNavigationScreen(),
       debugShowCheckedModeBanner: false,
     );

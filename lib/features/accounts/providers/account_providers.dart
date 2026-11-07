@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/database/app_database.dart';
 import '../../../main.dart';
 import '../repositories/account_repository.dart';
 import '../models/account_model.dart';
@@ -18,4 +19,8 @@ final totalNetWorthProvider = Provider<AsyncValue<double>>((ref) {
       .where((a) => !a.isArchived)
       .fold(0.0, (sum, a) => sum + a.balance);
   });
+});
+
+final accountTransactionsProvider = StreamProvider.family<List<Transaction>, int>((ref, accountId) {
+  return ref.watch(accountRepositoryProvider).watchTransactionsByAccount(accountId);
 });

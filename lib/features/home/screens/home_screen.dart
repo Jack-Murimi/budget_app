@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../accounts/providers/account_providers.dart';
-import '../../accounts/screens/accounts_screen.dart';
 import '../../budgets/providers/budget_providers.dart';
 import '../../budgets/screens/budgets_screen.dart';
-import '../../categories/screens/categories_screen.dart';
-import '../../fuliza/screens/fuliza_screen.dart';
+import '../../accounts/screens/accounts_screen.dart';
+import '../../recurring/providers/recurring_providers.dart';
+import '../../recurring/screens/recurring_screen.dart';
 import '../../transactions/providers/transaction_providers.dart';
 import '../providers/navigation_providers.dart';
 import '../widgets/spending_summary_card.dart';
@@ -35,42 +35,6 @@ class HomeScreen extends ConsumerWidget {
             const Text('Budget KE'),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.category_outlined),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const CategoriesScreen()),
-            ),
-            tooltip: 'Categories',
-          ),
-          IconButton(
-            icon: const Icon(Icons.sync_problem_rounded),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const FulizaScreen()),
-            ),
-            tooltip: 'Fuliza',
-          ),
-          IconButton(
-            icon: const Icon(Icons.bar_chart),
-            onPressed: () {}, // ponytail: stats screen; add when analytics feature added
-            tooltip: 'Statistics',
-          ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () => ref.read(selectedTabProvider.notifier).state = 1,
-            tooltip: 'Search transactions',
-          ),
-          IconButton(
-            icon: const Icon(Icons.pie_chart_outline),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BudgetsScreen())),
-            tooltip: 'Budgets',
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_balance_wallet_outlined),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen())),
-            tooltip: 'Accounts',
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(recentTransactionsProvider),
@@ -88,6 +52,77 @@ class HomeScreen extends ConsumerWidget {
                 child: LinearProgressIndicator(),
               ),
               error: (_, __) => const SizedBox.shrink(),
+            ),
+            Consumer(
+              builder: (context, ref, _) {
+                final dueAsync = ref.watch(dueOrOverdueRecurringProvider);
+                return dueAsync.when(
+                  data: (items) {
+                    if (items.isEmpty) return const SizedBox.shrink();
+                    final theme = Theme.of(context);
+                    final overdueCount = items.where((i) => i.isOverdue).length;
+                    final isAlert = overdueCount > 0;
+
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: InkWell(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const RecurringScreen()),
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isAlert ? theme.colorScheme.errorContainer.withValues(alpha: 0.6) : Colors.amber.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isAlert ? theme.colorScheme.error : Colors.amber.shade700,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isAlert ? Icons.warning_amber_rounded : Icons.schedule,
+                                color: isAlert ? theme.colorScheme.error : Colors.amber.shade900,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  isAlert
+                                      ? '$overdueCount bill${overdueCount == 1 ? '' : 's'} overdue!'
+                                      : '${items.length} bill${items.length == 1 ? '' : 's'} due soon',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: isAlert ? theme.colorScheme.onErrorContainer : Colors.amber.shade900,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                'View',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: isAlert ? theme.colorScheme.error : Colors.amber.shade900,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.chevron_right,
+                                size: 16,
+                                color: isAlert ? theme.colorScheme.error : Colors.amber.shade900,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                );
+              },
             ),
             Consumer(
               builder: (context, ref, _) {

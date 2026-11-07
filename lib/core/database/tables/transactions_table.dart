@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'accounts_table.dart';
 import 'categories_table.dart';
+import 'recurring_transactions_table.dart';
 
 class Transactions extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -20,6 +21,8 @@ class Transactions extends Table {
   IntColumn get toAccountId => integer().nullable().references(Accounts, #id)();
   BoolColumn get isParsed => boolean().withDefault(const Constant(false))(); // came from SMS parse
   BoolColumn get excludeFromBudget => boolean().withDefault(const Constant(false))();
+  IntColumn get recurrenceId => integer().nullable().references(RecurringTransactions, #id)();
+  BoolColumn get isRecurring => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override

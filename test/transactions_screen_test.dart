@@ -60,19 +60,22 @@ void main() {
   testWidgets('search filters out non-matching items', (tester) async {
     final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
     addTearDown(container.dispose);
-    
+
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
         child: const MaterialApp(home: TransactionsScreen()),
       ),
     );
-    
+
     await tester.pumpAndSettle();
-    
+
+    await tester.tap(find.byIcon(Icons.search));
+    await tester.pumpAndSettle();
+
     await tester.enterText(find.byType(TextField), 'Grocery');
     await tester.pumpAndSettle();
-    
+
     expect(find.descendant(of: find.byType(ListTile), matching: find.text('Grocery')), findsOneWidget);
     expect(find.text('Salary'), findsNothing);
     expect(find.text('1 transaction'), findsOneWidget);
@@ -81,26 +84,38 @@ void main() {
   testWidgets('type filter chips filter items', (tester) async {
     final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
     addTearDown(container.dispose);
-    
+
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
         child: const MaterialApp(home: TransactionsScreen()),
       ),
     );
-    
+
     await tester.pumpAndSettle();
-    
+
+    await tester.tap(find.byIcon(Icons.tune));
+    await tester.pumpAndSettle();
+
     await tester.tap(find.text('Expense'));
     await tester.pumpAndSettle();
-    
+
+    await tester.tap(find.text('Apply'));
+    await tester.pumpAndSettle();
+
     expect(find.descendant(of: find.byType(ListTile), matching: find.text('Grocery')), findsOneWidget);
     expect(find.text('Salary'), findsNothing);
     expect(find.text('1 transaction'), findsOneWidget);
-    
+
+    await tester.tap(find.byIcon(Icons.tune));
+    await tester.pumpAndSettle();
+
     await tester.tap(find.text('Income'));
     await tester.pumpAndSettle();
-    
+
+    await tester.tap(find.text('Apply'));
+    await tester.pumpAndSettle();
+
     expect(find.text('Grocery'), findsNothing);
     expect(find.text('Salary'), findsOneWidget);
     expect(find.text('1 transaction'), findsOneWidget);
@@ -125,5 +140,31 @@ void main() {
     expect(find.text('Delete Transaction'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
     expect(find.text('Delete'), findsOneWidget);
+  });
+
+  testWidgets('renders leading type icons for income, expense, and transfer', (tester) async {
+    await db.into(db.transactions).insert(TransactionsCompanion.insert(
+      header: 'To Savings',
+      amount: 200.0,
+      transactionDate: DateTime.now(),
+      type: const Value('transfer'),
+      mpesaRef: const Value('REF003'),
+    ));
+
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: TransactionsScreen()),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_downward_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.swap_horiz_rounded), findsOneWidget);
   });
 }

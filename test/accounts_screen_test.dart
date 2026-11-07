@@ -60,8 +60,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Add Account'), findsOneWidget);
-    expect(find.text('Name'), findsOneWidget);
-    expect(find.text('Initial Balance'), findsOneWidget);
+    expect(find.text('Name *'), findsOneWidget);
+    expect(find.text('Opening Balance'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
@@ -122,8 +122,7 @@ void main() {
 
     await pumpAccountsScreen(tester, container);
 
-    final popupMenu = find.byType(PopupMenuButton<String>).first;
-    await tester.tap(popupMenu);
+    await tester.tap(find.text('M-Pesa'));
     await tester.pumpAndSettle();
 
     expect(find.text('Adjust Balance'), findsOneWidget);

@@ -9,6 +9,11 @@
 - **Phase 2: Budgets & Spending Limits** — Complete
   - Category and overall budgets
   - Period-based budget calculation & progress tracking
+- **Phase 3: Recurring Money & Subscriptions** — Complete
+  - Schema migration v8 (`recurring_transactions` table, transaction linkage)
+  - Recurrence engine (daily, weekly, monthly, yearly, custom interval calculations)
+  - Upcoming & Due schedule UI with Mark as Paid & Skip occurrence flows
+  - Subscription management with pause/resume and monthly commitment summary
 
 ---
 

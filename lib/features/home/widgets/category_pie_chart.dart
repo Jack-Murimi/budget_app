@@ -65,11 +65,11 @@ class _CategoryPieChartSectionState extends ConsumerState<CategoryPieChartSectio
           String displayName;
           Color color;
 
-          if (t.categoryId == null) {
+          final category = t.categoryId != null ? categoryMap[t.categoryId!] : null;
+          if (category == null) {
             displayName = 'Uncategorized';
             color = const Color(0xFF9E9E9E);
           } else {
-            final category = categoryMap[t.categoryId!]!;
             displayName = _getCategoryName(category, _showSubcategories, categories);
             final colorHex = category.colorHex;
             color = colorHex.isNotEmpty

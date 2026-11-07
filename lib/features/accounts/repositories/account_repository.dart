@@ -16,10 +16,10 @@ class AccountRepository {
     return trigger.asyncMap((_) async {
       final accounts = await getAll(includeArchived: includeArchived);
       final transactions = await db.select(db.transactions).get();
-      
+
       final accountsWithBalance = accounts.map((account) {
         double balance = account.initialBalance;
-        
+
         for (final t in transactions) {
           if (t.accountId == account.id) {
             if (t.type == 'income') {
@@ -30,12 +30,12 @@ class AccountRepository {
               balance -= (t.amount + t.transactionCost);
             }
           }
-          
+
           if (t.toAccountId == account.id && t.type == 'transfer') {
             balance += t.amount;
           }
         }
-        
+
         return AccountWithBalance(account: account, balance: balance);
       }).toList();
 
@@ -47,6 +47,13 @@ class AccountRepository {
 
       return accountsWithBalance;
     });
+  }
+
+  Stream<List<Transaction>> watchTransactionsByAccount(int accountId) {
+    return (db.select(db.transactions)
+          ..where((t) => t.accountId.equals(accountId) | t.toAccountId.equals(accountId))
+          ..orderBy([(t) => OrderingTerm.desc(t.transactionDate)]))
+        .watch();
   }
 
   Future<List<Account>> getAll({bool includeArchived = false}) {
@@ -64,13 +71,24 @@ class AccountRepository {
     return db.into(db.accounts).insert(account);
   }
 
-  Future<bool> updateAccount(AccountsCompanion account) {
-    return db.update(db.accounts).replace(account);
+  Future<bool> updateAccount(AccountsCompanion account) async {
+    final count = await (db.update(db.accounts)..where((a) => a.id.equals(account.id.value))).write(account);
+    return count > 0;
   }
 
   Future<void> archiveAccount(int id, {bool archive = true}) {
     return (db.update(db.accounts)..where((a) => a.id.equals(id)))
       .write(AccountsCompanion(isArchived: Value(archive)));
+  }
+
+  Future<void> setDefault(int id) async {
+    await (db.update(db.accounts)).write(const AccountsCompanion(isDefault: Value(false)));
+    await (db.update(db.accounts)..where((a) => a.id.equals(id)))
+        .write(const AccountsCompanion(isDefault: Value(true)));
+  }
+
+  Future<void> deleteAccount(int id) async {
+    await (db.delete(db.accounts)..where((a) => a.id.equals(id))).go();
   }
 
   Future<int?> correctBalance({

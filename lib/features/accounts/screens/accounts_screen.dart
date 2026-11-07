@@ -5,6 +5,7 @@ import '../../../core/database/app_database.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../providers/account_providers.dart';
 import '../models/account_model.dart';
+import 'account_detail_screen.dart';
 
 class AccountsScreen extends ConsumerStatefulWidget {
   const AccountsScreen({super.key});
@@ -14,163 +15,29 @@ class AccountsScreen extends ConsumerStatefulWidget {
 }
 
 class _AccountsScreenState extends ConsumerState<AccountsScreen> {
-  final _newBalanceCtrl = TextEditingController();
+  static const _typeOptions = ['mpesa', 'cash', 'bank', 'airtel', 'other'];
+  static const _colorOptions = {
+    '#1B5E20': 'Dark Green',
+    '#4CAF50': 'Green',
+    '#2196F3': 'Blue',
+    '#F44336': 'Red',
+    '#FF9800': 'Orange',
+    '#9C27B0': 'Purple',
+    '#009688': 'Teal',
+    '#795548': 'Brown',
+    '#607D8B': 'Grey',
+  };
 
-  @override
-  void dispose() {
-    _newBalanceCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _showAdjustBalanceDialog(AccountWithBalance account) async {
-    _newBalanceCtrl.text = account.balance.toStringAsFixed(2);
-
-    return showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Adjust Balance'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _newBalanceCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'New Balance',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final newBal = double.tryParse(_newBalanceCtrl.text.replaceAll('KES ', '').replaceAll(',', ''));
-              if (newBal != null) {
-                await ref.read(accountRepositoryProvider).correctBalance(
-                  accountId: account.id,
-                  currentBalance: account.balance,
-                  targetBalance: newBal,
-                );
-                if (!ctx.mounted) return;
-                Navigator.of(ctx).pop();
-              }
-            },
-            child: const Text('Update'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showTransferDialog() async {
-    final amountCtrl = TextEditingController();
-    final feeCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-
-    final accounts = await ref.read(accountRepositoryProvider).getAll();
-    if (!mounted) return;
-    final accountOptions = accounts.where((a) => !a.isArchived).toList();
-
-    int? fromId = accountOptions.isNotEmpty ? accountOptions.first.id : null;
-    int? toId = accountOptions.length > 1 ? accountOptions[1].id : null;
-
-    return showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Transfer Between Accounts'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<int>(
-                  decoration: const InputDecoration(labelText: 'From Account', border: OutlineInputBorder()),
-                  initialValue: fromId,
-                  items: accountOptions.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))).toList(),
-                  onChanged: (v) => setDialogState(() => fromId = v),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  decoration: const InputDecoration(labelText: 'To Account', border: OutlineInputBorder()),
-                  initialValue: toId,
-                  items: accountOptions.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))).toList(),
-                  onChanged: (v) => setDialogState(() => toId = v),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: amountCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Amount (KES)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: feeCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Transaction Fee (KES)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: noteCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Note',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final amount = double.tryParse(amountCtrl.text);
-                final fee = double.tryParse(feeCtrl.text) ?? 0.0;
-                final note = noteCtrl.text.trim();
-
-                if (fromId != null && toId != null && amount != null) {
-                  await ref.read(accountRepositoryProvider).createTransfer(
-                    fromAccountId: fromId!,
-                    toAccountId: toId!,
-                    amount: amount,
-                    transactionCost: fee,
-                    note: note,
-                  );
-                  if (!ctx.mounted) return;
-                  Navigator.of(ctx).pop();
-                }
-              },
-              child: const Text('Transfer'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showAddAccountDialog() async {
+  Future<void> _showAddDialog() async {
     final nameCtrl = TextEditingController();
     final balanceCtrl = TextEditingController();
-    final colorCtrl = TextEditingController(text: '#4CAF50');
     String selectedType = 'mpesa';
+    String selectedColor = '#4CAF50';
 
-    return showDialog<void>(
+    await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
+        builder: (ctx, setS) => AlertDialog(
           title: const Text('Add Account'),
           content: SingleChildScrollView(
             child: Column(
@@ -178,40 +45,40 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
               children: [
                 TextField(
                   controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(labelText: 'Name *', border: OutlineInputBorder()),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
-                  initialValue: selectedType,
-                  items: const ['mpesa', 'cash', 'bank', 'airtel', 'other']
-                      .map((t) => DropdownMenuItem(value: t, child: Text(t.toUpperCase())))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) {
-                      setDialogState(() => selectedType = v);
-                    }
-                  },
+                  value: selectedType,
+                  items: _typeOptions.map((t) => DropdownMenuItem(value: t, child: Text(t.toUpperCase()))).toList(),
+                  onChanged: (v) { if (v != null) setS(() => selectedType = v); },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'Color', border: OutlineInputBorder()),
+                  value: selectedColor,
+                  items: _colorOptions.entries.map((e) => DropdownMenuItem(
+                    value: e.key,
+                    child: Row(children: [
+                      Container(width: 16, height: 16, margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(color: Color(int.parse(e.key.replaceFirst('#', '0xFF'))), shape: BoxShape.circle)),
+                      Text(e.value),
+                    ]),
+                  )).toList(),
+                  onChanged: (v) { if (v != null) setS(() => selectedColor = v); },
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: balanceCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Initial Balance', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: colorCtrl,
-                  decoration: const InputDecoration(labelText: 'Color (hex)', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(labelText: 'Opening Balance', border: OutlineInputBorder()),
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             FilledButton(
               onPressed: () async {
                 if (nameCtrl.text.trim().isEmpty) return;
@@ -220,13 +87,84 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                     name: nameCtrl.text.trim(),
                     type: Value(selectedType),
                     initialBalance: Value(double.tryParse(balanceCtrl.text) ?? 0.0),
-                    colorHex: Value(colorCtrl.text.trim()),
+                    colorHex: Value(selectedColor),
                   ),
                 );
                 if (!ctx.mounted) return;
-                Navigator.of(ctx).pop();
+                Navigator.pop(ctx);
               },
               child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showTransferDialog() async {
+    final amountCtrl = TextEditingController();
+    final feeCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    final accounts = await ref.read(accountRepositoryProvider).getAll();
+    if (!mounted) return;
+    final opts = accounts.where((a) => !a.isArchived).toList();
+    int? fromId = opts.isNotEmpty ? opts.first.id : null;
+    int? toId = opts.length > 1 ? opts[1].id : null;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('Transfer Between Accounts'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int>(
+                  decoration: const InputDecoration(labelText: 'From Account', border: OutlineInputBorder()),
+                  value: fromId,
+                  items: opts.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))).toList(),
+                  onChanged: (v) => setS(() => fromId = v),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  decoration: const InputDecoration(labelText: 'To Account', border: OutlineInputBorder()),
+                  value: toId,
+                  items: opts.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))).toList(),
+                  onChanged: (v) => setS(() => toId = v),
+                ),
+                const SizedBox(height: 12),
+                TextField(controller: amountCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Amount (KES)', border: OutlineInputBorder())),
+                const SizedBox(height: 12),
+                TextField(controller: feeCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Fee (KES)', border: OutlineInputBorder())),
+                const SizedBox(height: 12),
+                TextField(controller: noteCtrl,
+                    decoration: const InputDecoration(labelText: 'Note', border: OutlineInputBorder())),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () async {
+                final amount = double.tryParse(amountCtrl.text);
+                if (fromId != null && toId != null && amount != null) {
+                  await ref.read(accountRepositoryProvider).createTransfer(
+                    fromAccountId: fromId!,
+                    toAccountId: toId!,
+                    amount: amount,
+                    transactionCost: double.tryParse(feeCtrl.text) ?? 0.0,
+                    note: noteCtrl.text.trim(),
+                  );
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
+                }
+              },
+              child: const Text('Transfer'),
             ),
           ],
         ),
@@ -244,98 +182,139 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
       appBar: AppBar(
         title: const Text('Accounts & Wallets'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.swap_horiz),
-            onPressed: _showTransferDialog,
-            tooltip: 'Transfer',
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showAddAccountDialog,
-            tooltip: 'Add Account',
-          ),
+          IconButton(icon: const Icon(Icons.swap_horiz), onPressed: _showTransferDialog, tooltip: 'Transfer'),
+          IconButton(icon: const Icon(Icons.add), onPressed: _showAddDialog, tooltip: 'Add Account'),
         ],
       ),
       body: accountsAsync.when(
-        data: (accounts) => accounts.isEmpty
-            ? const Center(child: Text('No accounts'))
-            : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  netWorthAsync.when(
-                    data: (total) => Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Total Balance'),
-                            Text(CurrencyFormatter.format(total)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    loading: () => const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: LinearProgressIndicator(),
-                    ),
-                    error: (_, __) => const SizedBox.shrink(),
-                  ),
-                  const SizedBox(height: 16),
-                  ...accounts.map((a) => Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Color(int.parse(a.colorHex.replaceFirst('#', '0xFF'))),
-                        child: Text(a.name[0], style: const TextStyle(color: Colors.white)),
-                      ),
-                      title: Wrap(
-                        spacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Text(a.name),
-                          if (a.isDefault)
-                            Chip(
-                              label: const Text('Default'),
-                              backgroundColor: theme.colorScheme.primaryContainer,
-                              labelStyle: TextStyle(
-                                color: theme.colorScheme.onPrimaryContainer,
-                                fontSize: 10,
-                              ),
-                            ),
-                        ],
-                      ),
-                      subtitle: Text(a.type.toUpperCase()),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(CurrencyFormatter.format(a.balance)),
-                          PopupMenuButton<String>(
-                            onSelected: (value) async {
-                              if (value == 'adjust') {
-                                await _showAdjustBalanceDialog(a);
-                              } else if (value == 'archive') {
-                                await ref.read(accountRepositoryProvider).archiveAccount(a.id, archive: true);
-                              } else if (value == 'unarchive') {
-                                await ref.read(accountRepositoryProvider).archiveAccount(a.id, archive: false);
-                              }
-                            },
-                            itemBuilder: (ctx) => [
-                              const PopupMenuItem(value: 'adjust', child: Text('Adjust Balance')),
-                              if (a.isArchived)
-                                const PopupMenuItem(value: 'unarchive', child: Text('Unarchive'))
-                              else
-                                const PopupMenuItem(value: 'archive', child: Text('Archive')),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  )),
-                ],
-              ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const Center(child: Text('Error loading accounts')),
+        data: (accounts) {
+          final active = accounts.where((a) => !a.isArchived).toList();
+          final archived = accounts.where((a) => a.isArchived).toList();
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // Net worth card
+              netWorthAsync.when(
+                data: (total) => Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Total Balance', style: theme.textTheme.bodyMedium),
+                        Text(CurrencyFormatter.format(total),
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ),
+                loading: () => const LinearProgressIndicator(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+              const SizedBox(height: 16),
+
+              if (active.isEmpty)
+                const Center(child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text('No accounts yet. Tap + to add one.'),
+                ))
+              else
+                ...active.map((a) => _AccountCard(account: a)),
+
+              if (archived.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text('Archived', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
+                ),
+                ...archived.map((a) => _AccountCard(account: a, dimmed: true)),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AccountCard extends ConsumerWidget {
+  final AccountWithBalance account;
+  final bool dimmed;
+
+  const _AccountCard({required this.account, this.dimmed = false});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final color = Color(int.parse(account.colorHex.replaceFirst('#', '0xFF')));
+
+    return Opacity(
+      opacity: dimmed ? 0.5 : 1.0,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => AccountDetailScreen(account: account)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(12)),
+                  child: Center(
+                    child: Text(account.name.isNotEmpty ? account.name[0].toUpperCase() : '?',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(account.name,
+                              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                          if (account.isDefault) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text('Default',
+                                  style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onPrimaryContainer)),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(account.type.toUpperCase(),
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(CurrencyFormatter.format(account.balance),
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 2),
+                    Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.outline),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
