@@ -4,6 +4,7 @@ import '../../accounts/screens/accounts_screen.dart';
 import '../../budgets/screens/budgets_screen.dart';
 import '../../categories/screens/categories_screen.dart';
 import '../../fuliza/screens/fuliza_screen.dart';
+import '../../insights/screens/insights_screen.dart';
 import '../../recurring/screens/recurring_screen.dart';
 import '../../settings/settings_screen.dart';
 import '../../transactions/screens/transactions_screen.dart';
@@ -22,11 +23,21 @@ class MainNavigationScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
+              leading: const Icon(Icons.insights_outlined),
+              title: const Text('Insights'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const InsightsScreen()));
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.account_balance_wallet_outlined),
               title: const Text('Accounts'),
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen()));
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AccountsScreen()));
               },
             ),
             ListTile(
@@ -34,7 +45,8 @@ class MainNavigationScreen extends ConsumerWidget {
               title: const Text('Recurring & Bills'),
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const RecurringScreen()));
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const RecurringScreen()));
               },
             ),
             ListTile(
@@ -42,7 +54,10 @@ class MainNavigationScreen extends ConsumerWidget {
               title: const Text('Categories'),
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const CategoriesScreen()));
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const CategoriesScreen()));
               },
             ),
             ListTile(
@@ -50,7 +65,8 @@ class MainNavigationScreen extends ConsumerWidget {
               title: const Text('Fuliza'),
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const FulizaScreen()));
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const FulizaScreen()));
               },
             ),
             ListTile(
@@ -58,7 +74,8 @@ class MainNavigationScreen extends ConsumerWidget {
               title: const Text('Settings'),
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()));
               },
             ),
           ],

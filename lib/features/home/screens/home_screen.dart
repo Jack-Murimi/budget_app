@@ -68,24 +68,35 @@ class HomeScreen extends ConsumerWidget {
                       child: InkWell(
                         onTap: () => Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const RecurringScreen()),
+                          MaterialPageRoute(
+                              builder: (_) => const RecurringScreen()),
                         ),
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: isAlert ? theme.colorScheme.errorContainer.withValues(alpha: 0.6) : Colors.amber.shade100,
+                            color: isAlert
+                                ? theme.colorScheme.errorContainer
+                                    .withValues(alpha: 0.6)
+                                : Colors.amber.shade100,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: isAlert ? theme.colorScheme.error : Colors.amber.shade700,
+                              color: isAlert
+                                  ? theme.colorScheme.error
+                                  : Colors.amber.shade700,
                               width: 1,
                             ),
                           ),
                           child: Row(
                             children: [
                               Icon(
-                                isAlert ? Icons.warning_amber_rounded : Icons.schedule,
-                                color: isAlert ? theme.colorScheme.error : Colors.amber.shade900,
+                                isAlert
+                                    ? Icons.warning_amber_rounded
+                                    : Icons.schedule,
+                                color: isAlert
+                                    ? theme.colorScheme.error
+                                    : Colors.amber.shade900,
                                 size: 20,
                               ),
                               const SizedBox(width: 10),
@@ -96,14 +107,18 @@ class HomeScreen extends ConsumerWidget {
                                       : '${items.length} bill${items.length == 1 ? '' : 's'} due soon',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    color: isAlert ? theme.colorScheme.onErrorContainer : Colors.amber.shade900,
+                                    color: isAlert
+                                        ? theme.colorScheme.onErrorContainer
+                                        : Colors.amber.shade900,
                                   ),
                                 ),
                               ),
                               Text(
                                 'View',
                                 style: theme.textTheme.labelSmall?.copyWith(
-                                  color: isAlert ? theme.colorScheme.error : Colors.amber.shade900,
+                                  color: isAlert
+                                      ? theme.colorScheme.error
+                                      : Colors.amber.shade900,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -111,7 +126,9 @@ class HomeScreen extends ConsumerWidget {
                               Icon(
                                 Icons.chevron_right,
                                 size: 16,
-                                color: isAlert ? theme.colorScheme.error : Colors.amber.shade900,
+                                color: isAlert
+                                    ? theme.colorScheme.error
+                                    : Colors.amber.shade900,
                               ),
                             ],
                           ),
@@ -137,7 +154,8 @@ class HomeScreen extends ConsumerWidget {
                             child: InkWell(
                               onTap: () => Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => const BudgetsScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => const BudgetsScreen()),
                               ),
                               child: Padding(
                                 padding: const EdgeInsets.all(12),
@@ -146,7 +164,8 @@ class HomeScreen extends ConsumerWidget {
                                   children: [
                                     const Row(
                                       children: [
-                                        Icon(Icons.account_balance_wallet, size: 20),
+                                        Icon(Icons.account_balance_wallet,
+                                            size: 20),
                                         SizedBox(width: 8),
                                         Text('Overall Budget'),
                                       ],
@@ -161,8 +180,10 @@ class HomeScreen extends ConsumerWidget {
                                       borderRadius: BorderRadius.circular(4),
                                       child: LinearProgressIndicator(
                                         value: budget.progress,
-                                        backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                        backgroundColor: theme.colorScheme
+                                            .surfaceContainerHighest,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
                                           budget.isOverBudget
                                               ? Colors.red
                                               : budget.progress >= 0.75
@@ -197,20 +218,27 @@ class HomeScreen extends ConsumerWidget {
                             child: Row(
                               children: accounts.map((a) {
                                 final isDefault = a.isDefault;
+                                final accountColor = Color(
+                                  int.parse(
+                                      a.colorHex.replaceFirst('#', '0xFF')),
+                                );
                                 return GestureDetector(
-                                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen())),
+                                  onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                              const AccountsScreen())),
                                   child: Container(
                                     margin: const EdgeInsets.only(right: 8),
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 10),
                                     decoration: BoxDecoration(
-                                      color: isDefault
-                                          ? theme.colorScheme.primaryContainer
-                                          : theme.colorScheme.surfaceContainerHighest,
+                                      color: accountColor.withValues(
+                                          alpha: isDefault ? 0.24 : 0.14),
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: isDefault
-                                            ? theme.colorScheme.primary
-                                            : theme.colorScheme.outline,
+                                        color: accountColor.withValues(
+                                            alpha: isDefault ? 0.9 : 0.5),
                                       ),
                                     ),
                                     child: Row(
@@ -220,24 +248,27 @@ class HomeScreen extends ConsumerWidget {
                                           height: 8,
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
-                                            color: Color(int.parse(a.colorHex.replaceFirst('#', '0xFF'))),
+                                            color: accountColor,
                                           ),
                                         ),
                                         const SizedBox(width: 8),
                                         Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Text(
                                               a.name,
-                                              style: theme.textTheme.labelMedium?.copyWith(
+                                              style: theme.textTheme.labelMedium
+                                                  ?.copyWith(
                                                 fontWeight: FontWeight.w600,
                                               ),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                             Text(
-                                              CurrencyFormatter.format(a.balance),
+                                              CurrencyFormatter.format(
+                                                  a.balance),
                                               style: theme.textTheme.bodySmall,
                                             ),
                                           ],
@@ -270,7 +301,8 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   const Spacer(),
                   TextButton(
-                    onPressed: () => ref.read(selectedTabProvider.notifier).state = 1,
+                    onPressed: () =>
+                        ref.read(selectedTabProvider.notifier).state = 1,
                     child: const Text('See all'),
                   ),
                 ],
