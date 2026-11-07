@@ -14,8 +14,8 @@
   - Recurrence engine (daily, weekly, monthly, yearly, custom interval calculations)
   - Upcoming & Due schedule UI with Mark as Paid & Skip occurrence flows
   - Subscription management with pause/resume and monthly commitment summary
-- **Phase 4: Insights & Analytics** — In progress
-  - Period selection, cashflow summary, category breakdown, daily cashflow chart
+- **Phase 4: Insights & Analytics** — Complete
+  - Period selection, cashflow summary, category breakdown, daily cashflow chart, net worth trend
 
 ---
 

@@ -32,6 +32,7 @@ class InsightsScreen extends ConsumerWidget {
     final summary = ref.watch(insightsSummaryProvider);
     final transactions = ref.watch(insightsTransactionsProvider);
     final categories = ref.watch(categoriesStreamProvider);
+    final netWorthTrend = ref.watch(netWorthTrendProvider);
     final title =
         '${DateFormat.MMMd().format(range.start)} - ${DateFormat.MMMd().format(range.end.subtract(const Duration(days: 1)))}';
     return Scaffold(
@@ -65,6 +66,12 @@ class InsightsScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   _CashflowChart(summary: data),
                 ]),
+              ),
+              const SizedBox(height: 16),
+              netWorthTrend.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+                data: (trend) => _NetWorthChart(trend: trend),
               ),
               const SizedBox(height: 16),
               transactions.when(
@@ -275,6 +282,63 @@ class _CategoryChart extends StatelessWidget {
                       Text(
                           '${(entries[i].value / total * 100).toStringAsFixed(0)}%')
                     ])),
+            ])));
+  }
+}
+
+class _NetWorthChart extends StatelessWidget {
+  final Map<DateTime, double> trend;
+  const _NetWorthChart({required this.trend});
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = trend.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    if (entries.isEmpty) return const SizedBox.shrink();
+    final spots = [
+      for (var i = 0; i < entries.length; i++)
+        FlSpot(i.toDouble(), entries[i].value)
+    ];
+    return Card(
+        child: Padding(
+            padding: const EdgeInsets.all(16),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Net worth trend',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(CurrencyFormatter.format(entries.last.value),
+                  style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 12),
+              SizedBox(
+                  height: 180,
+                  child: LineChart(LineChartData(
+                    borderData: FlBorderData(show: false),
+                    gridData: const FlGridData(show: false),
+                    titlesData: const FlTitlesData(
+                        leftTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        topTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false))),
+                    lineBarsData: [
+                      LineChartBarData(
+                          spots: spots,
+                          isCurved: true,
+                          color: Theme.of(context).colorScheme.primary,
+                          barWidth: 3,
+                          dotData: const FlDotData(show: false),
+                          belowBarData: BarAreaData(
+                              show: true,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withValues(alpha: 0.12)))
+                    ],
+                  ))),
             ])));
   }
 }

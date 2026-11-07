@@ -25,4 +25,30 @@ void main() {
     expect(summary.previousExpenses, 100);
     expect(summary.net, 750);
   });
+
+  test('builds net worth trend from account transactions', () {
+    final date = DateTime(2026, 11, 1);
+    final trend = buildNetWorthTrend([
+      TransactionModel(
+          id: 1,
+          header: 'Pay',
+          amount: 200,
+          type: 'income',
+          accountId: 1,
+          transactionDate: date,
+          createdAt: date),
+      TransactionModel(
+          id: 2,
+          header: 'Food',
+          amount: 50,
+          type: 'expense',
+          accountId: 1,
+          transactionDate: date.add(const Duration(days: 1)),
+          createdAt: date),
+    ], DateRange(date, date.add(const Duration(days: 3))), 100);
+
+    expect(trend[date], 300);
+    expect(trend[date.add(const Duration(days: 1))], 250);
+    expect(trend[date.add(const Duration(days: 2))], 250);
+  });
 }
