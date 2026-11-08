@@ -17,14 +17,15 @@ Last updated: 2026-11-09
 - [x] Phase 6 — CSV export/import, duplicate detection, encrypted backup/restore, file picker UI
 - [x] Phase 7 — Biometric lock + auto-lock, privacy screen (FLAG_SECURE), inline calculator on amount field, l10n en+sw, Material 3 dynamic color, OLED pure dark mode
 - [~] Phase 8 — Android widget (BudgetWidget), launcher shortcuts (Quick Add / Scan SMS), deep links (budgetke://); Firestore sync deferred
-- [ ] Parallel Track — Payee memory, bulk SMS scanner, specialized parsers (Pochi, Till, M-Shwari, Reversals)
+- [x] Parallel Track — Payee memory (learn/suggest on save), specialized parsers (Pochi, Till, M-Shwari, Reversals), bulk SMS scanner with Needs-Review queue
 
 ## Evidence
 - `45490e2`: savings goals.
 - Phase 6: CSV exports transactions/accounts/categories; transaction import deduplicates timestamp + amount + payee; AES-GCM encrypted versioned JSON backup restores all app tables.
 - Phase 7: local_auth v3 biometric gate + lifecycle auto-lock; FLAG_SECURE via method channel; CalculatorAmountField evaluates +/-/* / expressions inline; ARB l10n en+sw generated; DynamicColorBuilder in main.dart; OLED dark via AppTheme.dark(oled:true).
 - Phase 8 (partial): BudgetWidget AppWidgetProvider, WidgetUpdateService writes spend+balance; shortcuts.xml static shortcuts; EventChannel deep link routing.
-- Verification: `flutter test` passed 95 tests. `flutter analyze` has 34 info-level findings, no errors or warnings.
+- Parallel Track: payee_category_rules table v12; PayeeCategoryRepository learn/suggest; parser extended with buyGoods/Till, Pochi la Biashara, M-Shwari loan/repayment/savings, Reversal; SmsInboxScanner + SmsInboxScreen with permission flow + Needs-Review tier.
+- Verification: `flutter test` passed 104 tests. `flutter analyze` has 0 errors/warnings.
 
 ## Update Rules
 1. Update Current Work before each deliverable.
