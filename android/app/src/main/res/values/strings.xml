@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Budget KE</string>
+    <string name="shortcut_add_short">Add</string>
+    <string name="shortcut_add_long">Quick Add Transaction</string>
+    <string name="shortcut_sms_short">Scan SMS</string>
+    <string name="shortcut_sms_long">Scan M-Pesa SMS</string>
+    <string name="widget_title">Budget KE</string>
+    <string name="widget_loading">Loading…</string>
+    <string name="widget_month_spend">Month spend</string>
+    <string name="widget_balance">Balance</string>
+</resources>

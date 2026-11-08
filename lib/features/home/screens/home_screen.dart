@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../../core/services/widget_update_service.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../../budgets/providers/budget_providers.dart';
@@ -42,11 +43,21 @@ class HomeScreen extends ConsumerWidget {
           padding: const EdgeInsets.only(bottom: 120),
           children: [
             summaryAsync.when(
-              data: (summary) => SpendingSummaryCard(
-                totalSpent: summary.totalExpenses,
-                totalIncome: summary.totalIncome,
-                month: summary.month,
-              ),
+              data: (summary) {
+                // Fire-and-forget widget update whenever home data loads
+                final netWorth = ref.read(totalNetWorthProvider);
+                netWorth.whenData((balance) {
+                  WidgetUpdateService.update(
+                    monthSpend: summary.totalExpenses,
+                    totalBalance: balance,
+                  );
+                });
+                return SpendingSummaryCard(
+                  totalSpent: summary.totalExpenses,
+                  totalIncome: summary.totalIncome,
+                  month: summary.month,
+                );
+              },
               loading: () => const Padding(
                 padding: EdgeInsets.all(16),
                 child: LinearProgressIndicator(),

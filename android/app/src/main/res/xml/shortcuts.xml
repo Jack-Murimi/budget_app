@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="quick_add_transaction"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_add"
+        android:shortcutShortLabel="@string/shortcut_add_short"
+        android:shortcutLongLabel="@string/shortcut_add_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.budgetapp.budget_app"
+            android:targetClass="com.budgetapp.budget_app.MainActivity"
+            android:data="budgetke://add_transaction" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="scan_sms"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_sms"
+        android:shortcutShortLabel="@string/shortcut_sms_short"
+        android:shortcutLongLabel="@string/shortcut_sms_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.budgetapp.budget_app"
+            android:targetClass="com.budgetapp.budget_app.MainActivity"
+            android:data="budgetke://scan_sms" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+</shortcuts>

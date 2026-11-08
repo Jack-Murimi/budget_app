@@ -11,13 +11,14 @@ void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
     final db = _testDb();
     addTearDown(db.close);
+    final navKey = GlobalKey<NavigatorState>();
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           dbProvider.overrideWithValue(db),
         ],
-        child: const BudgetApp(),
+        child: BudgetApp(navigatorKey: navKey),
       ),
     );
 
