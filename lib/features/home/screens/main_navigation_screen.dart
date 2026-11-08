@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../main.dart';
 import '../../accounts/screens/accounts_screen.dart';
 import '../../budgets/screens/budgets_screen.dart';
 import '../../categories/screens/categories_screen.dart';
@@ -7,6 +8,7 @@ import '../../debts/screens/debts_screen.dart';
 import '../../fuliza/screens/fuliza_screen.dart';
 import '../../goals/screens/goals_screen.dart';
 import '../../insights/screens/insights_screen.dart';
+import '../../portability/screens/data_portability_screen.dart';
 import '../../recurring/screens/recurring_screen.dart';
 import '../../settings/settings_screen.dart';
 import '../../transactions/screens/transactions_screen.dart';
@@ -17,13 +19,14 @@ import 'home_screen.dart';
 class MainNavigationScreen extends ConsumerWidget {
   const MainNavigationScreen({super.key});
 
-  void _showMoreSheet(BuildContext context) {
+  void _showMoreSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             ListTile(
               leading: const Icon(Icons.handshake_outlined),
               title: const Text('Loans & Debts'),
@@ -98,9 +101,24 @@ class MainNavigationScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const SettingsScreen()));
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.import_export_outlined),
+              title: const Text('Export & backup'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        DataPortabilityScreen(db: ref.read(dbProvider)),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -124,7 +142,7 @@ class MainNavigationScreen extends ConsumerWidget {
         selectedIndex: clampedIndex,
         onDestinationSelected: (i) {
           if (i == 3) {
-            _showMoreSheet(context);
+            _showMoreSheet(context, ref);
           } else {
             ref.read(selectedTabProvider.notifier).state = i;
           }

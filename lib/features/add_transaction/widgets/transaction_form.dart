@@ -10,6 +10,7 @@ import '../../transactions/providers/transaction_providers.dart';
 import '../../debts/providers/debt_providers.dart';
 import '../../../shared/utils/date_formatter.dart';
 import '../../../main.dart';
+import 'calculator_amount_field.dart';
 
 class TransactionForm extends ConsumerStatefulWidget {
   final MpesaParseResult? parseResult;
@@ -254,7 +255,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
           const SizedBox(height: 16),
 
           // Amount
-          TextFormField(
+          CalculatorAmountField(
             controller: _amountCtrl,
             decoration: InputDecoration(
               labelText: 'Amount (KES) *',
@@ -264,7 +265,6 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
                   ? const Tooltip(message: 'Auto-filled from M-Pesa', child: Icon(Icons.auto_awesome, size: 16))
                   : null,
             ),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             validator: (v) {
               if (v == null || v.isEmpty) return 'Amount is required';
               if (double.tryParse(v) == null) return 'Enter a valid number';

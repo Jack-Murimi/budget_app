@@ -1,0 +1,58 @@
+{
+  "@@locale": "en",
+  "appTitle": "Budget KE",
+  "@appTitle": {"description": "Application title"},
+
+  "navHome": "Home",
+  "navTransactions": "Transactions",
+  "navBudgets": "Budgets",
+  "navMore": "More",
+
+  "settingsTitle": "Settings",
+  "settingsAppearance": "Appearance",
+  "settingsAbout": "About",
+  "settingsThemeSystem": "System default",
+  "settingsThemeLight": "Light",
+  "settingsThemeDark": "Dark",
+  "settingsThemePureDark": "Pure Dark (OLED)",
+  "settingsDynamicColor": "Dynamic color",
+  "settingsDynamicColorDesc": "Use wallpaper colors (Android 12+)",
+  "settingsBiometric": "Biometric lock",
+  "settingsBiometricDesc": "Require fingerprint or face to open app",
+  "settingsAutoLock": "Auto-lock",
+  "settingsAutoLockImmediate": "Immediately",
+  "settingsAutoLock1min": "After 1 minute",
+  "settingsAutoLock5min": "After 5 minutes",
+
+  "transactionsTitle": "Transactions",
+  "addTransaction": "Add transaction",
+  "amount": "Amount",
+  "amountKES": "Amount (KES)",
+  "header": "Header",
+  "description": "Description",
+  "date": "Date & Time",
+  "category": "Category",
+  "account": "Account",
+  "expense": "Expense",
+  "income": "Income",
+  "transfer": "Transfer",
+  "save": "Save",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "edit": "Edit",
+
+  "budgetsTitle": "Budgets",
+  "accountsTitle": "Accounts",
+  "categoriesTitle": "Categories",
+
+  "biometricPrompt": "Authenticate to open Budget KE",
+  "biometricLockedTitle": "App Locked",
+  "biometricUnlock": "Unlock",
+
+  "restoreConfirmTitle": "Replace current data?",
+  "restoreConfirmBody": "Restoring permanently replaces all current app data.",
+  "restore": "Restore",
+
+  "errorRequired": "Required",
+  "errorInvalidNumber": "Enter a valid number"
+}

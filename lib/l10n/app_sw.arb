@@ -1,0 +1,57 @@
+{
+  "@@locale": "sw",
+  "appTitle": "Budget KE",
+
+  "navHome": "Nyumbani",
+  "navTransactions": "Miamala",
+  "navBudgets": "Bajeti",
+  "navMore": "Zaidi",
+
+  "settingsTitle": "Mipangilio",
+  "settingsAppearance": "Muonekano",
+  "settingsAbout": "Kuhusu",
+  "settingsThemeSystem": "Mfumo (otomatiki)",
+  "settingsThemeLight": "Mwanga",
+  "settingsThemeDark": "Giza",
+  "settingsThemePureDark": "Giza Kamili (OLED)",
+  "settingsDynamicColor": "Rangi zinazobadilika",
+  "settingsDynamicColorDesc": "Tumia rangi za picha ya skrini (Android 12+)",
+  "settingsBiometric": "Kufunga kwa biometriki",
+  "settingsBiometricDesc": "Hitaji alama ya kidole au uso kufungua programu",
+  "settingsAutoLock": "Kufunga otomatiki",
+  "settingsAutoLockImmediate": "Mara moja",
+  "settingsAutoLock1min": "Baada ya dakika 1",
+  "settingsAutoLock5min": "Baada ya dakika 5",
+
+  "transactionsTitle": "Miamala",
+  "addTransaction": "Ongeza muamala",
+  "amount": "Kiasi",
+  "amountKES": "Kiasi (KES)",
+  "header": "Kichwa",
+  "description": "Maelezo",
+  "date": "Tarehe & Saa",
+  "category": "Kategoria",
+  "account": "Akaunti",
+  "expense": "Matumizi",
+  "income": "Mapato",
+  "transfer": "Uhamisho",
+  "save": "Hifadhi",
+  "cancel": "Ghairi",
+  "delete": "Futa",
+  "edit": "Hariri",
+
+  "budgetsTitle": "Bajeti",
+  "accountsTitle": "Akaunti",
+  "categoriesTitle": "Kategoria",
+
+  "biometricPrompt": "Thibitisha ili ufungue Budget KE",
+  "biometricLockedTitle": "Programu Imefungwa",
+  "biometricUnlock": "Fungua",
+
+  "restoreConfirmTitle": "Badilisha data ya sasa?",
+  "restoreConfirmBody": "Kurejesha itabadilisha data yote ya sasa kabisa.",
+  "restore": "Rejesha",
+
+  "errorRequired": "Inahitajika",
+  "errorInvalidNumber": "Ingiza nambari sahihi"
+}

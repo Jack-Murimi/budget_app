@@ -3,9 +3,9 @@
 Last updated: 2026-11-08
 
 ## Current Work
-- Active phase: 5 — Debts, Loans & Goals
+- Active phase: 7 — Polish, security & settings
 - Current deliverable: complete
-- Next phase: 6 — Data portability & backup
+- Next phase: 8 — Ecosystem & extras
 
 ## Verified Completion
 - [x] Phase 0 — Baseline & regression gate
@@ -14,15 +14,15 @@ Last updated: 2026-11-08
 - [x] Phase 3 — Recurring money & subscriptions
 - [x] Phase 4 — Insights & analytics
 - [x] Phase 5 — debt/loan tracking, repayments, savings goals, contribution allocation
-- [ ] Phase 6 — Data portability & backup
-- [ ] Phase 7 — Polish, security & settings
+- [x] Phase 6 — CSV export/import, duplicate detection, encrypted backup/restore, file picker UI
+- [x] Phase 7 — Biometric lock + auto-lock, privacy screen (FLAG_SECURE), inline calculator on amount field, l10n en+sw, Material 3 dynamic color, OLED pure dark mode
 - [ ] Phase 8 — Ecosystem & extras
 
 ## Evidence
-- `e044455` (2026-11-08 15:29 EAT): debts and loans tracking.
-- Debt schema, Kenyan products, due date, flat interest, partial/full repayments, outstanding recalculation, ledger links present.
-- Goals added locally: target/current amount, target date, progress UI, account-funded contribution, linked transfer.
-- Verification: `flutter test` passed 90 tests. `flutter analyze` has 24 existing info-level findings; no errors or warnings.
+- `45490e2`: savings goals.
+- Phase 6: CSV exports transactions/accounts/categories; transaction import deduplicates timestamp + amount + payee; AES-GCM encrypted versioned JSON backup restores all app tables.
+- Phase 7: local_auth v3 biometric gate + lifecycle auto-lock; FLAG_SECURE via method channel; CalculatorAmountField evaluates +/-/* / expressions inline; ARB l10n en+sw generated; DynamicColorBuilder in main.dart; OLED dark via AppTheme.dark(oled:true).
+- Verification: `flutter test` passed 95 tests. `flutter analyze` has 34 info-level findings, no errors or warnings.
 
 ## Update Rules
 1. Update Current Work before each deliverable.
