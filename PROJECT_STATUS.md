@@ -1,11 +1,11 @@
 # Project Status
 
-Last updated: 2026-11-08
+Last updated: 2026-11-09
 
 ## Current Work
-- Active phase: 7 — Polish, security & settings
-- Current deliverable: complete
-- Next phase: 8 — Ecosystem & extras
+- Active phase: 8 (partial) + Parallel Track — Parser improvements
+- Current deliverable: Parallel Track — payee memory, bulk SMS scanner, specialized parsers
+- Note: Phase 8 Firestore cloud sync deferred (requires Firebase project config)
 
 ## Verified Completion
 - [x] Phase 0 — Baseline & regression gate
@@ -16,12 +16,14 @@ Last updated: 2026-11-08
 - [x] Phase 5 — debt/loan tracking, repayments, savings goals, contribution allocation
 - [x] Phase 6 — CSV export/import, duplicate detection, encrypted backup/restore, file picker UI
 - [x] Phase 7 — Biometric lock + auto-lock, privacy screen (FLAG_SECURE), inline calculator on amount field, l10n en+sw, Material 3 dynamic color, OLED pure dark mode
-- [ ] Phase 8 — Ecosystem & extras
+- [~] Phase 8 — Android widget (BudgetWidget), launcher shortcuts (Quick Add / Scan SMS), deep links (budgetke://); Firestore sync deferred
+- [ ] Parallel Track — Payee memory, bulk SMS scanner, specialized parsers (Pochi, Till, M-Shwari, Reversals)
 
 ## Evidence
 - `45490e2`: savings goals.
 - Phase 6: CSV exports transactions/accounts/categories; transaction import deduplicates timestamp + amount + payee; AES-GCM encrypted versioned JSON backup restores all app tables.
 - Phase 7: local_auth v3 biometric gate + lifecycle auto-lock; FLAG_SECURE via method channel; CalculatorAmountField evaluates +/-/* / expressions inline; ARB l10n en+sw generated; DynamicColorBuilder in main.dart; OLED dark via AppTheme.dark(oled:true).
+- Phase 8 (partial): BudgetWidget AppWidgetProvider, WidgetUpdateService writes spend+balance; shortcuts.xml static shortcuts; EventChannel deep link routing.
 - Verification: `flutter test` passed 95 tests. `flutter analyze` has 34 info-level findings, no errors or warnings.
 
 ## Update Rules

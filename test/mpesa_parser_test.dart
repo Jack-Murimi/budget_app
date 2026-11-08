@@ -49,7 +49,7 @@ void main() {
   });
 
   group('paybill', () {
-    test('paid to MERCHANT format', () {
+    test('paid to MERCHANT format (buyGoods/till)', () {
       const msg = 'VK4QX22V99 Confirmed. Ksh500.00 paid to KPLC PREPAID. on 15/10/26 at 8:00 PM. New M-PESA balance is Ksh2,000.00. Transaction cost, Ksh0.00';
       final result = MpesaParser.parse(msg);
       
@@ -58,7 +58,8 @@ void main() {
       expect(result.amount, 500.00);
       expect(result.counterpartyName, 'KPLC PREPAID');
       expect(result.counterpartyAccount, '');
-      expect(result.type, MpesaTransactionType.paybill);
+      // M-Pesa "paid to X" without an account number is classified as buyGoods
+      expect(result.type, MpesaTransactionType.buyGoods);
       expect(result.newBalance, 2000.00);
     });
 
@@ -223,6 +224,53 @@ void main() {
       
       expect(result.isValid, false);
       expect(result.errorMessage, 'No amount found');
+    });
+  });
+
+  group('specialized parsers', () {
+    test('buyGoods till number extraction', () {
+      const msg = 'QR7XY88Z01 Confirmed. Ksh350.00 paid to QUICKMART RUIRU Till 123456 on 3/11/26 at 11:30 AM. New M-PESA balance is Ksh1,650.00. Transaction cost, Ksh0.00';
+      final result = MpesaParser.parse(msg);
+      expect(result.isValid, true);
+      expect(result.type, MpesaTransactionType.buyGoods);
+      expect(result.amount, 350.00);
+      expect(result.counterpartyAccount, '123456');
+    });
+
+    test('Pochi la Biashara inflow', () {
+      const msg = 'PB3QX11U87 Confirmed. You have received Ksh200.00 from MARY WANJIKU 0712345678 via Pochi La Biashara on 2/11/26 at 10:00 AM. New M-PESA balance is Ksh800.00.';
+      final result = MpesaParser.parse(msg);
+      expect(result.isValid, true);
+      expect(result.type, MpesaTransactionType.pochiLaBiashara);
+      expect(result.amount, 200.00);
+    });
+
+    test('M-Shwari loan disbursement', () {
+      const msg = 'MS1AB22C33 Confirmed. M-Shwari Loan of Ksh5,000.00 has been disbursed to your M-PESA account on 1/11/26 at 9:00 AM. New M-PESA balance is Ksh5,500.00.';
+      final result = MpesaParser.parse(msg);
+      expect(result.isValid, true);
+      expect(result.type, MpesaTransactionType.mShwariLoan);
+      expect(result.amount, 5000.00);
+      expect(result.type.transactionType, 'income');
+    });
+
+    test('M-Shwari loan repayment', () {
+      const msg = 'MS2CD44E55 Confirmed. Ksh5,150.00 M-Shwari Loan repayment made on 15/11/26 at 2:00 PM. New M-PESA balance is Ksh350.00.';
+      final result = MpesaParser.parse(msg);
+      expect(result.isValid, true);
+      expect(result.type, MpesaTransactionType.mShwariRepayment);
+      expect(result.amount, 5150.00);
+    });
+
+    test('Safaricom reversal', () {
+      const msg = 'RV9ZZ00A11 Confirmed. Transaction UK3QX11U87 of Ksh500.00 has been reversed on 5/11/26 at 3:00 PM. New M-PESA balance is Ksh2,500.00.';
+      final result = MpesaParser.parse(msg);
+      expect(result.isValid, true);
+      expect(result.type, MpesaTransactionType.reversal);
+      expect(result.amount, 500.00);
+      expect(result.counterpartyName, 'Reversal');
+      expect(result.counterpartyAccount, 'UK3QX11U87'); // linked original ref
+      expect(result.type.transactionType, 'income');
     });
   });
 }

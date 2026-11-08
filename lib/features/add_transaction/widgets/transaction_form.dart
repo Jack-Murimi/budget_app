@@ -6,6 +6,7 @@ import '../../accounts/providers/account_providers.dart';
 import '../../categories/widgets/category_picker.dart';
 import '../../transactions/models/mpesa_parse_result.dart';
 import '../../transactions/models/transaction_model.dart';
+import '../../transactions/providers/payee_category_providers.dart';
 import '../../transactions/providers/transaction_providers.dart';
 import '../../debts/providers/debt_providers.dart';
 import '../../../shared/utils/date_formatter.dart';
@@ -62,6 +63,23 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
       );
       _date = p?.transactionDate ?? DateTime.now();
       _type = p?.type.transactionType ?? 'expense';
+      // Suggest category from payee memory
+      if (p?.counterpartyName != null && p!.counterpartyName.isNotEmpty) {
+        _loadSuggestedCategory(p.counterpartyName);
+      }
+    }
+  }
+
+  Future<void> _loadSuggestedCategory(String payee) async {
+    final repo = ref.read(payeeCategoryRepositoryProvider);
+    final catId = await repo.suggest(payee);
+    if (catId == null || !mounted) return;
+    final db = ref.read(dbProvider);
+    final cat = await (db.select(db.categories)
+          ..where((c) => c.id.equals(catId)))
+        .getSingleOrNull();
+    if (cat != null && mounted && _selectedCategory == null) {
+      setState(() => _selectedCategory = cat);
     }
   }
 
@@ -404,6 +422,12 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
 
                 try {
                   await ref.read(transactionRepositoryProvider).updateTransaction(companion);
+                  // Learn payee → category mapping
+                  final catId = _selectedCategory?.id;
+                  final payee = _descCtrl.text.trim();
+                  if (catId != null && payee.isNotEmpty) {
+                    ref.read(payeeCategoryRepositoryProvider).learn(payee, catId);
+                  }
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -447,6 +471,14 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
                           counterparty: _descCtrl.text,
                         )
                       : await ref.read(transactionRepositoryProvider).insertOrIgnoreDuplicate(companion);
+                  // Learn payee → category mapping on successful new save
+                  if (id != null) {
+                    final catId = _selectedCategory?.id;
+                    final payee = _descCtrl.text.trim();
+                    if (catId != null && payee.isNotEmpty) {
+                      ref.read(payeeCategoryRepositoryProvider).learn(payee, catId);
+                    }
+                  }
                   if (!context.mounted) return;
                   if (id == null) {
                     ScaffoldMessenger.of(context).showSnackBar(

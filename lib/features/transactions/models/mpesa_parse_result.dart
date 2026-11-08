@@ -86,6 +86,11 @@ enum MpesaTransactionType {
   fulizaDrawdown,     // Fuliza credit — paired with send, skip saving
   fulizaRepayment,    // Paying back Fuliza
   airtime,
+  pochiLaBiashara,    // Pochi la Biashara inflow/outflow
+  mShwariLoan,        // M-Shwari loan disbursement
+  mShwariRepayment,   // M-Shwari loan repayment
+  mShwariSavings,     // M-Shwari lock/unlock savings
+  reversal,           // Safaricom transaction reversal
   unknown;
 
   String get defaultDescription => switch (this) {
@@ -98,11 +103,19 @@ enum MpesaTransactionType {
         MpesaTransactionType.fulizaDrawdown => 'Fuliza Drawdown',
         MpesaTransactionType.fulizaRepayment => 'Fuliza Repayment',
         MpesaTransactionType.airtime => 'Airtime',
+        MpesaTransactionType.pochiLaBiashara => 'Pochi la Biashara',
+        MpesaTransactionType.mShwariLoan => 'M-Shwari Loan',
+        MpesaTransactionType.mShwariRepayment => 'M-Shwari Repayment',
+        MpesaTransactionType.mShwariSavings => 'M-Shwari Savings',
+        MpesaTransactionType.reversal => 'Reversal',
         MpesaTransactionType.unknown => 'M-Pesa Transaction',
       };
 
   String get transactionType => switch (this) {
         MpesaTransactionType.receiveMoney => 'income',
+        MpesaTransactionType.pochiLaBiashara => 'income', // may be either; default income
+        MpesaTransactionType.mShwariLoan => 'income',
+        MpesaTransactionType.reversal => 'income', // money comes back
         _ => 'expense',
       };
 }

@@ -8,6 +8,7 @@ import '../../debts/screens/debts_screen.dart';
 import '../../fuliza/screens/fuliza_screen.dart';
 import '../../goals/screens/goals_screen.dart';
 import '../../insights/screens/insights_screen.dart';
+import '../../sms/screens/sms_inbox_screen.dart';
 import '../../portability/screens/data_portability_screen.dart';
 import '../../recurring/screens/recurring_screen.dart';
 import '../../settings/settings_screen.dart';
@@ -90,6 +91,18 @@ class MainNavigationScreen extends ConsumerWidget {
                 Navigator.pop(ctx);
                 Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const FulizaScreen()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.sms_outlined),
+              title: const Text('Scan SMS Inbox'),
+              subtitle: const Text('Import M-Pesa SMS from your inbox'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SmsInboxScreen()),
+                );
               },
             ),
             ListTile(

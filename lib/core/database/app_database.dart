@@ -5,8 +5,10 @@ import 'tables/budgets_table.dart';
 import 'tables/categories_table.dart';
 import 'tables/debts_table.dart';
 import 'tables/fuliza_records_table.dart';
+import 'tables/payee_category_rules_table.dart';
 import 'tables/recurring_transactions_table.dart';
 import 'tables/savings_goals_table.dart';
+import 'tables/sms_inbox_items_table.dart';
 import 'tables/transactions_table.dart';
 
 part 'app_database.g.dart';
@@ -21,7 +23,9 @@ part 'app_database.g.dart';
   Debts,
   DebtRepayments,
   SavingsGoals,
-  GoalContributions
+  GoalContributions,
+  PayeeCategoryRules,
+  SmsInboxItems,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -30,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -173,6 +177,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 11) {
             await m.createTable(savingsGoals);
             await m.createTable(goalContributions);
+          }
+          if (from < 12) {
+            await m.createTable(payeeCategoryRules);
+            await m.createTable(smsInboxItems);
           }
         },
       );

@@ -47,6 +47,11 @@ class MpesaParser {
       return _parseFulizaDrawdown(msg, ref);
     }
 
+    // Reversal — special handling
+    if (type == MpesaTransactionType.reversal) {
+      return _parseReversal(msg, ref);
+    }
+
     // Extract amounts
     final allAmounts = _amountRe.allMatches(msg)
         .map((m) => _parseAmount(m.group(1)!))
@@ -96,11 +101,40 @@ class MpesaParser {
     // Order matters — most specific first
     if (lower.contains('fuliza m-pesa amount is')) return MpesaTransactionType.fulizaDrawdown;
     if (lower.contains('used to fully pay your outstanding fuliza')) return MpesaTransactionType.fulizaRepayment;
-    if (lower.contains('you have received') || lower.contains('confirmed.you have received')) return MpesaTransactionType.receiveMoney;
+
+    // Reversal: "has been reversed" or "reversal of"
+    if (lower.contains('has been reversed') || lower.contains('reversal of')) {
+      return MpesaTransactionType.reversal;
+    }
+
+    // Pochi la Biashara — check BEFORE receiveMoney (message also says "you have received")
+    if (lower.contains('pochi la biashara')) return MpesaTransactionType.pochiLaBiashara;
+
+    if (lower.contains('you have received') || lower.contains('confirmed.you have received')) {
+      return MpesaTransactionType.receiveMoney;
+    }
     if (lower.contains('airtime purchase')) return MpesaTransactionType.airtime;
     if (lower.contains('withdrawn from agent')) return MpesaTransactionType.withdraw;
     if (lower.contains('give') && lower.contains('cash to')) return MpesaTransactionType.agentCashout;
-    if (lower.contains('sent to') && lower.contains('for account')) return MpesaTransactionType.paybill; // paybill with account
+
+    // M-Shwari
+    if (lower.contains('m-shwari loan') && lower.contains('disbursed')) {
+      return MpesaTransactionType.mShwariLoan;
+    }
+    if (lower.contains('m-shwari loan') && lower.contains('repayment')) {
+      return MpesaTransactionType.mShwariRepayment;
+    }
+    if (lower.contains('m-shwari lock savings') || lower.contains('m-shwari savings')) {
+      return MpesaTransactionType.mShwariSavings;
+    }
+
+    // Buy Goods (Till) — "paid to <MERCHANT>" without an account reference
+    if (lower.contains('paid to') && !lower.contains('for account')) {
+      return MpesaTransactionType.buyGoods;
+    }
+
+    // Paybill with account
+    if (lower.contains('sent to') && lower.contains('for account')) return MpesaTransactionType.paybill;
     if (lower.contains('sent to')) return MpesaTransactionType.sendMoney;
     if (lower.contains('paid to')) return MpesaTransactionType.paybill;
 
@@ -134,10 +168,20 @@ class MpesaParser {
         if (m2 != null) return (_cleanName(m2.group(1)!), m2.group(2) ?? '');
         // "paid to NAME. on" or "paid to NAME on"
         m2 = RegExp(
-          r'paid to ([A-Za-z][A-Za-z\s\-]+?)[\.\s]+on\s',
+          r'paid to ([A-Za-z][A-Za-z\s\-]+?)[.\s]+on\s',
           caseSensitive: false,
         ).firstMatch(msg);
         return (_cleanName(m2?.group(1) ?? ''), '');
+
+      case MpesaTransactionType.buyGoods:
+        // "paid to MERCHANT NAME. on" — may include till number after name
+        final mg = RegExp(
+          r'paid to ([A-Za-z0-9][A-Za-z0-9\s\-&.]+?)[.\s]+on\s',
+          caseSensitive: false,
+        ).firstMatch(msg);
+        // Extract till number if present: "Till XXXXXXX"
+        final till = RegExp(r'[Tt]ill\s+(\d+)').firstMatch(msg);
+        return (_cleanName(mg?.group(1) ?? ''), till?.group(1) ?? '');
 
       case MpesaTransactionType.receiveMoney:
         // "received Ksh... from NAME 0758***343 on"
@@ -169,6 +213,34 @@ class MpesaParser {
           caseSensitive: false,
         ).firstMatch(msg);
         return (_cleanName(m6?.group(2) ?? ''), m6?.group(1) ?? '');
+
+      case MpesaTransactionType.pochiLaBiashara:
+        // Inflow: "received Ksh... from CUSTOMER via Pochi La Biashara"
+        // Outflow: "paid Ksh... to PAYEE via Pochi La Biashara"
+        final inflow = RegExp(
+          r'received\s+Ksh.*?from\s+([A-Za-z][A-Za-z\s]+?)\s+via',
+          caseSensitive: false,
+        ).firstMatch(msg);
+        if (inflow != null) return (_cleanName(inflow.group(1)!), '');
+        final outflow = RegExp(
+          r'paid\s+Ksh.*?to\s+([A-Za-z][A-Za-z\s]+?)\s+via',
+          caseSensitive: false,
+        ).firstMatch(msg);
+        return (_cleanName(outflow?.group(1) ?? 'Pochi la Biashara'), '');
+
+      case MpesaTransactionType.mShwariLoan:
+        return ('M-Shwari Loan', '');
+
+      case MpesaTransactionType.mShwariRepayment:
+        return ('M-Shwari Repayment', '');
+
+      case MpesaTransactionType.mShwariSavings:
+        return ('M-Shwari Savings', '');
+
+      case MpesaTransactionType.reversal:
+        // "Transaction UK3QX11U87 of Ksh... has been reversed"
+        final origRef = RegExp(r'[Tt]ransaction\s+([A-Z0-9]{8,12})\s+of').firstMatch(msg);
+        return ('Reversal', origRef?.group(1) ?? '');
 
       case MpesaTransactionType.fulizaRepayment:
         return ('Fuliza M-PESA Repayment', '');
@@ -244,6 +316,29 @@ class MpesaParser {
       fulizaAccessFee: accessFee,
       outstandingTotal: outstanding,
       fulizaDueDate: dueDate,
+    );
+  }
+
+  static MpesaParseResult _parseReversal(String msg, String ref) {
+    final allAmounts = _amountRe.allMatches(msg)
+        .map((m) => _parseAmount(m.group(1)!))
+        .where((a) => a > 0)
+        .toList();
+    final amount = allAmounts.isNotEmpty ? allAmounts.first : 0.0;
+    final dateMatch = _dateRe.firstMatch(msg);
+    final timeMatch = _timeRe.firstMatch(msg);
+    final origRef = RegExp(r'[Tt]ransaction\s+([A-Z0-9]{8,12})\s+of').firstMatch(msg);
+
+    return MpesaParseResult(
+      mpesaRef: ref,
+      amount: amount,
+      transactionCost: 0,
+      transactionDate: _buildDateTime(dateMatch, timeMatch),
+      counterpartyName: 'Reversal',
+      counterpartyAccount: origRef?.group(1) ?? '',
+      type: MpesaTransactionType.reversal,
+      newBalance: 0,
+      isValid: true,
     );
   }
 }

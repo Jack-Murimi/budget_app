@@ -5236,6 +5236,801 @@ class GoalContributionsCompanion extends UpdateCompanion<GoalContribution> {
   }
 }
 
+class $PayeeCategoryRulesTable extends PayeeCategoryRules
+    with TableInfo<$PayeeCategoryRulesTable, PayeeCategoryRule> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PayeeCategoryRulesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _payeePatternMeta =
+      const VerificationMeta('payeePattern');
+  @override
+  late final GeneratedColumn<String> payeePattern = GeneratedColumn<String>(
+      'payee_pattern', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _categoryIdMeta =
+      const VerificationMeta('categoryId');
+  @override
+  late final GeneratedColumn<int> categoryId = GeneratedColumn<int>(
+      'category_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _hitCountMeta =
+      const VerificationMeta('hitCount');
+  @override
+  late final GeneratedColumn<int> hitCount = GeneratedColumn<int>(
+      'hit_count', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(1));
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [payeePattern, categoryId, hitCount, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'payee_category_rules';
+  @override
+  VerificationContext validateIntegrity(Insertable<PayeeCategoryRule> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('payee_pattern')) {
+      context.handle(
+          _payeePatternMeta,
+          payeePattern.isAcceptableOrUnknown(
+              data['payee_pattern']!, _payeePatternMeta));
+    } else if (isInserting) {
+      context.missing(_payeePatternMeta);
+    }
+    if (data.containsKey('category_id')) {
+      context.handle(
+          _categoryIdMeta,
+          categoryId.isAcceptableOrUnknown(
+              data['category_id']!, _categoryIdMeta));
+    } else if (isInserting) {
+      context.missing(_categoryIdMeta);
+    }
+    if (data.containsKey('hit_count')) {
+      context.handle(_hitCountMeta,
+          hitCount.isAcceptableOrUnknown(data['hit_count']!, _hitCountMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {payeePattern};
+  @override
+  PayeeCategoryRule map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PayeeCategoryRule(
+      payeePattern: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payee_pattern'])!,
+      categoryId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}category_id'])!,
+      hitCount: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}hit_count'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $PayeeCategoryRulesTable createAlias(String alias) {
+    return $PayeeCategoryRulesTable(attachedDatabase, alias);
+  }
+}
+
+class PayeeCategoryRule extends DataClass
+    implements Insertable<PayeeCategoryRule> {
+  final String payeePattern;
+  final int categoryId;
+  final int hitCount;
+  final DateTime updatedAt;
+  const PayeeCategoryRule(
+      {required this.payeePattern,
+      required this.categoryId,
+      required this.hitCount,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['payee_pattern'] = Variable<String>(payeePattern);
+    map['category_id'] = Variable<int>(categoryId);
+    map['hit_count'] = Variable<int>(hitCount);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  PayeeCategoryRulesCompanion toCompanion(bool nullToAbsent) {
+    return PayeeCategoryRulesCompanion(
+      payeePattern: Value(payeePattern),
+      categoryId: Value(categoryId),
+      hitCount: Value(hitCount),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory PayeeCategoryRule.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PayeeCategoryRule(
+      payeePattern: serializer.fromJson<String>(json['payeePattern']),
+      categoryId: serializer.fromJson<int>(json['categoryId']),
+      hitCount: serializer.fromJson<int>(json['hitCount']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'payeePattern': serializer.toJson<String>(payeePattern),
+      'categoryId': serializer.toJson<int>(categoryId),
+      'hitCount': serializer.toJson<int>(hitCount),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  PayeeCategoryRule copyWith(
+          {String? payeePattern,
+          int? categoryId,
+          int? hitCount,
+          DateTime? updatedAt}) =>
+      PayeeCategoryRule(
+        payeePattern: payeePattern ?? this.payeePattern,
+        categoryId: categoryId ?? this.categoryId,
+        hitCount: hitCount ?? this.hitCount,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  PayeeCategoryRule copyWithCompanion(PayeeCategoryRulesCompanion data) {
+    return PayeeCategoryRule(
+      payeePattern: data.payeePattern.present
+          ? data.payeePattern.value
+          : this.payeePattern,
+      categoryId:
+          data.categoryId.present ? data.categoryId.value : this.categoryId,
+      hitCount: data.hitCount.present ? data.hitCount.value : this.hitCount,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PayeeCategoryRule(')
+          ..write('payeePattern: $payeePattern, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('hitCount: $hitCount, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(payeePattern, categoryId, hitCount, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PayeeCategoryRule &&
+          other.payeePattern == this.payeePattern &&
+          other.categoryId == this.categoryId &&
+          other.hitCount == this.hitCount &&
+          other.updatedAt == this.updatedAt);
+}
+
+class PayeeCategoryRulesCompanion extends UpdateCompanion<PayeeCategoryRule> {
+  final Value<String> payeePattern;
+  final Value<int> categoryId;
+  final Value<int> hitCount;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const PayeeCategoryRulesCompanion({
+    this.payeePattern = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.hitCount = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PayeeCategoryRulesCompanion.insert({
+    required String payeePattern,
+    required int categoryId,
+    this.hitCount = const Value.absent(),
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  })  : payeePattern = Value(payeePattern),
+        categoryId = Value(categoryId),
+        updatedAt = Value(updatedAt);
+  static Insertable<PayeeCategoryRule> custom({
+    Expression<String>? payeePattern,
+    Expression<int>? categoryId,
+    Expression<int>? hitCount,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (payeePattern != null) 'payee_pattern': payeePattern,
+      if (categoryId != null) 'category_id': categoryId,
+      if (hitCount != null) 'hit_count': hitCount,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PayeeCategoryRulesCompanion copyWith(
+      {Value<String>? payeePattern,
+      Value<int>? categoryId,
+      Value<int>? hitCount,
+      Value<DateTime>? updatedAt,
+      Value<int>? rowid}) {
+    return PayeeCategoryRulesCompanion(
+      payeePattern: payeePattern ?? this.payeePattern,
+      categoryId: categoryId ?? this.categoryId,
+      hitCount: hitCount ?? this.hitCount,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (payeePattern.present) {
+      map['payee_pattern'] = Variable<String>(payeePattern.value);
+    }
+    if (categoryId.present) {
+      map['category_id'] = Variable<int>(categoryId.value);
+    }
+    if (hitCount.present) {
+      map['hit_count'] = Variable<int>(hitCount.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PayeeCategoryRulesCompanion(')
+          ..write('payeePattern: $payeePattern, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('hitCount: $hitCount, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SmsInboxItemsTable extends SmsInboxItems
+    with TableInfo<$SmsInboxItemsTable, SmsInboxItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SmsInboxItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _rawBodyMeta =
+      const VerificationMeta('rawBody');
+  @override
+  late final GeneratedColumn<String> rawBody = GeneratedColumn<String>(
+      'raw_body', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _parsedTypeMeta =
+      const VerificationMeta('parsedType');
+  @override
+  late final GeneratedColumn<String> parsedType = GeneratedColumn<String>(
+      'parsed_type', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _parsedAmountMeta =
+      const VerificationMeta('parsedAmount');
+  @override
+  late final GeneratedColumn<double> parsedAmount = GeneratedColumn<double>(
+      'parsed_amount', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _parsedPayeeMeta =
+      const VerificationMeta('parsedPayee');
+  @override
+  late final GeneratedColumn<String> parsedPayee = GeneratedColumn<String>(
+      'parsed_payee', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _parsedRefMeta =
+      const VerificationMeta('parsedRef');
+  @override
+  late final GeneratedColumn<String> parsedRef = GeneratedColumn<String>(
+      'parsed_ref', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _parsedDateMeta =
+      const VerificationMeta('parsedDate');
+  @override
+  late final GeneratedColumn<int> parsedDate = GeneratedColumn<int>(
+      'parsed_date', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+      'status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('pending'));
+  static const VerificationMeta _parseNoteMeta =
+      const VerificationMeta('parseNote');
+  @override
+  late final GeneratedColumn<String> parseNote = GeneratedColumn<String>(
+      'parse_note', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        rawBody,
+        parsedType,
+        parsedAmount,
+        parsedPayee,
+        parsedRef,
+        parsedDate,
+        status,
+        parseNote,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sms_inbox_items';
+  @override
+  VerificationContext validateIntegrity(Insertable<SmsInboxItem> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('raw_body')) {
+      context.handle(_rawBodyMeta,
+          rawBody.isAcceptableOrUnknown(data['raw_body']!, _rawBodyMeta));
+    } else if (isInserting) {
+      context.missing(_rawBodyMeta);
+    }
+    if (data.containsKey('parsed_type')) {
+      context.handle(
+          _parsedTypeMeta,
+          parsedType.isAcceptableOrUnknown(
+              data['parsed_type']!, _parsedTypeMeta));
+    }
+    if (data.containsKey('parsed_amount')) {
+      context.handle(
+          _parsedAmountMeta,
+          parsedAmount.isAcceptableOrUnknown(
+              data['parsed_amount']!, _parsedAmountMeta));
+    }
+    if (data.containsKey('parsed_payee')) {
+      context.handle(
+          _parsedPayeeMeta,
+          parsedPayee.isAcceptableOrUnknown(
+              data['parsed_payee']!, _parsedPayeeMeta));
+    }
+    if (data.containsKey('parsed_ref')) {
+      context.handle(_parsedRefMeta,
+          parsedRef.isAcceptableOrUnknown(data['parsed_ref']!, _parsedRefMeta));
+    }
+    if (data.containsKey('parsed_date')) {
+      context.handle(
+          _parsedDateMeta,
+          parsedDate.isAcceptableOrUnknown(
+              data['parsed_date']!, _parsedDateMeta));
+    }
+    if (data.containsKey('status')) {
+      context.handle(_statusMeta,
+          status.isAcceptableOrUnknown(data['status']!, _statusMeta));
+    }
+    if (data.containsKey('parse_note')) {
+      context.handle(_parseNoteMeta,
+          parseNote.isAcceptableOrUnknown(data['parse_note']!, _parseNoteMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SmsInboxItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SmsInboxItem(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      rawBody: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}raw_body'])!,
+      parsedType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parsed_type']),
+      parsedAmount: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}parsed_amount']),
+      parsedPayee: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parsed_payee']),
+      parsedRef: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parsed_ref']),
+      parsedDate: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}parsed_date']),
+      status: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
+      parseNote: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parse_note']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $SmsInboxItemsTable createAlias(String alias) {
+    return $SmsInboxItemsTable(attachedDatabase, alias);
+  }
+}
+
+class SmsInboxItem extends DataClass implements Insertable<SmsInboxItem> {
+  final int id;
+  final String rawBody;
+  final String? parsedType;
+  final double? parsedAmount;
+  final String? parsedPayee;
+  final String? parsedRef;
+  final int? parsedDate;
+  final String status;
+  final String? parseNote;
+  final DateTime createdAt;
+  const SmsInboxItem(
+      {required this.id,
+      required this.rawBody,
+      this.parsedType,
+      this.parsedAmount,
+      this.parsedPayee,
+      this.parsedRef,
+      this.parsedDate,
+      required this.status,
+      this.parseNote,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['raw_body'] = Variable<String>(rawBody);
+    if (!nullToAbsent || parsedType != null) {
+      map['parsed_type'] = Variable<String>(parsedType);
+    }
+    if (!nullToAbsent || parsedAmount != null) {
+      map['parsed_amount'] = Variable<double>(parsedAmount);
+    }
+    if (!nullToAbsent || parsedPayee != null) {
+      map['parsed_payee'] = Variable<String>(parsedPayee);
+    }
+    if (!nullToAbsent || parsedRef != null) {
+      map['parsed_ref'] = Variable<String>(parsedRef);
+    }
+    if (!nullToAbsent || parsedDate != null) {
+      map['parsed_date'] = Variable<int>(parsedDate);
+    }
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || parseNote != null) {
+      map['parse_note'] = Variable<String>(parseNote);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  SmsInboxItemsCompanion toCompanion(bool nullToAbsent) {
+    return SmsInboxItemsCompanion(
+      id: Value(id),
+      rawBody: Value(rawBody),
+      parsedType: parsedType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parsedType),
+      parsedAmount: parsedAmount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parsedAmount),
+      parsedPayee: parsedPayee == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parsedPayee),
+      parsedRef: parsedRef == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parsedRef),
+      parsedDate: parsedDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parsedDate),
+      status: Value(status),
+      parseNote: parseNote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parseNote),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory SmsInboxItem.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SmsInboxItem(
+      id: serializer.fromJson<int>(json['id']),
+      rawBody: serializer.fromJson<String>(json['rawBody']),
+      parsedType: serializer.fromJson<String?>(json['parsedType']),
+      parsedAmount: serializer.fromJson<double?>(json['parsedAmount']),
+      parsedPayee: serializer.fromJson<String?>(json['parsedPayee']),
+      parsedRef: serializer.fromJson<String?>(json['parsedRef']),
+      parsedDate: serializer.fromJson<int?>(json['parsedDate']),
+      status: serializer.fromJson<String>(json['status']),
+      parseNote: serializer.fromJson<String?>(json['parseNote']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'rawBody': serializer.toJson<String>(rawBody),
+      'parsedType': serializer.toJson<String?>(parsedType),
+      'parsedAmount': serializer.toJson<double?>(parsedAmount),
+      'parsedPayee': serializer.toJson<String?>(parsedPayee),
+      'parsedRef': serializer.toJson<String?>(parsedRef),
+      'parsedDate': serializer.toJson<int?>(parsedDate),
+      'status': serializer.toJson<String>(status),
+      'parseNote': serializer.toJson<String?>(parseNote),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  SmsInboxItem copyWith(
+          {int? id,
+          String? rawBody,
+          Value<String?> parsedType = const Value.absent(),
+          Value<double?> parsedAmount = const Value.absent(),
+          Value<String?> parsedPayee = const Value.absent(),
+          Value<String?> parsedRef = const Value.absent(),
+          Value<int?> parsedDate = const Value.absent(),
+          String? status,
+          Value<String?> parseNote = const Value.absent(),
+          DateTime? createdAt}) =>
+      SmsInboxItem(
+        id: id ?? this.id,
+        rawBody: rawBody ?? this.rawBody,
+        parsedType: parsedType.present ? parsedType.value : this.parsedType,
+        parsedAmount:
+            parsedAmount.present ? parsedAmount.value : this.parsedAmount,
+        parsedPayee: parsedPayee.present ? parsedPayee.value : this.parsedPayee,
+        parsedRef: parsedRef.present ? parsedRef.value : this.parsedRef,
+        parsedDate: parsedDate.present ? parsedDate.value : this.parsedDate,
+        status: status ?? this.status,
+        parseNote: parseNote.present ? parseNote.value : this.parseNote,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  SmsInboxItem copyWithCompanion(SmsInboxItemsCompanion data) {
+    return SmsInboxItem(
+      id: data.id.present ? data.id.value : this.id,
+      rawBody: data.rawBody.present ? data.rawBody.value : this.rawBody,
+      parsedType:
+          data.parsedType.present ? data.parsedType.value : this.parsedType,
+      parsedAmount: data.parsedAmount.present
+          ? data.parsedAmount.value
+          : this.parsedAmount,
+      parsedPayee:
+          data.parsedPayee.present ? data.parsedPayee.value : this.parsedPayee,
+      parsedRef: data.parsedRef.present ? data.parsedRef.value : this.parsedRef,
+      parsedDate:
+          data.parsedDate.present ? data.parsedDate.value : this.parsedDate,
+      status: data.status.present ? data.status.value : this.status,
+      parseNote: data.parseNote.present ? data.parseNote.value : this.parseNote,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SmsInboxItem(')
+          ..write('id: $id, ')
+          ..write('rawBody: $rawBody, ')
+          ..write('parsedType: $parsedType, ')
+          ..write('parsedAmount: $parsedAmount, ')
+          ..write('parsedPayee: $parsedPayee, ')
+          ..write('parsedRef: $parsedRef, ')
+          ..write('parsedDate: $parsedDate, ')
+          ..write('status: $status, ')
+          ..write('parseNote: $parseNote, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, rawBody, parsedType, parsedAmount,
+      parsedPayee, parsedRef, parsedDate, status, parseNote, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SmsInboxItem &&
+          other.id == this.id &&
+          other.rawBody == this.rawBody &&
+          other.parsedType == this.parsedType &&
+          other.parsedAmount == this.parsedAmount &&
+          other.parsedPayee == this.parsedPayee &&
+          other.parsedRef == this.parsedRef &&
+          other.parsedDate == this.parsedDate &&
+          other.status == this.status &&
+          other.parseNote == this.parseNote &&
+          other.createdAt == this.createdAt);
+}
+
+class SmsInboxItemsCompanion extends UpdateCompanion<SmsInboxItem> {
+  final Value<int> id;
+  final Value<String> rawBody;
+  final Value<String?> parsedType;
+  final Value<double?> parsedAmount;
+  final Value<String?> parsedPayee;
+  final Value<String?> parsedRef;
+  final Value<int?> parsedDate;
+  final Value<String> status;
+  final Value<String?> parseNote;
+  final Value<DateTime> createdAt;
+  const SmsInboxItemsCompanion({
+    this.id = const Value.absent(),
+    this.rawBody = const Value.absent(),
+    this.parsedType = const Value.absent(),
+    this.parsedAmount = const Value.absent(),
+    this.parsedPayee = const Value.absent(),
+    this.parsedRef = const Value.absent(),
+    this.parsedDate = const Value.absent(),
+    this.status = const Value.absent(),
+    this.parseNote = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  SmsInboxItemsCompanion.insert({
+    this.id = const Value.absent(),
+    required String rawBody,
+    this.parsedType = const Value.absent(),
+    this.parsedAmount = const Value.absent(),
+    this.parsedPayee = const Value.absent(),
+    this.parsedRef = const Value.absent(),
+    this.parsedDate = const Value.absent(),
+    this.status = const Value.absent(),
+    this.parseNote = const Value.absent(),
+    required DateTime createdAt,
+  })  : rawBody = Value(rawBody),
+        createdAt = Value(createdAt);
+  static Insertable<SmsInboxItem> custom({
+    Expression<int>? id,
+    Expression<String>? rawBody,
+    Expression<String>? parsedType,
+    Expression<double>? parsedAmount,
+    Expression<String>? parsedPayee,
+    Expression<String>? parsedRef,
+    Expression<int>? parsedDate,
+    Expression<String>? status,
+    Expression<String>? parseNote,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (rawBody != null) 'raw_body': rawBody,
+      if (parsedType != null) 'parsed_type': parsedType,
+      if (parsedAmount != null) 'parsed_amount': parsedAmount,
+      if (parsedPayee != null) 'parsed_payee': parsedPayee,
+      if (parsedRef != null) 'parsed_ref': parsedRef,
+      if (parsedDate != null) 'parsed_date': parsedDate,
+      if (status != null) 'status': status,
+      if (parseNote != null) 'parse_note': parseNote,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  SmsInboxItemsCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? rawBody,
+      Value<String?>? parsedType,
+      Value<double?>? parsedAmount,
+      Value<String?>? parsedPayee,
+      Value<String?>? parsedRef,
+      Value<int?>? parsedDate,
+      Value<String>? status,
+      Value<String?>? parseNote,
+      Value<DateTime>? createdAt}) {
+    return SmsInboxItemsCompanion(
+      id: id ?? this.id,
+      rawBody: rawBody ?? this.rawBody,
+      parsedType: parsedType ?? this.parsedType,
+      parsedAmount: parsedAmount ?? this.parsedAmount,
+      parsedPayee: parsedPayee ?? this.parsedPayee,
+      parsedRef: parsedRef ?? this.parsedRef,
+      parsedDate: parsedDate ?? this.parsedDate,
+      status: status ?? this.status,
+      parseNote: parseNote ?? this.parseNote,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (rawBody.present) {
+      map['raw_body'] = Variable<String>(rawBody.value);
+    }
+    if (parsedType.present) {
+      map['parsed_type'] = Variable<String>(parsedType.value);
+    }
+    if (parsedAmount.present) {
+      map['parsed_amount'] = Variable<double>(parsedAmount.value);
+    }
+    if (parsedPayee.present) {
+      map['parsed_payee'] = Variable<String>(parsedPayee.value);
+    }
+    if (parsedRef.present) {
+      map['parsed_ref'] = Variable<String>(parsedRef.value);
+    }
+    if (parsedDate.present) {
+      map['parsed_date'] = Variable<int>(parsedDate.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (parseNote.present) {
+      map['parse_note'] = Variable<String>(parseNote.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SmsInboxItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('rawBody: $rawBody, ')
+          ..write('parsedType: $parsedType, ')
+          ..write('parsedAmount: $parsedAmount, ')
+          ..write('parsedPayee: $parsedPayee, ')
+          ..write('parsedRef: $parsedRef, ')
+          ..write('parsedDate: $parsedDate, ')
+          ..write('status: $status, ')
+          ..write('parseNote: $parseNote, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5251,6 +6046,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SavingsGoalsTable savingsGoals = $SavingsGoalsTable(this);
   late final $GoalContributionsTable goalContributions =
       $GoalContributionsTable(this);
+  late final $PayeeCategoryRulesTable payeeCategoryRules =
+      $PayeeCategoryRulesTable(this);
+  late final $SmsInboxItemsTable smsInboxItems = $SmsInboxItemsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5265,7 +6063,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         debts,
         debtRepayments,
         savingsGoals,
-        goalContributions
+        goalContributions,
+        payeeCategoryRules,
+        smsInboxItems
       ];
 }
 
@@ -7751,6 +8551,410 @@ typedef $$GoalContributionsTableProcessedTableManager = ProcessedTableManager<
     ),
     GoalContribution,
     PrefetchHooks Function()>;
+typedef $$PayeeCategoryRulesTableCreateCompanionBuilder
+    = PayeeCategoryRulesCompanion Function({
+  required String payeePattern,
+  required int categoryId,
+  Value<int> hitCount,
+  required DateTime updatedAt,
+  Value<int> rowid,
+});
+typedef $$PayeeCategoryRulesTableUpdateCompanionBuilder
+    = PayeeCategoryRulesCompanion Function({
+  Value<String> payeePattern,
+  Value<int> categoryId,
+  Value<int> hitCount,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+
+class $$PayeeCategoryRulesTableFilterComposer
+    extends Composer<_$AppDatabase, $PayeeCategoryRulesTable> {
+  $$PayeeCategoryRulesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get payeePattern => $composableBuilder(
+      column: $table.payeePattern, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get categoryId => $composableBuilder(
+      column: $table.categoryId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get hitCount => $composableBuilder(
+      column: $table.hitCount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$PayeeCategoryRulesTableOrderingComposer
+    extends Composer<_$AppDatabase, $PayeeCategoryRulesTable> {
+  $$PayeeCategoryRulesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get payeePattern => $composableBuilder(
+      column: $table.payeePattern,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get categoryId => $composableBuilder(
+      column: $table.categoryId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get hitCount => $composableBuilder(
+      column: $table.hitCount, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$PayeeCategoryRulesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PayeeCategoryRulesTable> {
+  $$PayeeCategoryRulesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get payeePattern => $composableBuilder(
+      column: $table.payeePattern, builder: (column) => column);
+
+  GeneratedColumn<int> get categoryId => $composableBuilder(
+      column: $table.categoryId, builder: (column) => column);
+
+  GeneratedColumn<int> get hitCount =>
+      $composableBuilder(column: $table.hitCount, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$PayeeCategoryRulesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $PayeeCategoryRulesTable,
+    PayeeCategoryRule,
+    $$PayeeCategoryRulesTableFilterComposer,
+    $$PayeeCategoryRulesTableOrderingComposer,
+    $$PayeeCategoryRulesTableAnnotationComposer,
+    $$PayeeCategoryRulesTableCreateCompanionBuilder,
+    $$PayeeCategoryRulesTableUpdateCompanionBuilder,
+    (
+      PayeeCategoryRule,
+      BaseReferences<_$AppDatabase, $PayeeCategoryRulesTable, PayeeCategoryRule>
+    ),
+    PayeeCategoryRule,
+    PrefetchHooks Function()> {
+  $$PayeeCategoryRulesTableTableManager(
+      _$AppDatabase db, $PayeeCategoryRulesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PayeeCategoryRulesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PayeeCategoryRulesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PayeeCategoryRulesTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> payeePattern = const Value.absent(),
+            Value<int> categoryId = const Value.absent(),
+            Value<int> hitCount = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              PayeeCategoryRulesCompanion(
+            payeePattern: payeePattern,
+            categoryId: categoryId,
+            hitCount: hitCount,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String payeePattern,
+            required int categoryId,
+            Value<int> hitCount = const Value.absent(),
+            required DateTime updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              PayeeCategoryRulesCompanion.insert(
+            payeePattern: payeePattern,
+            categoryId: categoryId,
+            hitCount: hitCount,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$PayeeCategoryRulesTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $PayeeCategoryRulesTable,
+    PayeeCategoryRule,
+    $$PayeeCategoryRulesTableFilterComposer,
+    $$PayeeCategoryRulesTableOrderingComposer,
+    $$PayeeCategoryRulesTableAnnotationComposer,
+    $$PayeeCategoryRulesTableCreateCompanionBuilder,
+    $$PayeeCategoryRulesTableUpdateCompanionBuilder,
+    (
+      PayeeCategoryRule,
+      BaseReferences<_$AppDatabase, $PayeeCategoryRulesTable, PayeeCategoryRule>
+    ),
+    PayeeCategoryRule,
+    PrefetchHooks Function()>;
+typedef $$SmsInboxItemsTableCreateCompanionBuilder = SmsInboxItemsCompanion
+    Function({
+  Value<int> id,
+  required String rawBody,
+  Value<String?> parsedType,
+  Value<double?> parsedAmount,
+  Value<String?> parsedPayee,
+  Value<String?> parsedRef,
+  Value<int?> parsedDate,
+  Value<String> status,
+  Value<String?> parseNote,
+  required DateTime createdAt,
+});
+typedef $$SmsInboxItemsTableUpdateCompanionBuilder = SmsInboxItemsCompanion
+    Function({
+  Value<int> id,
+  Value<String> rawBody,
+  Value<String?> parsedType,
+  Value<double?> parsedAmount,
+  Value<String?> parsedPayee,
+  Value<String?> parsedRef,
+  Value<int?> parsedDate,
+  Value<String> status,
+  Value<String?> parseNote,
+  Value<DateTime> createdAt,
+});
+
+class $$SmsInboxItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $SmsInboxItemsTable> {
+  $$SmsInboxItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get rawBody => $composableBuilder(
+      column: $table.rawBody, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parsedType => $composableBuilder(
+      column: $table.parsedType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get parsedAmount => $composableBuilder(
+      column: $table.parsedAmount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parsedPayee => $composableBuilder(
+      column: $table.parsedPayee, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parsedRef => $composableBuilder(
+      column: $table.parsedRef, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get parsedDate => $composableBuilder(
+      column: $table.parsedDate, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parseNote => $composableBuilder(
+      column: $table.parseNote, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$SmsInboxItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SmsInboxItemsTable> {
+  $$SmsInboxItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get rawBody => $composableBuilder(
+      column: $table.rawBody, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get parsedType => $composableBuilder(
+      column: $table.parsedType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get parsedAmount => $composableBuilder(
+      column: $table.parsedAmount,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get parsedPayee => $composableBuilder(
+      column: $table.parsedPayee, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get parsedRef => $composableBuilder(
+      column: $table.parsedRef, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get parsedDate => $composableBuilder(
+      column: $table.parsedDate, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get parseNote => $composableBuilder(
+      column: $table.parseNote, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$SmsInboxItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SmsInboxItemsTable> {
+  $$SmsInboxItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get rawBody =>
+      $composableBuilder(column: $table.rawBody, builder: (column) => column);
+
+  GeneratedColumn<String> get parsedType => $composableBuilder(
+      column: $table.parsedType, builder: (column) => column);
+
+  GeneratedColumn<double> get parsedAmount => $composableBuilder(
+      column: $table.parsedAmount, builder: (column) => column);
+
+  GeneratedColumn<String> get parsedPayee => $composableBuilder(
+      column: $table.parsedPayee, builder: (column) => column);
+
+  GeneratedColumn<String> get parsedRef =>
+      $composableBuilder(column: $table.parsedRef, builder: (column) => column);
+
+  GeneratedColumn<int> get parsedDate => $composableBuilder(
+      column: $table.parsedDate, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get parseNote =>
+      $composableBuilder(column: $table.parseNote, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$SmsInboxItemsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $SmsInboxItemsTable,
+    SmsInboxItem,
+    $$SmsInboxItemsTableFilterComposer,
+    $$SmsInboxItemsTableOrderingComposer,
+    $$SmsInboxItemsTableAnnotationComposer,
+    $$SmsInboxItemsTableCreateCompanionBuilder,
+    $$SmsInboxItemsTableUpdateCompanionBuilder,
+    (
+      SmsInboxItem,
+      BaseReferences<_$AppDatabase, $SmsInboxItemsTable, SmsInboxItem>
+    ),
+    SmsInboxItem,
+    PrefetchHooks Function()> {
+  $$SmsInboxItemsTableTableManager(_$AppDatabase db, $SmsInboxItemsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SmsInboxItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SmsInboxItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SmsInboxItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> rawBody = const Value.absent(),
+            Value<String?> parsedType = const Value.absent(),
+            Value<double?> parsedAmount = const Value.absent(),
+            Value<String?> parsedPayee = const Value.absent(),
+            Value<String?> parsedRef = const Value.absent(),
+            Value<int?> parsedDate = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<String?> parseNote = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              SmsInboxItemsCompanion(
+            id: id,
+            rawBody: rawBody,
+            parsedType: parsedType,
+            parsedAmount: parsedAmount,
+            parsedPayee: parsedPayee,
+            parsedRef: parsedRef,
+            parsedDate: parsedDate,
+            status: status,
+            parseNote: parseNote,
+            createdAt: createdAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String rawBody,
+            Value<String?> parsedType = const Value.absent(),
+            Value<double?> parsedAmount = const Value.absent(),
+            Value<String?> parsedPayee = const Value.absent(),
+            Value<String?> parsedRef = const Value.absent(),
+            Value<int?> parsedDate = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<String?> parseNote = const Value.absent(),
+            required DateTime createdAt,
+          }) =>
+              SmsInboxItemsCompanion.insert(
+            id: id,
+            rawBody: rawBody,
+            parsedType: parsedType,
+            parsedAmount: parsedAmount,
+            parsedPayee: parsedPayee,
+            parsedRef: parsedRef,
+            parsedDate: parsedDate,
+            status: status,
+            parseNote: parseNote,
+            createdAt: createdAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$SmsInboxItemsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $SmsInboxItemsTable,
+    SmsInboxItem,
+    $$SmsInboxItemsTableFilterComposer,
+    $$SmsInboxItemsTableOrderingComposer,
+    $$SmsInboxItemsTableAnnotationComposer,
+    $$SmsInboxItemsTableCreateCompanionBuilder,
+    $$SmsInboxItemsTableUpdateCompanionBuilder,
+    (
+      SmsInboxItem,
+      BaseReferences<_$AppDatabase, $SmsInboxItemsTable, SmsInboxItem>
+    ),
+    SmsInboxItem,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7775,4 +8979,8 @@ class $AppDatabaseManager {
       $$SavingsGoalsTableTableManager(_db, _db.savingsGoals);
   $$GoalContributionsTableTableManager get goalContributions =>
       $$GoalContributionsTableTableManager(_db, _db.goalContributions);
+  $$PayeeCategoryRulesTableTableManager get payeeCategoryRules =>
+      $$PayeeCategoryRulesTableTableManager(_db, _db.payeeCategoryRules);
+  $$SmsInboxItemsTableTableManager get smsInboxItems =>
+      $$SmsInboxItemsTableTableManager(_db, _db.smsInboxItems);
 }
