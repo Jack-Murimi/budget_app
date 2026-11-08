@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../accounts/screens/accounts_screen.dart';
 import '../../budgets/screens/budgets_screen.dart';
 import '../../categories/screens/categories_screen.dart';
+import '../../debts/screens/debts_screen.dart';
 import '../../fuliza/screens/fuliza_screen.dart';
 import '../../insights/screens/insights_screen.dart';
 import '../../recurring/screens/recurring_screen.dart';
@@ -22,6 +23,15 @@ class MainNavigationScreen extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            ListTile(
+              leading: const Icon(Icons.handshake_outlined),
+              title: const Text('Loans & Debts'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const DebtsScreen()));
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.insights_outlined),
               title: const Text('Insights'),

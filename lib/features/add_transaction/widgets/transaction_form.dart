@@ -7,6 +7,7 @@ import '../../categories/widgets/category_picker.dart';
 import '../../transactions/models/mpesa_parse_result.dart';
 import '../../transactions/models/transaction_model.dart';
 import '../../transactions/providers/transaction_providers.dart';
+import '../../debts/providers/debt_providers.dart';
 import '../../../shared/utils/date_formatter.dart';
 import '../../../main.dart';
 
@@ -439,9 +440,13 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
                 );
 
                 try {
-                  final id = await ref
-                      .read(transactionRepositoryProvider)
-                      .insertOrIgnoreDuplicate(companion);
+                  final isLoanGiven = _selectedCategory?.name.toLowerCase() == 'loan given';
+                  final id = isLoanGiven
+                      ? await ref.read(debtRepositoryProvider).recordLoanGiven(
+                          transaction: companion,
+                          counterparty: _descCtrl.text,
+                        )
+                      : await ref.read(transactionRepositoryProvider).insertOrIgnoreDuplicate(companion);
                   if (!context.mounted) return;
                   if (id == null) {
                     ScaffoldMessenger.of(context).showSnackBar(

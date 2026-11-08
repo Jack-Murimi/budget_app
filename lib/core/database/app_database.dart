@@ -3,13 +3,14 @@ import 'package:drift_flutter/drift_flutter.dart';
 import 'tables/accounts_table.dart';
 import 'tables/budgets_table.dart';
 import 'tables/categories_table.dart';
+import 'tables/debts_table.dart';
 import 'tables/fuliza_records_table.dart';
 import 'tables/recurring_transactions_table.dart';
 import 'tables/transactions_table.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Transactions, Categories, FulizaRecords, Accounts, Budgets, RecurringTransactions])
+@DriftDatabase(tables: [Transactions, Categories, FulizaRecords, Accounts, Budgets, RecurringTransactions, Debts, DebtRepayments])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -17,7 +18,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -144,6 +145,13 @@ class AppDatabase extends _$AppDatabase {
           await customStatement('ALTER TABLE transactions ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0');
         } catch (_) {}
       }
+      if (from < 9) {
+        await m.createTable(debts);
+        await m.createTable(debtRepayments);
+      }
+      if (from < 10) {
+        await m.addColumn(transactions, transactions.debtId);
+      }
     },
   );
 
@@ -179,6 +187,8 @@ class AppDatabase extends _$AppDatabase {
     final savings = await addCat('Savings', 'savings', '#FFB300');
     final income = await addCat('Income', 'attach_money', '#43A047');
     await addCat('Other', 'more_horiz', '#757575');
+    await addCat('Loan Given', 'handshake', '#1565C0');
+    await addCat('Loan Received', 'account_balance', '#00897B');
     final transfer = await addCat('Transfer', 'swap_horiz', '#546E7A');
 
     // ── Food & Dining sub-categories ──

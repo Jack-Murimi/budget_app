@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'accounts_table.dart';
 import 'categories_table.dart';
 import 'recurring_transactions_table.dart';
+import 'debts_table.dart';
 
 class Transactions extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -23,6 +24,7 @@ class Transactions extends Table {
   BoolColumn get excludeFromBudget => boolean().withDefault(const Constant(false))();
   IntColumn get recurrenceId => integer().nullable().references(RecurringTransactions, #id)();
   BoolColumn get isRecurring => boolean().withDefault(const Constant(false))();
+  IntColumn get debtId => integer().nullable().references(Debts, #id)();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override

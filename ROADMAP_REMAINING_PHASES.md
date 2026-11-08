@@ -16,6 +16,8 @@
   - Subscription management with pause/resume and monthly commitment summary
 - **Phase 4: Insights & Analytics** — Complete
   - Period selection, cashflow summary, category breakdown, daily cashflow chart, net worth trend
+- **Phase 5: Debts, Loans & Goals** — In progress
+  - Loans taken/given, due dates, interest, partial/full repayments, ledger links
 
 ---
 
