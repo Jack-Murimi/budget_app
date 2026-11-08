@@ -5,6 +5,7 @@ import '../../budgets/screens/budgets_screen.dart';
 import '../../categories/screens/categories_screen.dart';
 import '../../debts/screens/debts_screen.dart';
 import '../../fuliza/screens/fuliza_screen.dart';
+import '../../goals/screens/goals_screen.dart';
 import '../../insights/screens/insights_screen.dart';
 import '../../recurring/screens/recurring_screen.dart';
 import '../../settings/settings_screen.dart';
@@ -30,6 +31,15 @@ class MainNavigationScreen extends ConsumerWidget {
                 Navigator.pop(ctx);
                 Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const DebtsScreen()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.savings_outlined),
+              title: const Text('Savings goals'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const GoalsScreen()));
               },
             ),
             ListTile(
