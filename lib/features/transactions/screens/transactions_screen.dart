@@ -280,8 +280,11 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
                 double income = 0, expense = 0;
                 for (final t in txns) {
-                  if (t.type == 'income') income += t.amount;
-                  else expense += t.amount + t.transactionCost + t.fulizaFee;
+                  if (t.type == 'income') {
+                    income += t.amount;
+                  } else {
+                    expense += t.amount + t.transactionCost + t.fulizaFee;
+                  }
                 }
                 final net = income - expense;
 
