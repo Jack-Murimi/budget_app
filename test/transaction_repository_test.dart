@@ -259,4 +259,138 @@ void main() {
     expect(record!.header, 'Updated');
     expect(record.amount, 300.0);
   });
+
+  group('getHeaderSuggestions', () {
+    test('returns empty list for empty/whitespace query', () async {
+      final res = await repo.getHeaderSuggestions('   ');
+      expect(res, isEmpty);
+    });
+
+    test('returns max 3 items and supports same header with different categories', () async {
+      // Create parent category (Food & Drinks) and sub-category (Groceries)
+      final foodId = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Food & Drinks',
+          icon: const Value('fastfood'),
+          colorHex: const Value('#FF0000'),
+        ),
+      );
+      final groceriesId = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Groceries',
+          parentId: Value(foodId),
+          icon: const Value('local_grocery_store'),
+          colorHex: const Value('#FF0000'),
+        ),
+      );
+      // Create Shopping category and Electronics sub-category
+      final shopId = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Shopping',
+          icon: const Value('shopping_bag'),
+          colorHex: const Value('#0000FF'),
+        ),
+      );
+      final elecId = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Electronics',
+          parentId: Value(shopId),
+          icon: const Value('devices'),
+          colorHex: const Value('#0000FF'),
+        ),
+      );
+
+      // Insert transactions:
+      // 1. Naivas with Groceries (sub of Food & Drinks)
+      await repo.insert(
+        TransactionsCompanion.insert(
+          header: 'Naivas',
+          amount: 1500.0,
+          transactionDate: DateTime(2026, 1, 2),
+          categoryId: Value(groceriesId),
+        ),
+      );
+      // 2. Naivas with Electronics (sub of Shopping)
+      await repo.insert(
+        TransactionsCompanion.insert(
+          header: 'Naivas',
+          amount: 5000.0,
+          transactionDate: DateTime(2026, 1, 3),
+          categoryId: Value(elecId),
+        ),
+      );
+      // 3. Nairobi Java House with Food & Drinks (top-level)
+      await repo.insert(
+        TransactionsCompanion.insert(
+          header: 'Nairobi Java House',
+          amount: 800.0,
+          transactionDate: DateTime(2026, 1, 4),
+          categoryId: Value(foodId),
+        ),
+      );
+      // 4. Naivas Supermarket (4th item matching 'Nai', older date)
+      await repo.insert(
+        TransactionsCompanion.insert(
+          header: 'Naivas Supermarket',
+          amount: 300.0,
+          transactionDate: DateTime(2026, 1, 1),
+        ),
+      );
+
+      final suggestions = await repo.getHeaderSuggestions('Nai');
+      // Max 3 items
+      expect(suggestions.length, 3);
+
+      // Verify that same header 'Naivas' appears with both different categories
+      final headers = suggestions.map((s) => s.header).toList();
+      expect(headers, contains('Naivas'));
+
+      // Find Naivas suggestions
+      final naivasItems = suggestions.where((s) => s.header == 'Naivas').toList();
+      expect(naivasItems.length, 2);
+
+      final elecSuggestion = naivasItems.firstWhere((s) => s.categoryId == elecId);
+      expect(elecSuggestion.categoryDisplay, 'Shopping > Electronics');
+      expect(elecSuggestion.categoryName, 'Electronics');
+      expect(elecSuggestion.parentCategoryName, 'Shopping');
+
+      final grocSuggestion = naivasItems.firstWhere((s) => s.categoryId == groceriesId);
+      expect(grocSuggestion.categoryDisplay, 'Food & Drinks > Groceries');
+      expect(grocSuggestion.categoryName, 'Groceries');
+      expect(grocSuggestion.parentCategoryName, 'Food & Drinks');
+    });
+
+    test('deduplicates same header + category and picks latest casing/date', () async {
+      final catId = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Utilities',
+          icon: const Value('bolt'),
+          colorHex: const Value('#FFFF00'),
+        ),
+      );
+
+      await repo.insert(
+        TransactionsCompanion.insert(
+          header: 'kplc tokens',
+          amount: 500.0,
+          transactionDate: DateTime(2026, 1, 1),
+          categoryId: Value(catId),
+        ),
+      );
+      await repo.insert(
+        TransactionsCompanion.insert(
+          header: 'KPLC Tokens',
+          amount: 1000.0,
+          transactionDate: DateTime(2026, 1, 5),
+          categoryId: Value(catId),
+        ),
+      );
+
+      final suggestions = await repo.getHeaderSuggestions('kplc');
+      expect(suggestions.length, 1);
+      expect(suggestions.first.header, 'KPLC Tokens');
+      expect(suggestions.first.categoryDisplay, 'Utilities');
+      expect(suggestions.first.categoryId, catId);
+    });
+  });
 }

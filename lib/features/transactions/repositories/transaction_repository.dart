@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
+import '../models/header_suggestion.dart';
 import '../models/transaction_model.dart';
 
 // ponytail: direct drift entities; add domain mapper when schema diverges
@@ -84,5 +85,55 @@ class TransactionRepository {
           ..where((t) => t.id.equals(transaction.id.value)))
         .write(transaction);
     return count > 0;
+  }
+
+  /// Returns up to 3 distinct header + category suggestions matching [query].
+  /// Ranked by prefix match first, then recency (most recently used).
+  Future<List<HeaderSuggestion>> getHeaderSuggestions(String query) async {
+    final clean = query.trim();
+    if (clean.isEmpty) return const [];
+
+    final pattern = '%$clean%';
+    final prefix = '$clean%';
+
+    final results = await db.customSelect(
+      '''
+      SELECT 
+        t.header,
+        t.category_id,
+        c.name AS category_name,
+        c.parent_id AS category_parent_id,
+        p.name AS parent_category_name,
+        MAX(t.transaction_date) AS max_date,
+        MAX(t.id) AS max_id
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN categories p ON c.parent_id = p.id
+      WHERE t.header IS NOT NULL 
+        AND TRIM(t.header) != '' 
+        AND LOWER(t.header) LIKE LOWER(?)
+      GROUP BY LOWER(TRIM(t.header)), t.category_id
+      ORDER BY 
+        CASE WHEN LOWER(TRIM(t.header)) LIKE LOWER(?) THEN 0 ELSE 1 END,
+        MAX(t.transaction_date) DESC,
+        MAX(t.id) DESC
+      LIMIT 3
+      ''',
+      variables: [
+        Variable.withString(pattern),
+        Variable.withString(prefix),
+      ],
+      readsFrom: {db.transactions, db.categories},
+    ).get();
+
+    return results.map((row) {
+      return HeaderSuggestion(
+        header: row.read<String>('header'),
+        categoryId: row.readNullable<int>('category_id'),
+        categoryName: row.readNullable<String>('category_name'),
+        parentCategoryId: row.readNullable<int>('category_parent_id'),
+        parentCategoryName: row.readNullable<String>('parent_category_name'),
+      );
+    }).toList();
   }
 }

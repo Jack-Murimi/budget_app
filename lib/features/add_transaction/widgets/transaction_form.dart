@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' show Value;
 import '../../../core/database/app_database.dart';
 import '../../accounts/providers/account_providers.dart';
+import '../../categories/providers/category_providers.dart';
 import '../../categories/widgets/category_picker.dart';
+import '../../transactions/models/header_suggestion.dart';
 import '../../transactions/models/mpesa_parse_result.dart';
 import '../../transactions/models/transaction_model.dart';
 import '../../transactions/providers/payee_category_providers.dart';
@@ -26,6 +28,7 @@ class TransactionForm extends ConsumerStatefulWidget {
 class _TransactionFormState extends ConsumerState<TransactionForm> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _headerCtrl;
+  late final FocusNode _headerFocusNode;
   late final TextEditingController _descCtrl;
   late final TextEditingController _amountCtrl;
   late final TextEditingController _costCtrl;
@@ -43,6 +46,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
     final p = widget.parseResult;
     final edit = widget.transactionToEdit;
     
+    _headerFocusNode = FocusNode();
     if (edit != null) {
       _headerCtrl = TextEditingController(text: edit.header);
       _descCtrl = TextEditingController(text: edit.description);
@@ -106,9 +110,32 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
     }
   }
 
+  Future<void> _onHeaderSuggestionSelected(HeaderSuggestion option) async {
+    if (option.categoryId == null) return;
+    final db = ref.read(dbProvider);
+    final cat = await (db.select(db.categories)
+          ..where((c) => c.id.equals(option.categoryId!)))
+        .getSingleOrNull();
+    if (cat != null && mounted) {
+      setState(() => _selectedCategory = cat);
+    }
+  }
+
+  String _categoryDisplayLabel(Category? cat, List<Category> allCats) {
+    if (cat == null) return 'Tap to select';
+    if (cat.parentId != null) {
+      final parent = allCats.where((c) => c.id == cat.parentId).firstOrNull;
+      if (parent != null) {
+        return '${parent.name} > ${cat.name}';
+      }
+    }
+    return cat.name;
+  }
+
   @override
   void dispose() {
     _descDebounce?.cancel();
+    _headerFocusNode.dispose();
     _headerCtrl.dispose();
     _descCtrl.dispose();
     _amountCtrl.dispose();
@@ -272,18 +299,76 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
           ),
           const SizedBox(height: 16),
 
-          // Header — ALWAYS manual, never auto-filled
-          TextFormField(
-            controller: _headerCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Header *',
-              hintText: 'e.g. Groceries at Naivas',
-              helperText: 'Your custom label for this transaction',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.title),
-            ),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Header is required' : null,
-            textCapitalization: TextCapitalization.sentences,
+          // Header — indexed suggestions from past entries (max 3)
+          RawAutocomplete<HeaderSuggestion>(
+            textEditingController: _headerCtrl,
+            focusNode: _headerFocusNode,
+            displayStringForOption: (option) => option.header,
+            optionsBuilder: (textEditingValue) {
+              final query = textEditingValue.text.trim();
+              if (query.isEmpty) {
+                return const Iterable<HeaderSuggestion>.empty();
+              }
+              return ref
+                  .read(transactionRepositoryProvider)
+                  .getHeaderSuggestions(query);
+            },
+            onSelected: (option) => _onHeaderSuggestionSelected(option),
+            fieldViewBuilder:
+                (context, controller, focusNode, onFieldSubmitted) {
+              return TextFormField(
+                controller: controller,
+                focusNode: focusNode,
+                decoration: const InputDecoration(
+                  labelText: 'Header *',
+                  hintText: 'e.g. Groceries at Naivas',
+                  helperText: 'Your custom label for this transaction',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.title),
+                ),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Header is required' : null,
+                textCapitalization: TextCapitalization.sentences,
+                onFieldSubmitted: (_) => onFieldSubmitted(),
+              );
+            },
+            optionsViewBuilder: (context, onSelected, options) {
+              final theme = Theme.of(context);
+              return Align(
+                alignment: AlignmentDirectional.topStart,
+                child: Material(
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(12),
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  clipBehavior: Clip.antiAlias,
+                  child: ListView.separated(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final option = options.elementAt(index);
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.history, size: 20),
+                        title: Text(option.header,
+                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: option.categoryDisplay.isNotEmpty
+                            ? Text(
+                                option.categoryDisplay,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              )
+                            : null,
+                        onTap: () => onSelected(option),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 16),
 
@@ -366,7 +451,10 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
                 suffixIcon: Icon(Icons.chevron_right),
               ),
               child: Text(
-                _selectedCategory?.name ?? 'Tap to select',
+                _categoryDisplayLabel(
+                  _selectedCategory,
+                  ref.watch(categoriesStreamProvider).value ?? [],
+                ),
                 style: _selectedCategory == null
                     ? TextStyle(color: theme.colorScheme.outline)
                     : null,

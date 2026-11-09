@@ -34,12 +34,18 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
           await m.createAll();
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_transactions_header ON transactions (header)',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_transactions_header_cat ON transactions (header, category_id)',
+          );
           await customStatement('''
         CREATE TABLE IF NOT EXISTS recurring_transactions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -182,6 +188,22 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(payeeCategoryRules);
             await m.createTable(smsInboxItems);
           }
+          if (from < 13) {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_transactions_header ON transactions (header)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_transactions_header_cat ON transactions (header, category_id)',
+            );
+          }
+        },
+        beforeOpen: (details) async {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_transactions_header ON transactions (header)',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_transactions_header_cat ON transactions (header, category_id)',
+          );
         },
       );
 
