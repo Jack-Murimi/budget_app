@@ -6,20 +6,26 @@ class CategoryRepository {
   final AppDatabase db;
   const CategoryRepository(this.db);
 
-  Stream<List<Category>> watchAll({bool includeArchived = false}) {
+  Stream<List<Category>> watchAll({bool includeArchived = false, String? transactionType}) {
     final query = db.select(db.categories)
       ..orderBy([(c) => OrderingTerm.asc(c.sortOrder), (c) => OrderingTerm.asc(c.name)]);
     if (!includeArchived) {
       query.where((c) => c.isArchived.equals(false));
     }
+    if (transactionType != null) {
+      query.where((c) => c.transactionType.equals(transactionType));
+    }
     return query.watch();
   }
 
-  Future<List<Category>> getAll({bool includeArchived = false}) {
+  Future<List<Category>> getAll({bool includeArchived = false, String? transactionType}) {
     final query = db.select(db.categories)
       ..orderBy([(c) => OrderingTerm.asc(c.sortOrder), (c) => OrderingTerm.asc(c.name)]);
     if (!includeArchived) {
       query.where((c) => c.isArchived.equals(false));
+    }
+    if (transactionType != null) {
+      query.where((c) => c.transactionType.equals(transactionType));
     }
     return query.get();
   }

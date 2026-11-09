@@ -297,11 +297,12 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
                 if (!snap.hasData) return const SizedBox();
                 final parents = snap.data!;
                 return DropdownButtonFormField<Category?>(
+                  isExpanded: true,
                   initialValue: _selectedParent,
                   decoration: const InputDecoration(labelText: 'Parent Category'),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text('None (Top-level)')),
-                    ...parents.map((p) => DropdownMenuItem(value: p, child: Text(p.name))),
+                    const DropdownMenuItem(value: null, child: Text('None (Top-level)', overflow: TextOverflow.ellipsis)),
+                    ...parents.map((p) => DropdownMenuItem(value: p, child: Text(p.name, overflow: TextOverflow.ellipsis))),
                   ],
                   onChanged: (v) => setState(() => _selectedParent = v),
                 );
@@ -383,6 +384,7 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
       icon: Value(_selectedIcon),
       colorHex: Value(_selectedColor),
       parentId: Value(_selectedParent?.id),
+      transactionType: Value(_selectedParent?.transactionType ?? widget.category?.transactionType ?? 'expense'),
     );
 
     if (widget.category == null) {

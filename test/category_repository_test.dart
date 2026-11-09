@@ -25,9 +25,9 @@ void main() {
   test('default categories seeded on DB creation', () async {
     final all = await repo.getAll();
     expect(all.isNotEmpty, true);
-    expect(all.any((c) => c.name == 'Food & Dining'), true);
+    expect(all.any((c) => c.name == 'Food & Groceries'), true);
     expect(all.any((c) => c.name == 'Transport'), true);
-    expect(all.any((c) => c.name == 'Income'), true);
+    expect(all.any((c) => c.name == 'Salary'), true);
   });
 
   test('getTopLevel returns only parent categories', () async {
@@ -36,21 +36,21 @@ void main() {
     for (final cat in topLevel) {
       expect(cat.parentId, isNull);
     }
-    expect(topLevel.any((c) => c.name == 'Food & Dining'), true);
+    expect(topLevel.any((c) => c.name == 'Food & Groceries'), true);
     expect(topLevel.any((c) => c.name == 'Transport'), true);
   });
 
   test('getChildren returns child categories', () async {
     final topLevel = await repo.getTopLevel();
-    final foodCategory = topLevel.firstWhere((c) => c.name == 'Food & Dining');
+    final foodCategory = topLevel.firstWhere((c) => c.name == 'Food & Groceries');
     
     final children = await repo.getChildren(foodCategory.id);
     expect(children.isNotEmpty, true);
     for (final child in children) {
       expect(child.parentId, foodCategory.id);
     }
-    expect(children.any((c) => c.name == 'Groceries'), true);
-    expect(children.any((c) => c.name == 'Restaurant'), true);
+    expect(children.any((c) => c.name == 'Supermarket'), true);
+    expect(children.any((c) => c.name == 'Eating Out'), true);
   });
 
   test('getAll returns all categories', () async {
@@ -145,7 +145,7 @@ void main() {
 
   test('reorderCategories works for subcategories', () async {
     final topLevel = await repo.getTopLevel();
-    final parent = topLevel.firstWhere((c) => c.name == 'Food & Dining');
+    final parent = topLevel.firstWhere((c) => c.name == 'Food & Groceries');
     
     final children = await repo.getChildren(parent.id);
     expect(children.length, greaterThanOrEqualTo(2));

@@ -37,7 +37,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     
     expect(find.text('Categories'), findsOneWidget);
-    expect(find.text('Food & Dining'), findsOneWidget);
+    expect(find.text('Food & Groceries'), findsOneWidget);
   });
 
   testWidgets('toggle archived filter', (tester) async {
@@ -75,7 +75,12 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
-    expect(find.text('My Custom Category'), findsOneWidget);
+    // Scroll down to find newly appended top-level category if not in immediate viewport
+    final newCatFinder = find.text('My Custom Category');
+    await tester.scrollUntilVisible(newCatFinder, 300, scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+
+    expect(newCatFinder, findsOneWidget);
   });
 
   testWidgets('archive category', (tester) async {
@@ -94,10 +99,10 @@ void main() {
     await tester.pumpWidget(buildTestApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Food & Dining'));
+    await tester.tap(find.text('Food & Groceries'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Groceries'), findsOneWidget);
-    expect(find.text('Restaurant'), findsOneWidget);
+    expect(find.text('Supermarket'), findsOneWidget);
+    expect(find.text('Eating Out'), findsOneWidget);
   });
 }

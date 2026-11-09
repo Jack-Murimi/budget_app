@@ -1027,6 +1027,14 @@ class $CategoriesTable extends Categories
   late final GeneratedColumn<int> parentId = GeneratedColumn<int>(
       'parent_id', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _transactionTypeMeta =
+      const VerificationMeta('transactionType');
+  @override
+  late final GeneratedColumn<String> transactionType = GeneratedColumn<String>(
+      'transaction_type', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('expense'));
   static const VerificationMeta _isDefaultMeta =
       const VerificationMeta('isDefault');
   @override
@@ -1070,6 +1078,7 @@ class $CategoriesTable extends Categories
         icon,
         colorHex,
         parentId,
+        transactionType,
         isDefault,
         isArchived,
         sortOrder,
@@ -1105,6 +1114,12 @@ class $CategoriesTable extends Categories
     if (data.containsKey('parent_id')) {
       context.handle(_parentIdMeta,
           parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta));
+    }
+    if (data.containsKey('transaction_type')) {
+      context.handle(
+          _transactionTypeMeta,
+          transactionType.isAcceptableOrUnknown(
+              data['transaction_type']!, _transactionTypeMeta));
     }
     if (data.containsKey('is_default')) {
       context.handle(_isDefaultMeta,
@@ -1143,6 +1158,8 @@ class $CategoriesTable extends Categories
           .read(DriftSqlType.string, data['${effectivePrefix}color_hex'])!,
       parentId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}parent_id']),
+      transactionType: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}transaction_type'])!,
       isDefault: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_default'])!,
       isArchived: attachedDatabase.typeMapping
@@ -1166,6 +1183,7 @@ class Category extends DataClass implements Insertable<Category> {
   final String icon;
   final String colorHex;
   final int? parentId;
+  final String transactionType;
   final bool isDefault;
   final bool isArchived;
   final int sortOrder;
@@ -1176,6 +1194,7 @@ class Category extends DataClass implements Insertable<Category> {
       required this.icon,
       required this.colorHex,
       this.parentId,
+      required this.transactionType,
       required this.isDefault,
       required this.isArchived,
       required this.sortOrder,
@@ -1190,6 +1209,7 @@ class Category extends DataClass implements Insertable<Category> {
     if (!nullToAbsent || parentId != null) {
       map['parent_id'] = Variable<int>(parentId);
     }
+    map['transaction_type'] = Variable<String>(transactionType);
     map['is_default'] = Variable<bool>(isDefault);
     map['is_archived'] = Variable<bool>(isArchived);
     map['sort_order'] = Variable<int>(sortOrder);
@@ -1206,6 +1226,7 @@ class Category extends DataClass implements Insertable<Category> {
       parentId: parentId == null && nullToAbsent
           ? const Value.absent()
           : Value(parentId),
+      transactionType: Value(transactionType),
       isDefault: Value(isDefault),
       isArchived: Value(isArchived),
       sortOrder: Value(sortOrder),
@@ -1222,6 +1243,7 @@ class Category extends DataClass implements Insertable<Category> {
       icon: serializer.fromJson<String>(json['icon']),
       colorHex: serializer.fromJson<String>(json['colorHex']),
       parentId: serializer.fromJson<int?>(json['parentId']),
+      transactionType: serializer.fromJson<String>(json['transactionType']),
       isDefault: serializer.fromJson<bool>(json['isDefault']),
       isArchived: serializer.fromJson<bool>(json['isArchived']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
@@ -1237,6 +1259,7 @@ class Category extends DataClass implements Insertable<Category> {
       'icon': serializer.toJson<String>(icon),
       'colorHex': serializer.toJson<String>(colorHex),
       'parentId': serializer.toJson<int?>(parentId),
+      'transactionType': serializer.toJson<String>(transactionType),
       'isDefault': serializer.toJson<bool>(isDefault),
       'isArchived': serializer.toJson<bool>(isArchived),
       'sortOrder': serializer.toJson<int>(sortOrder),
@@ -1250,6 +1273,7 @@ class Category extends DataClass implements Insertable<Category> {
           String? icon,
           String? colorHex,
           Value<int?> parentId = const Value.absent(),
+          String? transactionType,
           bool? isDefault,
           bool? isArchived,
           int? sortOrder,
@@ -1260,6 +1284,7 @@ class Category extends DataClass implements Insertable<Category> {
         icon: icon ?? this.icon,
         colorHex: colorHex ?? this.colorHex,
         parentId: parentId.present ? parentId.value : this.parentId,
+        transactionType: transactionType ?? this.transactionType,
         isDefault: isDefault ?? this.isDefault,
         isArchived: isArchived ?? this.isArchived,
         sortOrder: sortOrder ?? this.sortOrder,
@@ -1272,6 +1297,9 @@ class Category extends DataClass implements Insertable<Category> {
       icon: data.icon.present ? data.icon.value : this.icon,
       colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
       parentId: data.parentId.present ? data.parentId.value : this.parentId,
+      transactionType: data.transactionType.present
+          ? data.transactionType.value
+          : this.transactionType,
       isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
       isArchived:
           data.isArchived.present ? data.isArchived.value : this.isArchived,
@@ -1288,6 +1316,7 @@ class Category extends DataClass implements Insertable<Category> {
           ..write('icon: $icon, ')
           ..write('colorHex: $colorHex, ')
           ..write('parentId: $parentId, ')
+          ..write('transactionType: $transactionType, ')
           ..write('isDefault: $isDefault, ')
           ..write('isArchived: $isArchived, ')
           ..write('sortOrder: $sortOrder, ')
@@ -1297,8 +1326,8 @@ class Category extends DataClass implements Insertable<Category> {
   }
 
   @override
-  int get hashCode => Object.hash(id, name, icon, colorHex, parentId, isDefault,
-      isArchived, sortOrder, createdAt);
+  int get hashCode => Object.hash(id, name, icon, colorHex, parentId,
+      transactionType, isDefault, isArchived, sortOrder, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1308,6 +1337,7 @@ class Category extends DataClass implements Insertable<Category> {
           other.icon == this.icon &&
           other.colorHex == this.colorHex &&
           other.parentId == this.parentId &&
+          other.transactionType == this.transactionType &&
           other.isDefault == this.isDefault &&
           other.isArchived == this.isArchived &&
           other.sortOrder == this.sortOrder &&
@@ -1320,6 +1350,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
   final Value<String> icon;
   final Value<String> colorHex;
   final Value<int?> parentId;
+  final Value<String> transactionType;
   final Value<bool> isDefault;
   final Value<bool> isArchived;
   final Value<int> sortOrder;
@@ -1330,6 +1361,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     this.icon = const Value.absent(),
     this.colorHex = const Value.absent(),
     this.parentId = const Value.absent(),
+    this.transactionType = const Value.absent(),
     this.isDefault = const Value.absent(),
     this.isArchived = const Value.absent(),
     this.sortOrder = const Value.absent(),
@@ -1341,6 +1373,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     this.icon = const Value.absent(),
     this.colorHex = const Value.absent(),
     this.parentId = const Value.absent(),
+    this.transactionType = const Value.absent(),
     this.isDefault = const Value.absent(),
     this.isArchived = const Value.absent(),
     this.sortOrder = const Value.absent(),
@@ -1352,6 +1385,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     Expression<String>? icon,
     Expression<String>? colorHex,
     Expression<int>? parentId,
+    Expression<String>? transactionType,
     Expression<bool>? isDefault,
     Expression<bool>? isArchived,
     Expression<int>? sortOrder,
@@ -1363,6 +1397,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       if (icon != null) 'icon': icon,
       if (colorHex != null) 'color_hex': colorHex,
       if (parentId != null) 'parent_id': parentId,
+      if (transactionType != null) 'transaction_type': transactionType,
       if (isDefault != null) 'is_default': isDefault,
       if (isArchived != null) 'is_archived': isArchived,
       if (sortOrder != null) 'sort_order': sortOrder,
@@ -1376,6 +1411,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       Value<String>? icon,
       Value<String>? colorHex,
       Value<int?>? parentId,
+      Value<String>? transactionType,
       Value<bool>? isDefault,
       Value<bool>? isArchived,
       Value<int>? sortOrder,
@@ -1386,6 +1422,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       icon: icon ?? this.icon,
       colorHex: colorHex ?? this.colorHex,
       parentId: parentId ?? this.parentId,
+      transactionType: transactionType ?? this.transactionType,
       isDefault: isDefault ?? this.isDefault,
       isArchived: isArchived ?? this.isArchived,
       sortOrder: sortOrder ?? this.sortOrder,
@@ -1411,6 +1448,9 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     if (parentId.present) {
       map['parent_id'] = Variable<int>(parentId.value);
     }
+    if (transactionType.present) {
+      map['transaction_type'] = Variable<String>(transactionType.value);
+    }
     if (isDefault.present) {
       map['is_default'] = Variable<bool>(isDefault.value);
     }
@@ -1434,6 +1474,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
           ..write('icon: $icon, ')
           ..write('colorHex: $colorHex, ')
           ..write('parentId: $parentId, ')
+          ..write('transactionType: $transactionType, ')
           ..write('isDefault: $isDefault, ')
           ..write('isArchived: $isArchived, ')
           ..write('sortOrder: $sortOrder, ')
@@ -6494,6 +6535,7 @@ typedef $$CategoriesTableCreateCompanionBuilder = CategoriesCompanion Function({
   Value<String> icon,
   Value<String> colorHex,
   Value<int?> parentId,
+  Value<String> transactionType,
   Value<bool> isDefault,
   Value<bool> isArchived,
   Value<int> sortOrder,
@@ -6505,6 +6547,7 @@ typedef $$CategoriesTableUpdateCompanionBuilder = CategoriesCompanion Function({
   Value<String> icon,
   Value<String> colorHex,
   Value<int?> parentId,
+  Value<String> transactionType,
   Value<bool> isDefault,
   Value<bool> isArchived,
   Value<int> sortOrder,
@@ -6534,6 +6577,10 @@ class $$CategoriesTableFilterComposer
 
   ColumnFilters<int> get parentId => $composableBuilder(
       column: $table.parentId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get transactionType => $composableBuilder(
+      column: $table.transactionType,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get isDefault => $composableBuilder(
       column: $table.isDefault, builder: (column) => ColumnFilters(column));
@@ -6572,6 +6619,10 @@ class $$CategoriesTableOrderingComposer
   ColumnOrderings<int> get parentId => $composableBuilder(
       column: $table.parentId, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get transactionType => $composableBuilder(
+      column: $table.transactionType,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get isDefault => $composableBuilder(
       column: $table.isDefault, builder: (column) => ColumnOrderings(column));
 
@@ -6608,6 +6659,9 @@ class $$CategoriesTableAnnotationComposer
 
   GeneratedColumn<int> get parentId =>
       $composableBuilder(column: $table.parentId, builder: (column) => column);
+
+  GeneratedColumn<String> get transactionType => $composableBuilder(
+      column: $table.transactionType, builder: (column) => column);
 
   GeneratedColumn<bool> get isDefault =>
       $composableBuilder(column: $table.isDefault, builder: (column) => column);
@@ -6650,6 +6704,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             Value<String> icon = const Value.absent(),
             Value<String> colorHex = const Value.absent(),
             Value<int?> parentId = const Value.absent(),
+            Value<String> transactionType = const Value.absent(),
             Value<bool> isDefault = const Value.absent(),
             Value<bool> isArchived = const Value.absent(),
             Value<int> sortOrder = const Value.absent(),
@@ -6661,6 +6716,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             icon: icon,
             colorHex: colorHex,
             parentId: parentId,
+            transactionType: transactionType,
             isDefault: isDefault,
             isArchived: isArchived,
             sortOrder: sortOrder,
@@ -6672,6 +6728,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             Value<String> icon = const Value.absent(),
             Value<String> colorHex = const Value.absent(),
             Value<int?> parentId = const Value.absent(),
+            Value<String> transactionType = const Value.absent(),
             Value<bool> isDefault = const Value.absent(),
             Value<bool> isArchived = const Value.absent(),
             Value<int> sortOrder = const Value.absent(),
@@ -6683,6 +6740,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             icon: icon,
             colorHex: colorHex,
             parentId: parentId,
+            transactionType: transactionType,
             isDefault: isDefault,
             isArchived: isArchived,
             sortOrder: sortOrder,

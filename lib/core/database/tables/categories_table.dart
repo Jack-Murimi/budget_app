@@ -6,6 +6,7 @@ class Categories extends Table {
   TextColumn get icon => text().withDefault(const Constant('category'))();
   TextColumn get colorHex => text().withDefault(const Constant('#6750A4'))();
   IntColumn get parentId => integer().nullable().references(Categories, #id)();
+  TextColumn get transactionType => text().withDefault(const Constant('expense'))(); // expense | income | transfer
   BoolColumn get isDefault => boolean().withDefault(const Constant(false))();
   BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();

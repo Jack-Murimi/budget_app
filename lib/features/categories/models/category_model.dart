@@ -4,6 +4,7 @@ class Category {
   final String icon;
   final String colorHex;
   final int? parentId;
+  final String transactionType;
   final bool isDefault;
   final bool isArchived;
   final int sortOrder;
@@ -15,6 +16,7 @@ class Category {
     required this.icon,
     required this.colorHex,
     this.parentId,
+    this.transactionType = 'expense',
     this.isDefault = false,
     this.isArchived = false,
     this.sortOrder = 0,

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
+import '../../../shared/utils/category_icon_helper.dart';
 import '../providers/category_providers.dart';
 
-/// Shows a 2-level category picker bottom sheet.
+/// Shows a category picker bottom sheet with transaction type tabs and sub-category drilling.
 /// Returns the selected [Category] (can be parent or sub-category).
-Future<Category?> showCategoryPicker(BuildContext context) {
+Future<Category?> showCategoryPicker(BuildContext context, {String? initialType}) {
   return showModalBottomSheet<Category>(
     context: context,
     isScrollControlled: true,
@@ -13,26 +14,43 @@ Future<Category?> showCategoryPicker(BuildContext context) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (ctx) => const _CategoryPickerSheet(),
+    builder: (ctx) => _CategoryPickerSheet(initialType: initialType),
   );
 }
 
 class _CategoryPickerSheet extends ConsumerStatefulWidget {
-  const _CategoryPickerSheet();
+  final String? initialType;
+  const _CategoryPickerSheet({this.initialType});
 
   @override
   ConsumerState<_CategoryPickerSheet> createState() => _CategoryPickerSheetState();
 }
 
 class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
+  late String _activeType;
   Category? _selectedParent; // null = top-level view
+
+  @override
+  void initState() {
+    super.initState();
+    _activeType = widget.initialType ?? 'expense';
+  }
+
+  Color _hexColor(String hex) {
+    try {
+      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
+    } catch (_) {
+      return Colors.grey;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesStreamProvider);
+    final theme = Theme.of(context);
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.6,
+      initialChildSize: 0.65,
       maxChildSize: 0.9,
       minChildSize: 0.4,
       expand: false,
@@ -42,16 +60,18 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.outline,
+                color: theme.colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
-          // Header with optional back button
+
+          // Header with back button / title
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 16, 8),
+            padding: const EdgeInsets.fromLTRB(8, 0, 16, 4),
             child: Row(
               children: [
                 if (_selectedParent != null)
@@ -66,10 +86,9 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                     _selectedParent != null
                         ? _selectedParent!.name
                         : 'Select Category',
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
-                // Allow selecting the parent category itself
                 if (_selectedParent != null)
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(_selectedParent),
@@ -78,17 +97,66 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
               ],
             ),
           ),
+
+          // Transaction type filter tabs (only on top-level)
+          if (_selectedParent == null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: SegmentedButton<String>(
+                showSelectedIcon: false,
+                style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                ),
+                segments: const [
+                  ButtonSegment(
+                    value: 'expense',
+                    label: Text('Expense'),
+                    icon: Icon(Icons.arrow_upward_rounded, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: 'income',
+                    label: Text('Income'),
+                    icon: Icon(Icons.arrow_downward_rounded, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: 'transfer',
+                    label: Text('Transfer'),
+                    icon: Icon(Icons.swap_horiz_rounded, size: 16),
+                  ),
+                ],
+                selected: {_activeType},
+                onSelectionChanged: (s) => setState(() {
+                  _activeType = s.first;
+                  _selectedParent = null;
+                }),
+              ),
+            ),
+
+          const Divider(height: 1),
+
           Expanded(
             child: categoriesAsync.when(
               data: (allCats) {
-                // Filter for current level
+                // Filter for current type & hierarchy level
+                final typeFiltered = allCats.where((c) => c.transactionType == _activeType).toList();
+
                 final toShow = _selectedParent == null
-                    ? allCats.where((c) => c.parentId == null).toList()
+                    ? typeFiltered.where((c) => c.parentId == null).toList()
                     : allCats.where((c) => c.parentId == _selectedParent!.id).toList();
 
-                // Check if category has children
                 bool hasChildren(Category cat) =>
                     allCats.any((c) => c.parentId == cat.id);
+
+                if (toShow.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'No ${_activeType.toUpperCase()} categories found',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  );
+                }
 
                 return ListView.builder(
                   controller: scrollCtrl,
@@ -97,12 +165,13 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                     final cat = toShow[i];
                     final color = _hexColor(cat.colorHex);
                     final children = hasChildren(cat);
+                    final icon = CategoryIconHelper.getIcon(cat.icon, type: cat.transactionType);
 
                     return ListTile(
                       leading: CircleAvatar(
                         backgroundColor: color.withValues(alpha: 0.15),
                         child: Icon(
-                          _iconData(cat.icon),
+                          icon,
                           color: color,
                           size: 20,
                         ),
@@ -113,10 +182,8 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                           : null,
                       onTap: () {
                         if (children) {
-                          // Drill into sub-categories
                           setState(() => _selectedParent = cat);
                         } else {
-                          // Leaf — select it
                           Navigator.of(context).pop(cat);
                         }
                       },
@@ -131,47 +198,5 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
         ],
       ),
     );
-  }
-
-  Color _hexColor(String hex) {
-    try {
-      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
-    } catch (_) {
-      return Colors.grey;
-    }
-  }
-
-  IconData _iconData(String name) {
-    // Map common icon names to real MaterialIcons
-    return switch (name) {
-      'restaurant' => Icons.restaurant,
-      'directions_car' => Icons.directions_car,
-      'shopping_bag' => Icons.shopping_bag,
-      'receipt_long' => Icons.receipt_long,
-      'movie' => Icons.movie,
-      'favorite' => Icons.favorite,
-      'school' => Icons.school,
-      'savings' => Icons.savings,
-      'attach_money' => Icons.attach_money,
-      'more_horiz' => Icons.more_horiz,
-      'swap_horiz' => Icons.swap_horiz,
-      'water_drop' => Icons.water_drop,
-      'bolt' => Icons.bolt,
-      'wifi' => Icons.wifi,
-      'home' => Icons.home,
-      'tv' => Icons.tv,
-      'phone_android' => Icons.phone_android,
-      'security' => Icons.security,
-      'medication' => Icons.medication,
-      'local_hospital' => Icons.local_hospital,
-      'fitness_center' => Icons.fitness_center,
-      'work' => Icons.work,
-      'store' => Icons.store,
-      'trending_up' => Icons.trending_up,
-      'groups' => Icons.groups,
-      'send' => Icons.send,
-      'sync' => Icons.sync,
-      _ => Icons.category,
-    };
   }
 }

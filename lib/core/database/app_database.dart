@@ -34,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -45,6 +45,9 @@ class AppDatabase extends _$AppDatabase {
           );
           await customStatement(
             'CREATE INDEX IF NOT EXISTS idx_transactions_header_cat ON transactions (header, category_id)',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories (transaction_type)',
           );
           await customStatement('''
         CREATE TABLE IF NOT EXISTS recurring_transactions (
@@ -196,6 +199,14 @@ class AppDatabase extends _$AppDatabase {
               'CREATE INDEX IF NOT EXISTS idx_transactions_header_cat ON transactions (header, category_id)',
             );
           }
+          if (from < 14) {
+            try {
+              await m.addColumn(categories, categories.transactionType);
+            } catch (_) {}
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories (transaction_type)',
+            );
+          }
         },
         beforeOpen: (details) async {
           await customStatement(
@@ -203,6 +214,9 @@ class AppDatabase extends _$AppDatabase {
           );
           await customStatement(
             'CREATE INDEX IF NOT EXISTS idx_transactions_header_cat ON transactions (header, category_id)',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories (transaction_type)',
           );
           // Fix seeded categories that had literal 'category' as icon
           await customStatement('''
@@ -263,116 +277,138 @@ class AppDatabase extends _$AppDatabase {
     if (existing.isNotEmpty) return; // already seeded
 
     // Helper to insert and return the new ID
-    Future<int> addCat(String name, String icon, String color,
-        {int? parentId}) async {
+    Future<int> addCat(
+      String name,
+      String icon,
+      String color, {
+      int? parentId,
+      String type = 'expense',
+    }) async {
       return await into(categories).insert(
         CategoriesCompanion.insert(
           name: name,
           icon: Value(icon),
           colorHex: Value(color),
+          transactionType: Value(type),
           isDefault: const Value(true),
           parentId: Value(parentId),
         ),
       );
     }
 
-    // ── Top-level categories ──
-    final food = await addCat('Food & Dining', 'restaurant', '#E53935');
+    // ════════════════════════════════════════════════════════════════════════
+    // EXPENSE CATEGORIES & SUBCATEGORIES
+    // ════════════════════════════════════════════════════════════════════════
+
+    // 1. Food & Groceries
+    final food = await addCat('Food & Groceries', 'local_grocery_store', '#E53935');
+    await addCat('Supermarket', 'shopping_cart', '#E53935', parentId: food);
+    await addCat('Market / Mama Mboga', 'store', '#E53935', parentId: food);
+    await addCat('Eating Out', 'restaurant', '#E53935', parentId: food);
+    await addCat('Delivery (Glovo/Uber Eats)', 'delivery_dining', '#E53935', parentId: food);
+    await addCat('Snacks & Drinks', 'local_cafe', '#E53935', parentId: food);
+
+    // 2. Housing
+    final housing = await addCat('Housing', 'home', '#5D4037');
+    await addCat('Rent', 'home', '#5D4037', parentId: housing);
+    await addCat('Service Charge', 'receipt_long', '#5D4037', parentId: housing);
+    await addCat('Repairs & Maintenance', 'build', '#5D4037', parentId: housing);
+    await addCat('Furniture & Household Items', 'chair', '#5D4037', parentId: housing);
+
+    // 3. Utilities & Bills
+    final utilities = await addCat('Utilities & Bills', 'bolt', '#F4511E');
+    await addCat('Electricity (KPLC tokens)', 'bolt', '#F4511E', parentId: utilities);
+    await addCat('Water', 'water_drop', '#F4511E', parentId: utilities);
+    await addCat('Internet / WiFi', 'wifi', '#F4511E', parentId: utilities);
+    await addCat('Airtime & Bundles', 'phone_android', '#F4511E', parentId: utilities);
+    await addCat('TV (DStv/Showmax)', 'tv', '#F4511E', parentId: utilities);
+
+    // 4. Transport
     final transport = await addCat('Transport', 'directions_car', '#1E88E5');
-    final shopping = await addCat('Shopping', 'shopping_bag', '#8E24AA');
-    final bills = await addCat('Bills & Utilities', 'receipt_long', '#F4511E');
-    final entertainment = await addCat('Entertainment', 'movie', '#43A047');
-    final health = await addCat('Health', 'favorite', '#E91E63');
-    final education = await addCat('Education', 'school', '#00897B');
-    final savings = await addCat('Savings', 'savings', '#FFB300');
-    final income = await addCat('Income', 'attach_money', '#43A047');
-    await addCat('Other', 'more_horiz', '#757575');
-    await addCat('Loan Given', 'handshake', '#1565C0');
-    await addCat('Loan Received', 'account_balance', '#00897B');
-    final transfer = await addCat('Transfer', 'swap_horiz', '#546E7A');
-
-    // ── Food & Dining sub-categories ──
-    await addCat('Groceries', 'local_grocery_store', '#E53935', parentId: food);
-    await addCat('Restaurant', 'restaurant', '#E53935', parentId: food);
-    await addCat('Cafe & Coffee', 'local_cafe', '#E53935', parentId: food);
-    await addCat('Fast Food', 'fastfood', '#E53935', parentId: food);
-    await addCat('Alcohol & Bar', 'local_bar', '#E53935', parentId: food);
-
-    // ── Transport sub-categories ──
-    await addCat('Fuel / Petrol', 'local_gas_station', '#1E88E5',
-        parentId: transport);
-    await addCat('Matatu / Bus', 'directions_bus', '#1E88E5',
-        parentId: transport);
-    await addCat('Taxi / Uber', 'local_taxi', '#1E88E5', parentId: transport);
+    await addCat('Matatu / Bus', 'directions_bus', '#1E88E5', parentId: transport);
+    await addCat('Boda / Uber / Bolt', 'local_taxi', '#1E88E5', parentId: transport);
+    await addCat('Fuel', 'local_gas_station', '#1E88E5', parentId: transport);
     await addCat('Parking', 'local_parking', '#1E88E5', parentId: transport);
-    await addCat('Vehicle Repair', 'build', '#1E88E5', parentId: transport);
-    await addCat('Flight / Travel', 'flight', '#1E88E5', parentId: transport);
+    await addCat('Car Maintenance & Insurance', 'build', '#1E88E5', parentId: transport);
 
-    // ── Shopping sub-categories ──
-    await addCat('Clothing', 'checkroom', '#8E24AA', parentId: shopping);
-    await addCat('Electronics', 'devices', '#8E24AA', parentId: shopping);
-    await addCat('Home & Furniture', 'chair', '#8E24AA', parentId: shopping);
-    await addCat('Cosmetics', 'face', '#8E24AA', parentId: shopping);
-    await addCat('Online Shopping', 'shopping_cart', '#8E24AA',
-        parentId: shopping);
+    // 5. Health
+    final health = await addCat('Health', 'favorite', '#E91E63');
+    await addCat('Hospital / Clinic', 'local_hospital', '#E91E63', parentId: health);
+    await addCat('Pharmacy', 'medication', '#E91E63', parentId: health);
+    await addCat('SHA / Insurance', 'security', '#E91E63', parentId: health);
+    await addCat('Fitness', 'fitness_center', '#E91E63', parentId: health);
 
-    // ── Bills & Utilities sub-categories ──
-    await addCat('Water Bill', 'water_drop', '#F4511E', parentId: bills);
-    await addCat('KPLC / Electricity', 'bolt', '#F4511E', parentId: bills);
-    await addCat('WiFi / Internet', 'wifi', '#F4511E', parentId: bills);
-    await addCat('Rent', 'home', '#F4511E', parentId: bills);
-    await addCat('TV / DSTV', 'tv', '#F4511E', parentId: bills);
-    await addCat('Gas / Cooking Gas', 'local_fire_department', '#F4511E',
-        parentId: bills);
-    await addCat('Phone / Airtime', 'phone_android', '#F4511E',
-        parentId: bills);
-    await addCat('Insurance', 'security', '#F4511E', parentId: bills);
-
-    // ── Entertainment sub-categories ──
-    await addCat('Movies / Cinema', 'theaters', '#43A047',
-        parentId: entertainment);
-    await addCat('Sports', 'sports_soccer', '#43A047', parentId: entertainment);
-    await addCat('Gaming', 'videogame_asset', '#43A047',
-        parentId: entertainment);
-    await addCat('Events / Concerts', 'event', '#43A047',
-        parentId: entertainment);
-
-    // ── Health sub-categories ──
-    await addCat('Pharmacy / Medicine', 'medication', '#E91E63',
-        parentId: health);
-    await addCat('Doctor / Hospital', 'local_hospital', '#E91E63',
-        parentId: health);
-    await addCat('Gym / Fitness', 'fitness_center', '#E91E63',
-        parentId: health);
-    await addCat('Dental', 'face', '#E91E63', parentId: health);
-    await addCat('Optical', 'visibility', '#E91E63', parentId: health);
-
-    // ── Education sub-categories ──
+    // 6. Education
+    final education = await addCat('Education', 'school', '#00897B');
     await addCat('School Fees', 'school', '#00897B', parentId: education);
-    await addCat('Books & Stationery', 'menu_book', '#00897B',
-        parentId: education);
-    await addCat('Courses / Training', 'cast_for_education', '#00897B',
-        parentId: education);
+    await addCat('Books & Supplies', 'menu_book', '#00897B', parentId: education);
+    await addCat('Courses & Training', 'laptop', '#00897B', parentId: education);
 
-    // ── Savings sub-categories ──
-    await addCat('Emergency Fund', 'shield', '#FFB300', parentId: savings);
-    await addCat('Investment', 'trending_up', '#FFB300', parentId: savings);
-    await addCat('Chama / SACCO', 'groups', '#FFB300', parentId: savings);
+    // 7. Family & Dependants
+    final family = await addCat('Family & Dependants', 'groups', '#8E24AA');
+    await addCat('Upkeep / Remittances', 'send', '#8E24AA', parentId: family);
+    await addCat('Childcare', 'face', '#8E24AA', parentId: family);
+    await addCat('Gifts & Support', 'card_giftcard', '#8E24AA', parentId: family);
+    await addCat('Harambee / Contributions', 'groups', '#8E24AA', parentId: family);
 
-    // ── Income sub-categories ──
-    await addCat('Salary', 'work', '#43A047', parentId: income);
-    await addCat('Business Income', 'store', '#43A047', parentId: income);
-    await addCat('Freelance', 'laptop', '#43A047', parentId: income);
-    await addCat('Investment Returns', 'trending_up', '#43A047',
-        parentId: income);
-    await addCat('Gift / Transfer In', 'card_giftcard', '#43A047',
-        parentId: income);
+    // 8. Personal & Lifestyle
+    final lifestyle = await addCat('Personal & Lifestyle', 'checkroom', '#D81B60');
+    await addCat('Clothing', 'checkroom', '#D81B60', parentId: lifestyle);
+    await addCat('Beauty & Grooming', 'face', '#D81B60', parentId: lifestyle);
+    await addCat('Entertainment', 'movie', '#D81B60', parentId: lifestyle);
+    await addCat('Subscriptions', 'repeat', '#D81B60', parentId: lifestyle);
+    await addCat('Travel & Holidays', 'flight', '#D81B60', parentId: lifestyle);
+    await addCat('Betting / Gaming', 'videogame_asset', '#D81B60', parentId: lifestyle);
 
-    // ── Transfer sub-categories ──
-    await addCat('Send Money', 'send', '#546E7A', parentId: transfer);
-    await addCat('Agent Deposit', 'account_balance', '#546E7A',
-        parentId: transfer);
-    await addCat('Fuliza Repayment', 'sync', '#546E7A', parentId: transfer);
+    // 9. Fees & Charges
+    final fees = await addCat('Fees & Charges', 'money_off', '#78909C');
+    await addCat('M-Pesa Transaction Fees', 'receipt_long', '#78909C', parentId: fees);
+    await addCat('Withdrawal Fees', 'payments', '#78909C', parentId: fees);
+    await addCat('Bank Fees', 'account_balance', '#78909C', parentId: fees);
+    await addCat('Fuliza / Overdraft Fees', 'sync_problem', '#78909C', parentId: fees);
+    await addCat('Excise Duty', 'account_balance_wallet', '#78909C', parentId: fees);
+
+    // 10. Debt Repayment
+    final debtRepay = await addCat('Debt Repayment', 'credit_card', '#C62828');
+    await addCat('Loan Repayment', 'handshake', '#C62828', parentId: debtRepay);
+    await addCat('Fuliza Repayment', 'sync', '#C62828', parentId: debtRepay);
+    await addCat('Mobile Loans (Tala/Branch/M-Shwari)', 'phone_android', '#C62828', parentId: debtRepay);
+    await addCat('Credit Card', 'credit_card', '#C62828', parentId: debtRepay);
+
+    // 11. Business
+    final business = await addCat('Business', 'store', '#00ACC1');
+    await addCat('Stock / Supplies', 'inventory_2', '#00ACC1', parentId: business);
+    await addCat('Operating Costs', 'receipt_long', '#00ACC1', parentId: business);
+    await addCat('Staff', 'groups', '#00ACC1', parentId: business);
+    await addCat('Licences & Taxes', 'account_balance', '#00ACC1', parentId: business);
+
+    // 12. Other (Expense)
+    final otherExp = await addCat('Other', 'more_horiz', '#757575');
+    await addCat('Uncategorized', 'help_outline', '#757575', parentId: otherExp);
+
+    // ════════════════════════════════════════════════════════════════════════
+    // INCOME CATEGORIES & SUBCATEGORIES
+    // ════════════════════════════════════════════════════════════════════════
+    await addCat('Salary', 'work', '#43A047', type: 'income');
+    await addCat('Business / Side Hustle', 'store', '#2E7D32', type: 'income');
+    await addCat('Received Money', 'volunteer_activism', '#388E3C', type: 'income');
+
+    final investments = await addCat('Investments', 'savings', '#1B5E20', type: 'income');
+    await addCat('Interest', 'trending_up', '#1B5E20', parentId: investments, type: 'income');
+    await addCat('Dividends', 'attach_money', '#1B5E20', parentId: investments, type: 'income');
+    await addCat('Sacco Returns', 'groups', '#1B5E20', parentId: investments, type: 'income');
+    await addCat('Money Market (MMF)', 'account_balance', '#1B5E20', parentId: investments, type: 'income');
+    await addCat('Rent Received', 'home', '#1B5E20', parentId: investments, type: 'income');
+
+    await addCat('Gifts & Refunds', 'card_giftcard', '#66BB6A', type: 'income');
+    await addCat('Other Income', 'add_circle_outline', '#81C784', type: 'income');
+
+    // ════════════════════════════════════════════════════════════════════════
+    // TRANSFER CATEGORIES & SUBCATEGORIES
+    // ════════════════════════════════════════════════════════════════════════
+    await addCat('Savings / Chama / Sacco Contribution', 'savings', '#0277BD', type: 'transfer');
+    await addCat('Own-account transfer (M-Pesa ↔ bank ↔ cash)', 'swap_horiz', '#455A64', type: 'transfer');
+    await addCat('Loan received (borrowed principal)', 'account_balance', '#00838F', type: 'transfer');
   }
 
   Future<void> _seedDefaultAccounts() async {

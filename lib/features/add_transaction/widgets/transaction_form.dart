@@ -164,7 +164,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
   }
 
   Future<void> _pickCategory() async {
-    final cat = await showCategoryPicker(context);
+    final cat = await showCategoryPicker(context, initialType: _type);
     if (cat != null) setState(() => _selectedCategory = cat);
   }
 
@@ -295,7 +295,13 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
               ButtonSegment(value: 'transfer', label: Text('Transfer'), icon: Icon(Icons.swap_horiz)),
             ],
             selected: {_type},
-            onSelectionChanged: (s) => setState(() => _type = s.first),
+            onSelectionChanged: (s) => setState(() {
+              _type = s.first;
+              if (_selectedCategory != null &&
+                  _selectedCategory!.transactionType != _type) {
+                _selectedCategory = null;
+              }
+            }),
           ),
           const SizedBox(height: 16),
 
