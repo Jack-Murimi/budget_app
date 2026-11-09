@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../../../main.dart';
 import '../../add_transaction/screens/add_transaction_screen.dart';
-import '../../transactions/services/mpesa_parser.dart';
 import '../services/sms_inbox_scanner.dart';
 
 class SmsInboxScreen extends ConsumerStatefulWidget {
