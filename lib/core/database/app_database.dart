@@ -228,6 +228,83 @@ class AppDatabase extends _$AppDatabase {
           if (hasNewTaxonomy.isEmpty) {
             await _seedDefaultCategories();
           }
+
+          // Cleanup: migrate foreign keys pointing to legacy duplicate categories, then remove them
+          await customStatement('''
+            UPDATE transactions
+            SET category_id = (
+              SELECT new_c.id FROM categories new_c
+              JOIN categories old_c ON old_c.name = new_c.name
+              WHERE old_c.id = transactions.category_id
+                AND old_c.id != new_c.id
+                AND old_c.name IN ('Transport', 'Health', 'Education', 'Other')
+              ORDER BY new_c.id DESC LIMIT 1
+            )
+            WHERE category_id IN (
+              SELECT old_c.id FROM categories old_c
+              WHERE old_c.name IN ('Transport', 'Health', 'Education', 'Other')
+                AND old_c.id NOT IN (
+                  SELECT MAX(id) FROM categories GROUP BY name
+                )
+            );
+          ''');
+
+          await customStatement('''
+            UPDATE recurring_transactions
+            SET category_id = (
+              SELECT new_c.id FROM categories new_c
+              JOIN categories old_c ON old_c.name = new_c.name
+              WHERE old_c.id = recurring_transactions.category_id
+                AND old_c.id != new_c.id
+                AND old_c.name IN ('Transport', 'Health', 'Education', 'Other')
+              ORDER BY new_c.id DESC LIMIT 1
+            )
+            WHERE category_id IN (
+              SELECT old_c.id FROM categories old_c
+              WHERE old_c.name IN ('Transport', 'Health', 'Education', 'Other')
+                AND old_c.id NOT IN (
+                  SELECT MAX(id) FROM categories GROUP BY name
+                )
+            );
+          ''');
+
+          await customStatement('''
+            UPDATE budgets
+            SET category_id = (
+              SELECT new_c.id FROM categories new_c
+              JOIN categories old_c ON old_c.name = new_c.name
+              WHERE old_c.id = budgets.category_id
+                AND old_c.id != new_c.id
+                AND old_c.name IN ('Transport', 'Health', 'Education', 'Other')
+              ORDER BY new_c.id DESC LIMIT 1
+            )
+            WHERE category_id IN (
+              SELECT old_c.id FROM categories old_c
+              WHERE old_c.name IN ('Transport', 'Health', 'Education', 'Other')
+                AND old_c.id NOT IN (
+                  SELECT MAX(id) FROM categories GROUP BY name
+                )
+            );
+          ''');
+
+          // Delete obsolete and duplicate old categories
+          await customStatement('''
+            DELETE FROM categories 
+            WHERE name IN ('Food & Dining', 'Shopping', 'Bills & Utilities', 'Entertainment', 'Savings', 'Income', 'Loan Given', 'Loan Received', 'Transfer')
+              AND is_default = 1
+              AND id NOT IN (SELECT DISTINCT category_id FROM transactions WHERE category_id IS NOT NULL);
+          ''');
+
+          // Remove duplicate older rows of Transport, Health, Education, Other (keep the newest)
+          await customStatement('''
+            DELETE FROM categories
+            WHERE name IN ('Transport', 'Health', 'Education', 'Other')
+              AND is_default = 1
+              AND id NOT IN (
+                SELECT MAX(id) FROM categories GROUP BY name, transaction_type
+              )
+              AND id NOT IN (SELECT DISTINCT category_id FROM transactions WHERE category_id IS NOT NULL);
+          ''');
         },
       );
 

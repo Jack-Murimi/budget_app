@@ -308,11 +308,52 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     ),
 
                     for (final entry in grouped.entries) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                        child: Text(entry.key,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                                color: theme.colorScheme.outline, fontWeight: FontWeight.w600)),
+                      Builder(
+                        builder: (context) {
+                          // Calculate net daily delta: Income - (Expenses + Fees)
+                          // Transfers are intra-account shifts, so they are excluded from net cashflow.
+                          double net = 0.0;
+                          for (final t in entry.value) {
+                            if (t.type == 'income') {
+                              net += t.amount;
+                            } else if (t.type == 'expense') {
+                              final totalCost = t.amount + t.transactionCost + t.fulizaFee;
+                              net -= totalCost;
+                            }
+                          }
+
+                          final isPositive = net > 0;
+                          final isNegative = net < 0;
+                          final netColor = isPositive
+                              ? theme.colorScheme.primary
+                              : (isNegative ? theme.colorScheme.error : theme.colorScheme.outline);
+                          final netSign = isPositive ? '+' : (isNegative ? '-' : '');
+                          final netFormatted = '$netSign${CurrencyFormatter.format(net.abs())}';
+
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    entry.key,
+                                    style: theme.textTheme.labelMedium?.copyWith(
+                                      color: theme.colorScheme.outline,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  netFormatted,
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    color: netColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                       for (final txn in entry.value)
                         Dismissible(
