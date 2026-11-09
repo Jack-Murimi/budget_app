@@ -79,6 +79,24 @@ class HomeFloatingActionButtons extends ConsumerWidget {
       return;
     }
 
+    // Reversal — annotate the original transaction if it exists
+    if (result.type == MpesaTransactionType.reversal) {
+      final origRef = result.counterpartyAccount; // original mpesa ref stored here
+      if (origRef.isNotEmpty) {
+        final original = await ref.read(transactionRepositoryProvider).getByRef(origRef);
+        if (original != null) {
+          // Add a note to the original transaction flagging it as reversed
+          await ref.read(transactionRepositoryProvider).updateTransaction(
+            TransactionsCompanion(
+              id: Value(original.id),
+              description: Value('[REVERSED] ${original.description}'),
+            ),
+          );
+        }
+      }
+      // Fall through to open the form so user confirms the reversal income entry
+    }
+
     // Normal transaction — check duplicate FIRST before opening form
     if (result.mpesaRef.isNotEmpty) {
       final existingTxn = await ref.read(transactionRepositoryProvider).getByRef(result.mpesaRef);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' show Value;
@@ -34,6 +35,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
   int? _selectedAccountId;
   int? _selectedToAccountId;
   bool _excludeFromBudget = false;
+  Timer? _descDebounce;
 
   @override
   void initState() {
@@ -68,6 +70,18 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
         _loadSuggestedCategory(p.counterpartyName);
       }
     }
+    // For manual entry: suggest category as user types description
+    _descCtrl.addListener(_onDescChanged);
+  }
+
+  void _onDescChanged() {
+    _descDebounce?.cancel();
+    _descDebounce = Timer(const Duration(milliseconds: 600), () {
+      final text = _descCtrl.text.trim();
+      if (text.length >= 3 && _selectedCategory == null) {
+        _loadSuggestedCategory(text);
+      }
+    });
   }
 
   Future<void> _loadSuggestedCategory(String payee) async {
@@ -94,6 +108,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
 
   @override
   void dispose() {
+    _descDebounce?.cancel();
     _headerCtrl.dispose();
     _descCtrl.dispose();
     _amountCtrl.dispose();
