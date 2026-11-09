@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../accounts/providers/account_providers.dart';
-import '../../add_transaction/screens/add_transaction_screen.dart';
 import '../../categories/providers/category_providers.dart';
 import '../../categories/widgets/category_picker.dart';
+import '../../home/widgets/transaction_list_item.dart';
 import '../models/transaction_model.dart';
 import '../providers/transaction_providers.dart';
 
@@ -67,19 +67,6 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         SnackBar(content: Text('Deleted "${txn.header}"'), duration: const Duration(seconds: 2)),
       );
     }
-  }
-
-  Widget _buildLeadingIcon(ThemeData theme, String type) {
-    final (IconData icon, Color bg, Color fg) = switch (type) {
-      'income' => (Icons.arrow_downward_rounded, theme.colorScheme.primaryContainer, theme.colorScheme.primary),
-      'transfer' => (Icons.swap_horiz_rounded, theme.colorScheme.tertiaryContainer, theme.colorScheme.tertiary),
-      _ => (Icons.arrow_upward_rounded, theme.colorScheme.errorContainer, theme.colorScheme.error),
-    };
-    return Container(
-      width: 40, height: 40,
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-      child: Icon(icon, color: fg, size: 20),
-    );
   }
 
   void _clearAllFilters() {
@@ -341,37 +328,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                             await _confirmDelete(context, txn);
                             return false;
                           },
-                          child: ListTile(
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => AddTransactionScreen(transactionToEdit: txn)),
-                            ),
-                            leading: _buildLeadingIcon(theme, txn.type),
-                            title: Text(txn.header,
-                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                              txn.description.isNotEmpty ? txn.description : (txn.mpesaRef ?? ''),
-                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '${txn.type == 'income' ? '+' : '-'}${CurrencyFormatter.format(txn.amount)}',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: txn.type == 'income'
-                                        ? theme.colorScheme.primary
-                                        : theme.colorScheme.error,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline, size: 18),
-                                  onPressed: () => _confirmDelete(context, txn),
-                                ),
-                              ],
-                            ),
+                          child: TransactionListItem(
+                            transaction: txn,
+                            onDelete: () => _confirmDelete(context, txn),
                           ),
                         ),
                     ],

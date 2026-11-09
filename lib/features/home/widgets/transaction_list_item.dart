@@ -10,11 +10,13 @@ import '../../transactions/models/transaction_model.dart';
 class TransactionListItem extends ConsumerWidget {
   final TransactionModel transaction;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
 
   const TransactionListItem({
     super.key,
     required this.transaction,
     this.onTap,
+    this.onDelete,
   });
 
   Color _parseColor(String? hex, Color fallback) {
@@ -121,6 +123,16 @@ class TransactionListItem extends ConsumerWidget {
                 color: amountColor,
               ),
             ),
+            if (onDelete != null) ...[
+              const SizedBox(width: 4),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: onDelete,
+              ),
+            ],
           ],
         ),
         subtitle: Padding(
