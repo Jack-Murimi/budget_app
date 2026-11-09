@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/utils/category_icon_helper.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/utils/date_formatter.dart';
 import '../../add_transaction/screens/add_transaction_screen.dart';
@@ -25,56 +26,6 @@ class TransactionListItem extends ConsumerWidget {
     }
   }
 
-  IconData _iconData(String? name, String type) {
-    if (name == null || name.isEmpty) {
-      return switch (type) {
-        'income' => Icons.arrow_downward_rounded,
-        'transfer' => Icons.swap_horiz_rounded,
-        _ => Icons.arrow_upward_rounded,
-      };
-    }
-    return switch (name) {
-      'restaurant' => Icons.restaurant,
-      'fastfood' => Icons.fastfood,
-      'local_cafe' => Icons.local_cafe,
-      'local_bar' => Icons.local_bar,
-      'local_grocery_store' => Icons.local_grocery_store,
-      'directions_car' => Icons.directions_car,
-      'local_taxi' => Icons.local_taxi,
-      'local_parking' => Icons.local_parking,
-      'flight' => Icons.flight,
-      'build' => Icons.build,
-      'shopping_bag' => Icons.shopping_bag,
-      'checkroom' => Icons.checkroom,
-      'devices' => Icons.devices,
-      'chair' => Icons.chair,
-      'face' => Icons.face,
-      'water_drop' => Icons.water_drop,
-      'bolt' => Icons.bolt,
-      'wifi' => Icons.wifi,
-      'home' => Icons.home,
-      'tv' => Icons.tv,
-      'phone_android' => Icons.phone_android,
-      'security' => Icons.security,
-      'movie' => Icons.movie,
-      'sports_soccer' => Icons.sports_soccer,
-      'theater_comedy' => Icons.theater_comedy,
-      'music_note' => Icons.music_note,
-      'medication' => Icons.medication,
-      'local_hospital' => Icons.local_hospital,
-      'fitness_center' => Icons.fitness_center,
-      'school' => Icons.school,
-      'work' => Icons.work,
-      'savings' => Icons.savings,
-      'attach_money' => Icons.attach_money,
-      'more_horiz' => Icons.more_horiz,
-      'swap_horiz' => Icons.swap_horiz,
-      'send' => Icons.send,
-      'sync' => Icons.sync,
-      _ => Icons.category_outlined,
-    };
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -94,7 +45,9 @@ class TransactionListItem extends ConsumerWidget {
           : (isTransfer ? theme.colorScheme.tertiary : theme.colorScheme.secondary),
     );
 
-    final IconData icon = _iconData(category?.icon, type);
+    final IconData icon = (category != null && category.icon == 'category')
+        ? CategoryIconHelper.getIcon(CategoryIconHelper.defaultIconForName(category.name), type: type)
+        : CategoryIconHelper.getIcon(category?.icon, type: type);
 
     final fee = transaction.transactionCost + transaction.fulizaFee;
     final totalAmount = isIncome ? transaction.amount : transaction.amount + fee;

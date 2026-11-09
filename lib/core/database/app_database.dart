@@ -204,6 +204,53 @@ class AppDatabase extends _$AppDatabase {
           await customStatement(
             'CREATE INDEX IF NOT EXISTS idx_transactions_header_cat ON transactions (header, category_id)',
           );
+          // Fix seeded categories that had literal 'category' as icon
+          await customStatement('''
+            UPDATE categories SET icon = CASE name
+              WHEN 'Food & Dining' THEN 'restaurant'
+              WHEN 'Transport' THEN 'directions_car'
+              WHEN 'Shopping' THEN 'shopping_bag'
+              WHEN 'Bills & Utilities' THEN 'receipt_long'
+              WHEN 'Entertainment' THEN 'movie'
+              WHEN 'Health' THEN 'favorite'
+              WHEN 'Education' THEN 'school'
+              WHEN 'Savings' THEN 'savings'
+              WHEN 'Income' THEN 'attach_money'
+              WHEN 'Other' THEN 'more_horiz'
+              WHEN 'Loan Given' THEN 'handshake'
+              WHEN 'Loan Received' THEN 'account_balance'
+              WHEN 'Transfer' THEN 'swap_horiz'
+              WHEN 'Groceries' THEN 'local_grocery_store'
+              WHEN 'Restaurant' THEN 'restaurant'
+              WHEN 'Cafe & Coffee' THEN 'local_cafe'
+              WHEN 'Fast Food' THEN 'fastfood'
+              WHEN 'Alcohol & Bar' THEN 'local_bar'
+              WHEN 'Fuel / Petrol' THEN 'local_gas_station'
+              WHEN 'Matatu / Bus' THEN 'directions_bus'
+              WHEN 'Taxi / Uber' THEN 'local_taxi'
+              WHEN 'Parking' THEN 'local_parking'
+              WHEN 'Vehicle Repair' THEN 'build'
+              WHEN 'Flight / Travel' THEN 'flight'
+              WHEN 'Clothing' THEN 'checkroom'
+              WHEN 'Electronics' THEN 'devices'
+              WHEN 'Home & Furniture' THEN 'chair'
+              WHEN 'Cosmetics' THEN 'face'
+              WHEN 'Online Shopping' THEN 'shopping_cart'
+              WHEN 'Water Bill' THEN 'water_drop'
+              WHEN 'KPLC / Electricity' THEN 'bolt'
+              WHEN 'WiFi / Internet' THEN 'wifi'
+              WHEN 'Rent' THEN 'home'
+              WHEN 'TV / DSTV' THEN 'tv'
+              WHEN 'Gas / Cooking Gas' THEN 'local_fire_department'
+              WHEN 'Phone / Airtime' THEN 'phone_android'
+              WHEN 'Insurance' THEN 'security'
+              WHEN 'Movies / Cinema' THEN 'theaters'
+              WHEN 'Sports' THEN 'sports_soccer'
+              WHEN 'Gaming' THEN 'videogame_asset'
+              ELSE icon
+            END
+            WHERE icon = 'category'
+          ''');
         },
       );
 
@@ -221,7 +268,7 @@ class AppDatabase extends _$AppDatabase {
       return await into(categories).insert(
         CategoriesCompanion.insert(
           name: name,
-          icon: const Value('category'),
+          icon: Value(icon),
           colorHex: Value(color),
           isDefault: const Value(true),
           parentId: Value(parentId),
