@@ -1,9 +1,20 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
 import '../../categories/providers/category_providers.dart';
 import '../../transactions/models/transaction_model.dart';
+
+class _Slice {
+  final String label;
+  final double value;
+  final Color color;
+  const _Slice(this.label, this.value, this.color);
+}
 
 class CategoryPieChartSection extends ConsumerStatefulWidget {
   final List<TransactionModel> transactions;
@@ -11,11 +22,18 @@ class CategoryPieChartSection extends ConsumerStatefulWidget {
   const CategoryPieChartSection({super.key, required this.transactions});
 
   @override
-  ConsumerState<CategoryPieChartSection> createState() => _CategoryPieChartSectionState();
+  ConsumerState<CategoryPieChartSection> createState() =>
+      _CategoryPieChartSectionState();
 }
 
-class _CategoryPieChartSectionState extends ConsumerState<CategoryPieChartSection> {
+class _CategoryPieChartSectionState
+    extends ConsumerState<CategoryPieChartSection> {
   bool _showSubcategories = false;
+  int? _touchedIndex;
+
+  static const int _maxSlices = 5; // top N, rest rolled into "Other"
+  static const Color _uncategorizedColor = Color(0xFF9E9E9E);
+  static const Color _otherColor = Color(0xFF78909C);
 
   static const List<Color> _palette = [
     Color(0xFF4CAF50),
@@ -30,183 +48,285 @@ class _CategoryPieChartSectionState extends ConsumerState<CategoryPieChartSectio
     Color(0xFF673AB7),
   ];
 
-  Map<int, Category> _buildCategoryMap(List<Category> categories) {
-    return {for (final c in categories) c.id: c};
-  }
+  static final NumberFormat _money = NumberFormat.decimalPattern();
 
-  String _getCategoryName(Category category, bool showSubcategories, List<Category> categories) {
-    if (showSubcategories) {
-      return category.name;
-    }
-    if (category.parentId != null) {
-      try {
-        final parent = categories.firstWhere((c) => c.id == category.parentId);
-        return parent.name;
-      } catch (e) {
-        return category.name;
+  // Stable fallback: same category always gets the same color.
+  Color _colorFor(Category c) =>
+      _tryParseColor(c.colorHex) ?? _palette[c.id % _palette.length];
+
+  /// Pure aggregation: no state mutation during build.
+  List<_Slice> _buildSlices(List<Category> categories) {
+    final byId = {for (final c in categories) c.id: c};
+    final totals = <int?, double>{};
+    final cats = <int?, Category?>{};
+
+    for (final t in widget.transactions) {
+      if (t.type != 'expense') continue;
+
+      var cat = t.categoryId != null ? byId[t.categoryId!] : null;
+      // Category mode: roll up to the parent AND use the parent's color,
+      // so the color doesn't depend on which child transaction came first.
+      if (cat != null && !_showSubcategories && cat.parentId != null) {
+        cat = byId[cat.parentId!] ?? cat;
       }
+
+      final key = cat?.id;
+      totals[key] = (totals[key] ?? 0) + t.amount;
+      cats[key] = cat;
     }
-    return category.name;
+
+    final entries = totals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final slices = <_Slice>[
+      for (final e in entries.take(_maxSlices))
+        _Slice(
+          cats[e.key]?.name ?? 'Uncategorized',
+          e.value,
+          cats[e.key] == null ? _uncategorizedColor : _colorFor(cats[e.key]!),
+        ),
+    ];
+
+    final rest =
+        entries.skip(_maxSlices).fold<double>(0, (s, e) => s + e.value);
+    if (rest > 0) slices.add(_Slice('Other', rest, _otherColor));
+    return slices;
   }
 
-  final Map<String, Color> categoryColors = {};
+  void _select(int index) {
+    HapticFeedback.selectionClick();
+    setState(() => _touchedIndex = _touchedIndex == index ? null : index);
+  }
 
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesStreamProvider);
 
     return categoriesAsync.when(
-      data: (categories) {
-        final categoryMap = _buildCategoryMap(categories);
-        categoryColors.clear();
+      skipLoadingOnReload: true, // no flicker when the stream re-emits
+      data: (categories) => _buildCard(context, _buildSlices(categories)),
+      loading: () =>
+          const SizedBox(height: 220), // reserve space, no layout jump
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
 
-        final grouped = <String, double>{};
-        for (final t in widget.transactions.where((t) => t.type == 'expense')) {
-          String displayName;
-          Color color;
+  Widget _buildCard(BuildContext context, List<_Slice> slices) {
+    final theme = Theme.of(context);
+    final total = slices.fold<double>(0, (s, e) => s + e.value);
+    final selected = (_touchedIndex != null && _touchedIndex! < slices.length)
+        ? _touchedIndex
+        : null;
 
-          final category = t.categoryId != null ? categoryMap[t.categoryId!] : null;
-          if (category == null) {
-            displayName = 'Uncategorized';
-            color = const Color(0xFF9E9E9E);
-          } else {
-            displayName = _getCategoryName(category, _showSubcategories, categories);
-            final colorHex = category.colorHex;
-            color = colorHex.isNotEmpty
-                ? _parseColor(colorHex)
-                : _palette[grouped.length % _palette.length];
-          }
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Spending Breakdown', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 12),
+            SegmentedButton<bool>(
+              showSelectedIcon: false,
+              style: const ButtonStyle(visualDensity: VisualDensity.compact),
+              segments: const [
+                ButtonSegment(value: false, label: Text('Category')),
+                ButtonSegment(value: true, label: Text('Subcategory')),
+              ],
+              selected: {_showSubcategories},
+              onSelectionChanged: (s) => setState(() {
+                _showSubcategories = s.first;
+                _touchedIndex = null;
+              }),
+            ),
+            const SizedBox(height: 16),
+            if (total <= 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'No expenses in this period',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ),
+              )
+            else
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final chartSize =
+                      math.min(160.0, constraints.maxWidth * 0.46);
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _buildChart(theme, slices, total, selected, chartSize),
+                      const SizedBox(width: 16),
+                      Expanded(
+                          child: _buildLegend(theme, slices, total, selected)),
+                    ],
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
-          grouped[displayName] = (grouped[displayName] ?? 0) + t.amount;
-          if (!categoryColors.containsKey(displayName)) {
-            categoryColors[displayName] = color;
-          }
-        }
+  Widget _buildChart(ThemeData theme, List<_Slice> slices, double total,
+      int? selected, double size) {
+    final scale = size / 160;
+    final centerLabel = selected != null ? slices[selected].label : 'Total';
+    final centerValue = selected != null ? slices[selected].value : total;
 
-        final sorted = grouped.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-        final top = sorted.take(5).toList();
+    return Semantics(
+      label:
+          'Spending breakdown: ${slices.map((s) => '${s.label} Ksh ${_money.format(s.value)}').join(', ')}',
+      excludeSemantics: true,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            PieChart(
+              PieChartData(
+                sectionsSpace: 2,
+                centerSpaceRadius: 38 * scale,
+                pieTouchData: PieTouchData(
+                  touchCallback: (event, response) {
+                    if (event is! FlTapUpEvent) return;
+                    final i = response?.touchedSection?.touchedSectionIndex;
+                    if (i == null || i < 0) {
+                      if (_touchedIndex != null) {
+                        setState(() => _touchedIndex = null);
+                      }
+                    } else {
+                      _select(i);
+                    }
+                  },
+                ),
+                sections: List.generate(slices.length, (i) {
+                  final s = slices[i];
+                  final pct = s.value / total * 100;
+                  final isSelected = i == selected;
+                  final dimmed = selected != null && !isSelected;
+                  final color =
+                      dimmed ? s.color.withValues(alpha: 0.45) : s.color;
+                  final onColor =
+                      ThemeData.estimateBrightnessForColor(s.color) ==
+                              Brightness.dark
+                          ? Colors.white
+                          : Colors.black87;
 
-        final total = top.fold<double>(0, (sum, e) => sum + e.value);
-
-        return Card(
-          margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  return PieChartSectionData(
+                    value: s.value,
+                    color: color,
+                    radius: (isSelected ? 40 : 34) * scale,
+                    // tiny slices can't fit a label
+                    title: pct >= 8 ? '${pct.toStringAsFixed(0)}%' : '',
+                    titleStyle: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: onColor),
+                  );
+                }),
+              ),
+            ),
+            IgnorePointer(
+              child: SizedBox(
+                width: 66 * scale,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('Spending Breakdown', style: Theme.of(context).textTheme.titleSmall),
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.sort, size: 18),
-                      onSelected: (value) {
-                        setState(() {
-                          _showSubcategories = value == 'subcategory';
-                        });
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(value: 'category', child: Text('Category')),
-                        const PopupMenuItem(value: 'subcategory', child: Text('Subcategory')),
-                      ],
+                    Text(
+                      centerLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _money.format(centerValue),
+                        style: theme.textTheme.labelLarge
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 160,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: PieChart(
-                          PieChartData(
-                            sections: List.generate(top.length, (i) {
-                              final pct = top[i].value / total * 100;
-                              return PieChartSectionData(
-                                value: top[i].value,
-                                color: categoryColors[top[i].key] ?? _palette[i % _palette.length],
-                                title: '${pct.toStringAsFixed(0)}%',
-                                radius: 60,
-                                titleStyle: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              );
-                            }),
-                            sectionsSpace: 2,
-                            centerSpaceRadius: 30,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegend(
+      ThemeData theme, List<_Slice> slices, double total, int? selected) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List.generate(slices.length, (i) {
+        final s = slices[i];
+        final pct = s.value / total * 100;
+        final dimmed = selected != null && selected != i;
+
+        return InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _select(i),
+          child: Opacity(
+            opacity: dimmed ? 0.5 : 1,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration:
+                        BoxDecoration(color: s.color, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(s.label,
+                            style: theme.textTheme.bodySmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Ksh ${_money.format(s.value)} (${pct.toStringAsFixed(1)}%)',
+                            style: theme.textTheme.labelSmall,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: List.generate(top.length, (i) {
-                            final pct = top[i].value / total * 100;
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 3),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: BoxDecoration(
-                                      color: categoryColors[top[i].key] ?? _palette[i % _palette.length],
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          top[i].key,
-                                          style: Theme.of(context).textTheme.bodySmall,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                          'Ksh${top[i].value.toStringAsFixed(0)} (${pct.toStringAsFixed(1)}%)',
-                                          style: Theme.of(context).textTheme.labelSmall,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (e, _) => const SizedBox.shrink(),
+      }),
     );
   }
 }
 
-Color _parseColor(String? hex) {
-  if (hex == null || hex.isEmpty) {
-    return const Color(0xFF6750A4);
-  }
+Color? _tryParseColor(String? hex) {
+  if (hex == null || hex.isEmpty) return null;
   try {
-    String hexValue = hex.replaceFirst('#', '');
-    if (hexValue.length == 6) {
-      hexValue = 'FF$hexValue';
-    }
-    return Color(int.parse(hexValue, radix: 16));
-  } catch (e) {
-    return const Color(0xFF6750A4);
+    var v = hex.replaceFirst('#', '');
+    if (v.length == 6) v = 'FF$v';
+    return Color(int.parse(v, radix: 16));
+  } catch (_) {
+    return null;
   }
 }
