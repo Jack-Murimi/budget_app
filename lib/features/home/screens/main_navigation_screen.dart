@@ -1,17 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../main.dart';
-import '../../accounts/screens/accounts_screen.dart';
 import '../../budgets/screens/budgets_screen.dart';
-import '../../categories/screens/categories_screen.dart';
-import '../../debts/screens/debts_screen.dart';
-import '../../fuliza/screens/fuliza_screen.dart';
-import '../../goals/screens/goals_screen.dart';
-import '../../insights/screens/insights_screen.dart';
-import '../../sms/screens/sms_inbox_screen.dart';
-import '../../portability/screens/data_portability_screen.dart';
-import '../../recurring/screens/recurring_screen.dart';
-import '../../settings/settings_screen.dart';
+import '../../more/screens/more_screen.dart';
 import '../../transactions/screens/transactions_screen.dart';
 import '../providers/navigation_providers.dart';
 import '../widgets/floating_action_buttons.dart';
@@ -20,127 +10,10 @@ import 'home_screen.dart';
 class MainNavigationScreen extends ConsumerWidget {
   const MainNavigationScreen({super.key});
 
-  void _showMoreSheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-            ListTile(
-              leading: const Icon(Icons.handshake_outlined),
-              title: const Text('Loans & Debts'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const DebtsScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.savings_outlined),
-              title: const Text('Savings goals'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const GoalsScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.insights_outlined),
-              title: const Text('Insights'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const InsightsScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.account_balance_wallet_outlined),
-              title: const Text('Accounts'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const AccountsScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.repeat),
-              title: const Text('Recurring & Bills'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const RecurringScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.category_outlined),
-              title: const Text('Categories'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const CategoriesScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.sync_problem_rounded),
-              title: const Text('Fuliza'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const FulizaScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.sms_outlined),
-              title: const Text('Scan SMS Inbox'),
-              subtitle: const Text('Import M-Pesa SMS from your inbox'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SmsInboxScreen()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text('Settings'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.import_export_outlined),
-              title: const Text('Export & backup'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        DataPortabilityScreen(db: ref.read(dbProvider)),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    ),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedIndex = ref.watch(selectedTabProvider);
-
-    // 3 real tabs: 0=Home, 1=Transactions, 2=Budgets; index 3=More sheet
-    final clampedIndex = selectedIndex.clamp(0, 2);
+    final clampedIndex = selectedIndex.clamp(0, 3);
 
     return Scaffold(
       body: IndexedStack(
@@ -149,16 +22,13 @@ class MainNavigationScreen extends ConsumerWidget {
           HomeScreen(),
           TransactionsScreen(isEmbedded: true),
           BudgetsScreen(),
+          MoreScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: clampedIndex,
         onDestinationSelected: (i) {
-          if (i == 3) {
-            _showMoreSheet(context, ref);
-          } else {
-            ref.read(selectedTabProvider.notifier).state = i;
-          }
+          ref.read(selectedTabProvider.notifier).state = i;
         },
         destinations: const [
           NavigationDestination(
@@ -178,6 +48,7 @@ class MainNavigationScreen extends ConsumerWidget {
           ),
           NavigationDestination(
             icon: Icon(Icons.more_horiz),
+            selectedIcon: Icon(Icons.more_horiz),
             label: 'More',
           ),
         ],
