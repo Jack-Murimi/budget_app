@@ -93,7 +93,7 @@ class CsvPortabilityService {
       final duplicate = await (_db.select(_db.transactions)
             ..where((item) =>
                 item.transactionDate.equals(date) &
-                item.amount.equals(amount) &
+                item.amount.equalsValue(amount) &
                 (item.counterpartyName.lower().equals(normalizedPayee) |
                     item.header.lower().equals(normalizedPayee)))
             ..limit(1))

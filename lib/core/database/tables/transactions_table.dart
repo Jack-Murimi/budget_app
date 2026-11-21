@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../converters/cents_converter.dart';
 import 'accounts_table.dart';
 import 'categories_table.dart';
 import 'recurring_transactions_table.dart';
@@ -8,10 +9,16 @@ class Transactions extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get header => text().withLength(min: 1, max: 200)();
   TextColumn get description => text().withDefault(const Constant(''))();
-  RealColumn get amount => real()();
-  RealColumn get transactionCost => real().withDefault(const Constant(0.0))();
-  RealColumn get fulizaAmount => real().withDefault(const Constant(0.0))(); // amount Fuliza covered
-  RealColumn get fulizaFee => real().withDefault(const Constant(0.0))(); // Fuliza access fee
+  IntColumn get amount => integer().map(const CentsConverter())();
+  IntColumn get transactionCost => integer()
+      .withDefault(const Constant(0))
+      .map(const CentsConverter())();
+  IntColumn get fulizaAmount => integer()
+      .withDefault(const Constant(0))
+      .map(const CentsConverter())(); // amount Fuliza covered
+  IntColumn get fulizaFee => integer()
+      .withDefault(const Constant(0))
+      .map(const CentsConverter())(); // Fuliza access fee
   TextColumn get type => text().withDefault(const Constant('expense'))(); // income | expense | transfer
   IntColumn get categoryId => integer().nullable().references(Categories, #id)();
   DateTimeColumn get transactionDate => dateTime()();

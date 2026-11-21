@@ -134,8 +134,10 @@ class MpesaParser {
     }
 
     // Paybill with account
-    if (lower.contains('sent to') && lower.contains('for account')) return MpesaTransactionType.paybill;
-    if (lower.contains('sent to')) return MpesaTransactionType.sendMoney;
+    if (lower.contains('for account')) return MpesaTransactionType.paybill;
+    if (lower.contains('sent to') || (lower.contains('sent ') && lower.contains(' to '))) {
+      return MpesaTransactionType.sendMoney;
+    }
     if (lower.contains('paid to')) return MpesaTransactionType.paybill;
 
     return MpesaTransactionType.unknown;
@@ -145,16 +147,16 @@ class MpesaParser {
       String msg, MpesaTransactionType type) {
     switch (type) {
       case MpesaTransactionType.sendMoney:
-        // "sent to NAME 0712345678 on" or "sent to NAME on" (no phone)
+        // "sent to NAME 0712345678 on" or "sent Ksh... to NAME 0712345678 on"
         // Also handles double spaces in names: "JOSEPHAT  RORI"
         var m = RegExp(
-          r'sent to ([A-Za-z][A-Za-z\s]+?)\s+(\d{10,12})\s+on',
+          r'sent\s+(?:[Kk][Ss][Hh]\s*[\d,]+\.?\d*\s+)?to\s+([A-Za-z][A-Za-z\s]+?)\s+(\d{10,12})\s+on',
           caseSensitive: false,
         ).firstMatch(msg);
         if (m != null) return (_cleanName(m.group(1)!), m.group(2)!);
         // No phone number
         m = RegExp(
-          r'sent to ([A-Za-z][A-Za-z\s]+?)\s+on\s+\d',
+          r'sent\s+(?:[Kk][Ss][Hh]\s*[\d,]+\.?\d*\s+)?to\s+([A-Za-z][A-Za-z\s]+?)[.\s]+on\s+\d',
           caseSensitive: false,
         ).firstMatch(msg);
         return (_cleanName(m?.group(1) ?? ''), '');
@@ -192,7 +194,7 @@ class MpesaParser {
         ).firstMatch(msg);
         if (m3 != null) return (_cleanName(m3.group(1)!), m3.group(2)!);
         final m4 = RegExp(
-          r'from ([A-Za-z][A-Za-z\s]+?)\s+on\s+\d',
+          r'from ([A-Za-z][A-Za-z\s]+?)[.\s]+on\s+\d',
           caseSensitive: false,
         ).firstMatch(msg);
         return (_cleanName(m4?.group(1) ?? ''), '');
@@ -253,7 +255,8 @@ class MpesaParser {
     }
   }
 
-  static String _cleanName(String s) => s.trim().replaceAll(RegExp(r'\s+'), ' ');
+  static String _cleanName(String s) =>
+      s.trim().replaceAll(RegExp(r'\.+$'), '').trim().replaceAll(RegExp(r'\s+'), ' ');
   static String _firstWords(String s, int n) =>
       s.trim().split(RegExp(r'\s+')).take(n).join(' ');
 

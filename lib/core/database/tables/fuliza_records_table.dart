@@ -1,11 +1,16 @@
 import 'package:drift/drift.dart';
+import '../converters/cents_converter.dart';
 
 class FulizaRecords extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get mpesaRef => text()();
-  RealColumn get fulizaAmount => real()();
-  RealColumn get accessFee => real().withDefault(const Constant(0.0))();
-  RealColumn get outstandingTotal => real().withDefault(const Constant(0.0))();
+  IntColumn get fulizaAmount => integer().map(const CentsConverter())();
+  IntColumn get accessFee => integer()
+      .withDefault(const Constant(0))
+      .map(const CentsConverter())();
+  IntColumn get outstandingTotal => integer()
+      .withDefault(const Constant(0))
+      .map(const CentsConverter())();
   DateTimeColumn get dueDate => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 

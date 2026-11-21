@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../converters/cents_converter.dart';
 
 /// Staging queue for SMS messages that could not be fully parsed or
 /// need user review before being saved as transactions.
@@ -11,7 +12,8 @@ class SmsInboxItems extends Table {
   // Parsed data (may be partial)
   TextColumn get parsedType =>
       text().nullable()(); // e.g. 'sendMoney', 'paybill', null=unknown
-  RealColumn get parsedAmount => real().nullable()();
+  IntColumn get parsedAmount =>
+      integer().nullable().map(const CentsConverter())();
   TextColumn get parsedPayee => text().nullable()();
   TextColumn get parsedRef => text().nullable()();
   IntColumn get parsedDate => integer().nullable()(); // ms since epoch

@@ -1,5 +1,7 @@
+// ignore_for_file: experimental_member_use
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'converters/cents_converter.dart';
 import 'tables/accounts_table.dart';
 import 'tables/budgets_table.dart';
 import 'tables/categories_table.dart';
@@ -34,7 +36,21 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 17;
+
+  Future<bool> _columnExists(String table, String column) async {
+    final rows = await customSelect('PRAGMA table_info("$table")').get();
+    return rows.any((row) => row.read<String>('name') == column);
+  }
+
+  static Expression<int> _realToCents(String columnName) =>
+      CustomExpression<int>('CAST(ROUND("$columnName" * 100) AS INTEGER)');
+
+  static Expression<int> _nullableRealToCents(String columnName) =>
+      CustomExpression<int>(
+        'CASE WHEN "$columnName" IS NULL THEN NULL '
+        'ELSE CAST(ROUND("$columnName" * 100) AS INTEGER) END',
+      );
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -49,35 +65,6 @@ class AppDatabase extends _$AppDatabase {
           await customStatement(
             'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories (transaction_type)',
           );
-          await customStatement('''
-        CREATE TABLE IF NOT EXISTS recurring_transactions (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          account_id INTEGER REFERENCES accounts(id),
-          category_id INTEGER REFERENCES categories(id),
-          amount REAL NOT NULL,
-          type TEXT NOT NULL DEFAULT 'expense',
-          payee TEXT NOT NULL DEFAULT '',
-          notes TEXT NOT NULL DEFAULT '',
-          frequency TEXT NOT NULL DEFAULT 'monthly',
-          interval_count INTEGER NOT NULL DEFAULT 1,
-          start_date INTEGER NOT NULL,
-          end_date INTEGER,
-          next_due_date INTEGER NOT NULL,
-          auto_record INTEGER NOT NULL DEFAULT 0,
-          notify INTEGER NOT NULL DEFAULT 1,
-          is_active INTEGER NOT NULL DEFAULT 1,
-          created_at INTEGER NOT NULL,
-          updated_at INTEGER NOT NULL
-        )
-      ''');
-          try {
-            await customStatement(
-                'ALTER TABLE transactions ADD COLUMN recurrence_id INTEGER REFERENCES recurring_transactions(id)');
-          } catch (_) {}
-          try {
-            await customStatement(
-                'ALTER TABLE transactions ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0');
-          } catch (_) {}
           await _seedDefaultCategories();
           await _seedDefaultAccounts();
         },
@@ -167,14 +154,16 @@ class AppDatabase extends _$AppDatabase {
             updated_at INTEGER NOT NULL
           )
         ''');
-            try {
+            if (!await _columnExists('transactions', 'recurrence_id')) {
               await customStatement(
-                  'ALTER TABLE transactions ADD COLUMN recurrence_id INTEGER REFERENCES recurring_transactions(id)');
-            } catch (_) {}
-            try {
+                'ALTER TABLE transactions ADD COLUMN recurrence_id INTEGER REFERENCES recurring_transactions(id)',
+              );
+            }
+            if (!await _columnExists('transactions', 'is_recurring')) {
               await customStatement(
-                  'ALTER TABLE transactions ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0');
-            } catch (_) {}
+                'ALTER TABLE transactions ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0',
+              );
+            }
           }
           if (from < 9) {
             await m.createTable(debts);
@@ -200,14 +189,151 @@ class AppDatabase extends _$AppDatabase {
             );
           }
           if (from < 14) {
-            try {
+            if (!await _columnExists('categories', 'transaction_type')) {
               await m.addColumn(categories, categories.transactionType);
-            } catch (_) {}
+            }
             await customStatement(
               'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories (transaction_type)',
             );
             // Re-seed taxonomy for existing users
             await _seedDefaultCategories();
+          }
+          if (from < 15) {
+            await customStatement('''
+              INSERT INTO categories (name, icon, color_hex, transaction_type, is_default, parent_id, sort_order)
+              SELECT 'Loan Given', 'handshake', '#00838F', 'expense', 1, NULL, 0
+              WHERE NOT EXISTS (
+                SELECT 1 FROM categories WHERE name = 'Loan Given' AND transaction_type = 'expense'
+              );
+            ''');
+            await customStatement('''
+              INSERT INTO categories (name, icon, color_hex, transaction_type, is_default, parent_id, sort_order)
+              SELECT 'Loan Repayment Received', 'handshake', '#43A047', 'income', 1, NULL, 0
+              WHERE NOT EXISTS (
+                SELECT 1 FROM categories WHERE name = 'Loan Repayment Received' AND transaction_type = 'income'
+              );
+            ''');
+            await customStatement('''
+              INSERT INTO categories (name, icon, color_hex, transaction_type, is_default, parent_id, sort_order)
+              SELECT 'Loan Received', 'handshake', '#00838F', 'income', 1, NULL, 0
+              WHERE NOT EXISTS (
+                SELECT 1 FROM categories WHERE name = 'Loan Received' AND transaction_type = 'income'
+              );
+            ''');
+          }
+          if (from < 16) {
+            if (!await _columnExists('debts', 'disbursement_shortfall')) {
+              await m.addColumn(debts, debts.disbursementShortfall);
+            }
+          }
+          if (from < 17) {
+            // Convert all monetary REAL columns to exact INTEGER cents (KES * 100)
+            // using Drift's TableMigration so SQLite column affinity becomes INTEGER.
+            await m.alterTable(
+              TableMigration(
+                accounts,
+                columnTransformer: {
+                  accounts.initialBalance: _realToCents('initial_balance'),
+                },
+              ),
+            );
+            await m.alterTable(
+              TableMigration(
+                budgets,
+                columnTransformer: {
+                  budgets.amount: _realToCents('amount'),
+                },
+              ),
+            );
+            await m.alterTable(
+              TableMigration(
+                fulizaRecords,
+                columnTransformer: {
+                  fulizaRecords.fulizaAmount: _realToCents('fuliza_amount'),
+                  fulizaRecords.accessFee: _realToCents('access_fee'),
+                  fulizaRecords.outstandingTotal:
+                      _realToCents('outstanding_total'),
+                },
+              ),
+            );
+            await customStatement(
+              'CREATE UNIQUE INDEX IF NOT EXISTS idx_fuliza_records_mpesa_ref ON fuliza_records (mpesa_ref)',
+            );
+            await m.alterTable(
+              TableMigration(
+                recurringTransactions,
+                columnTransformer: {
+                  recurringTransactions.amount: _realToCents('amount'),
+                },
+              ),
+            );
+            await m.alterTable(
+              TableMigration(
+                debts,
+                columnTransformer: {
+                  debts.principal: _realToCents('principal'),
+                  debts.outstanding: _realToCents('outstanding'),
+                  debts.interest: _realToCents('interest'),
+                  debts.disbursementShortfall:
+                      _realToCents('disbursement_shortfall'),
+                },
+              ),
+            );
+            await m.alterTable(
+              TableMigration(
+                debtRepayments,
+                columnTransformer: {
+                  debtRepayments.amount: _realToCents('amount'),
+                },
+              ),
+            );
+            await m.alterTable(
+              TableMigration(
+                savingsGoals,
+                columnTransformer: {
+                  savingsGoals.targetAmount: _realToCents('target_amount'),
+                  savingsGoals.currentAmount: _realToCents('current_amount'),
+                },
+              ),
+            );
+            await m.alterTable(
+              TableMigration(
+                goalContributions,
+                columnTransformer: {
+                  goalContributions.amount: _realToCents('amount'),
+                },
+              ),
+            );
+            await m.alterTable(
+              TableMigration(
+                smsInboxItems,
+                columnTransformer: {
+                  smsInboxItems.parsedAmount:
+                      _nullableRealToCents('parsed_amount'),
+                },
+              ),
+            );
+            await m.alterTable(
+              TableMigration(
+                transactions,
+                columnTransformer: {
+                  transactions.amount: _realToCents('amount'),
+                  transactions.transactionCost:
+                      _realToCents('transaction_cost'),
+                  transactions.fulizaAmount: _realToCents('fuliza_amount'),
+                  transactions.fulizaFee: _realToCents('fuliza_fee'),
+                },
+              ),
+            );
+            await customStatement(
+              'CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_mpesa_ref ON transactions (mpesa_ref) WHERE mpesa_ref IS NOT NULL',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_transactions_header ON transactions (header)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_transactions_header_cat ON transactions (header, category_id)',
+            );
           }
         },
         beforeOpen: (details) async {
@@ -290,7 +416,7 @@ class AppDatabase extends _$AppDatabase {
           // Delete obsolete and duplicate old categories
           await customStatement('''
             DELETE FROM categories 
-            WHERE name IN ('Food & Dining', 'Shopping', 'Bills & Utilities', 'Entertainment', 'Savings', 'Income', 'Loan Given', 'Loan Received', 'Transfer')
+            WHERE name IN ('Food & Dining', 'Shopping', 'Bills & Utilities', 'Entertainment', 'Savings', 'Income', 'Transfer')
               AND is_default = 1
               AND id NOT IN (SELECT DISTINCT category_id FROM transactions WHERE category_id IS NOT NULL);
           ''');
@@ -422,6 +548,7 @@ class AppDatabase extends _$AppDatabase {
     // 12. Other (Expense)
     final otherExp = await addCat('Other', 'more_horiz', '#757575');
     await addCat('Uncategorized', 'help_outline', '#757575', parentId: otherExp);
+    await addCat('Loan Given', 'handshake', '#00838F');
 
     // ════════════════════════════════════════════════════════════════════════
     // INCOME CATEGORIES & SUBCATEGORIES
@@ -439,6 +566,8 @@ class AppDatabase extends _$AppDatabase {
 
     await addCat('Gifts & Refunds', 'card_giftcard', '#66BB6A', type: 'income');
     await addCat('Other Income', 'add_circle_outline', '#81C784', type: 'income');
+    await addCat('Loan Repayment Received', 'handshake', '#43A047', type: 'income');
+    await addCat('Loan Received', 'handshake', '#00838F', type: 'income');
 
     // ════════════════════════════════════════════════════════════════════════
     // TRANSFER CATEGORIES & SUBCATEGORIES

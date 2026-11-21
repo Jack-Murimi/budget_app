@@ -333,7 +333,34 @@ class HomeScreen extends ConsumerWidget {
                   child: CircularProgressIndicator(),
                 ),
               ),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (_, __) => Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Could not load your transactions.',
+                      style: Theme.of(context).textTheme.titleSmall,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.tonalIcon(
+                      onPressed: () {
+                        ref.invalidate(recentTransactionsProvider);
+                        ref.invalidate(monthSummaryProvider);
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),

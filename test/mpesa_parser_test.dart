@@ -46,6 +46,18 @@ void main() {
       expect(result.counterpartyAccount, '0722111222');
       expect(result.type, MpesaTransactionType.sendMoney);
     });
+
+    test('Bridge repayment sent with trailing dot', () {
+      const msg = 'UKAQX1V4NX Confirmed. You have sent Ksh603.68 to Bridge. on 10/11/2026 at 12:02 PM. New MPESA balance is Ksh8,567.08.';
+      final result = MpesaParser.parse(msg);
+
+      expect(result.isValid, true);
+      expect(result.mpesaRef, 'UKAQX1V4NX');
+      expect(result.amount, 603.68);
+      expect(result.counterpartyName, 'Bridge');
+      expect(result.type, MpesaTransactionType.sendMoney);
+      expect(result.newBalance, 8567.08);
+    });
   });
 
   group('paybill', () {
@@ -102,6 +114,18 @@ void main() {
       expect(result.counterpartyName, 'BOB KIMANI');
       expect(result.counterpartyAccount, '0758***343');
       expect(result.type, MpesaTransactionType.receiveMoney);
+    });
+
+    test('Bridge loan received message with trailing dot', () {
+      const msg = 'UKBQX21TEG Confirmed. You have received Ksh600.00 from Bridge. on 11/11/2026 at 07:00 PM. New MPESA balance is Ksh774.08.';
+      final result = MpesaParser.parse(msg);
+
+      expect(result.isValid, true);
+      expect(result.mpesaRef, 'UKBQX21TEG');
+      expect(result.amount, 600.00);
+      expect(result.counterpartyName, 'Bridge');
+      expect(result.type, MpesaTransactionType.receiveMoney);
+      expect(result.newBalance, 774.08);
     });
   });
 

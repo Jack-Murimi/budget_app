@@ -5,5 +5,14 @@ import '../repositories/debt_repository.dart';
 
 final debtRepositoryProvider =
     Provider((ref) => DebtRepository(ref.watch(dbProvider)));
+
 final debtsProvider = StreamProvider<List<DebtWithRepayments>>(
     (ref) => ref.watch(debtRepositoryProvider).watchAll());
+
+final lentDebtsProvider = StreamProvider<List<DebtWithRepayments>>(
+  (ref) => ref.watch(debtRepositoryProvider).watchLent(),
+);
+
+final borrowedDebtsProvider = StreamProvider<List<DebtWithRepayments>>(
+  (ref) => ref.watch(debtRepositoryProvider).watchBorrowed(),
+);

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../converters/cents_converter.dart';
 import 'accounts_table.dart';
 import 'categories_table.dart';
 
@@ -6,7 +7,7 @@ class RecurringTransactions extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get accountId => integer().nullable().references(Accounts, #id)();
   IntColumn get categoryId => integer().nullable().references(Categories, #id)();
-  RealColumn get amount => real()();
+  IntColumn get amount => integer().map(const CentsConverter())();
   TextColumn get type => text().withDefault(const Constant('expense'))(); // income | expense | transfer
   TextColumn get payee => text().withDefault(const Constant(''))();
   TextColumn get notes => text().withDefault(const Constant(''))();

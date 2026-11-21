@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/database/converters/cents_converter.dart';
 import '../models/recurring_model.dart';
 import '../services/recurrence_engine.dart';
 
@@ -42,7 +43,7 @@ class RecurringRepository {
       id: row.read<int>('id'),
       accountId: row.readNullable<int>('account_id'),
       categoryId: row.readNullable<int>('category_id'),
-      amount: row.read<double>('amount'),
+      amount: CentsConverter.fromCents(row.read<int>('amount')),
       type: row.read<String>('type'),
       payee: row.read<String>('payee'),
       notes: row.read<String>('notes'),
@@ -78,7 +79,7 @@ class RecurringRepository {
       variables: [
         Variable<int>(r.accountId),
         Variable<int>(r.categoryId),
-        Variable<double>(r.amount),
+        Variable.withInt(CentsConverter.toCents(r.amount)),
         Variable<String>(r.type),
         Variable<String>(r.payee),
         Variable<String>(r.notes),
@@ -122,7 +123,7 @@ class RecurringRepository {
       variables: [
         Variable<int>(r.accountId),
         Variable<int>(r.categoryId),
-        Variable<double>(r.amount),
+        Variable.withInt(CentsConverter.toCents(r.amount)),
         Variable<String>(r.type),
         Variable<String>(r.payee),
         Variable<String>(r.notes),
@@ -232,7 +233,7 @@ class RecurringRepository {
         Variable.withDateTime(DateTime.fromMillisecondsSinceEpoch(now)),
         Variable<int>(r.id),
       ],
-      updates: {_db.transactions},
+      updates: {_db.recurringTransactions},
     );
   }
 }

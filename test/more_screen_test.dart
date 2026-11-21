@@ -34,7 +34,7 @@ void main() {
     );
   }
 
-  testWidgets('More tab renders MoreScreen with all sections and 10 items',
+  testWidgets('More tab renders MoreScreen with all sections and items',
       (tester) async {
     final container =
         ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
@@ -55,9 +55,12 @@ void main() {
     // Verify section headers in viewport / after scrolling
     expect(find.text('MONEY'), findsOneWidget);
     expect(find.text('AUTOMATION'), findsOneWidget);
+
+    // Scroll to see ORGANIZE and APP sections
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
     expect(find.text('ORGANIZE'), findsOneWidget);
 
-    // Scroll to see APP section at bottom
     await tester.drag(find.byType(ListView), const Offset(0, -300));
     await tester.pumpAndSettle();
     expect(find.text('APP'), findsOneWidget);

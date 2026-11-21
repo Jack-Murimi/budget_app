@@ -1,10 +1,11 @@
 import 'package:drift/drift.dart';
+import '../converters/cents_converter.dart';
 import 'categories_table.dart';
 
 class Budgets extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text().withLength(min: 1, max: 100)();
-  RealColumn get amount => real()();
+  IntColumn get amount => integer().map(const CentsConverter())();
   TextColumn get period => text().withDefault(const Constant('monthly'))(); // monthly, weekly, custom
   IntColumn get categoryId => integer().nullable().references(Categories, #id)(); // null = overall budget
   DateTimeColumn get startDate => dateTime()();

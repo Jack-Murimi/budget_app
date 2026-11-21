@@ -96,8 +96,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Find the header field (label is 'Header *')
-    final headerField = find.widgetWithText(TextFormField, 'Header *');
+    // Find the header field (label is 'Title *')
+    final headerField = find.widgetWithText(TextFormField, 'Title *');
     expect(headerField, findsOneWidget);
 
     // Type 'Nai' into the header field

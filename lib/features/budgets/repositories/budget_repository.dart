@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/database/converters/cents_converter.dart';
 import '../models/budget_model.dart';
 
 class BudgetRepository {
@@ -47,10 +48,15 @@ class BudgetRepository {
             .map((row) => row.readTable(_db.transactions))
             .get();
 
-        final spent = txns.fold<double>(
-          0.0,
-          (sum, t) => sum + t.amount + t.transactionCost + t.fulizaFee,
+        final spentCents = txns.fold<int>(
+          0,
+          (sum, t) =>
+              sum +
+              CentsConverter.toCents(t.amount) +
+              CentsConverter.toCents(t.transactionCost) +
+              CentsConverter.toCents(t.fulizaFee),
         );
+        final spent = CentsConverter.fromCents(spentCents);
 
         // Get category info if needed
         String? categoryName;

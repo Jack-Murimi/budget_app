@@ -43,8 +43,60 @@ void main() {
     );
     expect(
       (await destination.select(destination.transactions).get())
-          .any((row) => row.header == 'Backup test'),
+          .any((row) => row.header == 'Backup test' && row.amount == 42.0),
       isTrue,
     );
+  });
+
+  test('restores legacy v1 REAL-money snapshots into integer cents', () async {
+    final destination = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(destination.close);
+
+    final legacyV1Snapshot = {
+      'version': 1,
+      'tables': {
+        'accounts': [
+          {
+            'id': 1,
+            'name': 'M-Pesa',
+            'type': 'mpesa',
+            'initial_balance': 250.75,
+            'currency': 'KES',
+            'color_hex': '#1B5E20',
+            'icon': 'phone_android',
+            'is_default': 1,
+            'is_archived': 0,
+            'created_at': 1730419200,
+          },
+        ],
+        'transactions': [
+          {
+            'id': 1,
+            'header': 'Legacy Coffee',
+            'description': '',
+            'amount': 123.45,
+            'transaction_cost': 5.50,
+            'fuliza_amount': 0.0,
+            'fuliza_fee': 0.0,
+            'type': 'expense',
+            'account_id': 1,
+            'transaction_date': 1730419200,
+            'is_parsed': 0,
+            'exclude_from_budget': 0,
+            'is_recurring': 0,
+            'created_at': 1730419200,
+          },
+        ],
+      },
+    };
+
+    await DatabaseBackupService(destination).restore(legacyV1Snapshot);
+
+    final account = await destination.select(destination.accounts).getSingle();
+    expect(account.initialBalance, 250.75);
+
+    final txn = await destination.select(destination.transactions).getSingle();
+    expect(txn.amount, 123.45);
+    expect(txn.transactionCost, 5.50);
   });
 }

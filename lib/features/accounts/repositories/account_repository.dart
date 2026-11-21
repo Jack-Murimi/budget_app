@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/database/converters/cents_converter.dart';
 import '../models/account_model.dart';
 
 class AccountRepository {
@@ -18,25 +19,31 @@ class AccountRepository {
       final transactions = await db.select(db.transactions).get();
 
       final accountsWithBalance = accounts.map((account) {
-        double balance = account.initialBalance;
+        int balanceCents = CentsConverter.toCents(account.initialBalance);
 
         for (final t in transactions) {
           if (t.accountId == account.id) {
             if (t.type == 'income') {
-              balance += t.amount;
+              balanceCents += CentsConverter.toCents(t.amount);
             } else if (t.type == 'expense') {
-              balance -= (t.amount + t.transactionCost + t.fulizaFee);
+              balanceCents -= CentsConverter.toCents(t.amount) +
+                  CentsConverter.toCents(t.transactionCost) +
+                  CentsConverter.toCents(t.fulizaFee);
             } else if (t.type == 'transfer') {
-              balance -= (t.amount + t.transactionCost);
+              balanceCents -= CentsConverter.toCents(t.amount) +
+                  CentsConverter.toCents(t.transactionCost);
             }
           }
 
           if (t.toAccountId == account.id && t.type == 'transfer') {
-            balance += t.amount;
+            balanceCents += CentsConverter.toCents(t.amount);
           }
         }
 
-        return AccountWithBalance(account: account, balance: balance);
+        return AccountWithBalance(
+          account: account,
+          balance: CentsConverter.fromCents(balanceCents),
+        );
       }).toList();
 
       accountsWithBalance.sort((a, b) {

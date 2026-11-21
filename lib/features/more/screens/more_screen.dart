@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../main.dart';
 import '../../accounts/screens/accounts_screen.dart';
 import '../../categories/screens/categories_screen.dart';
+import '../../debts/screens/bridge_charges_screen.dart';
 import '../../debts/screens/debts_screen.dart';
 import '../../fuliza/screens/fuliza_screen.dart';
 import '../../goals/screens/goals_screen.dart';
@@ -27,6 +28,12 @@ List<MoreSectionConfig> buildMoreSections(WidgetRef ref) {
           title: 'Loans & Debts',
           icon: Icons.handshake_outlined,
           destination: (_) => const DebtsScreen(),
+        ),
+        MoreItemConfig(
+          title: 'Bridge Charges',
+          subtitle: 'Track costs from Bridge loans',
+          icon: Icons.account_balance_outlined,
+          destination: (_) => const BridgeChargesScreen(),
         ),
         MoreItemConfig(
           title: 'Fuliza Overdraft',
