@@ -36,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   Future<bool> _columnExists(String table, String column) async {
     final rows = await customSelect('PRAGMA table_info("$table")').get();
@@ -56,15 +56,7 @@ class AppDatabase extends _$AppDatabase {
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
           await m.createAll();
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_transactions_header ON transactions (header)',
-          );
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_transactions_header_cat ON transactions (header, category_id)',
-          );
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories (transaction_type)',
-          );
+          await _createPerformanceIndexes();
           await _seedDefaultCategories();
           await _seedDefaultAccounts();
         },
@@ -335,104 +327,133 @@ class AppDatabase extends _$AppDatabase {
               'CREATE INDEX IF NOT EXISTS idx_transactions_header_cat ON transactions (header, category_id)',
             );
           }
+          if (from < 18) {
+            await _createPerformanceIndexes();
+            await _cleanupLegacyDuplicateCategories();
+            final catCount = await customSelect(
+              'SELECT COUNT(*) AS cnt FROM categories',
+            ).getSingle();
+            if (catCount.read<int>('cnt') == 0) {
+              await _seedDefaultCategories();
+            }
+          }
         },
         beforeOpen: (details) async {
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_transactions_header ON transactions (header)',
-          );
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_transactions_header_cat ON transactions (header, category_id)',
-          );
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories (transaction_type)',
-          );
-          // Ensure new taxonomy categories exist even if old ones were seeded
-          final hasNewTaxonomy = await (select(categories)
-                ..where((c) => c.name.equals('Food & Groceries'))
-                ..limit(1))
-              .get();
-          if (hasNewTaxonomy.isEmpty) {
-            await _seedDefaultCategories();
-          }
-
-          // Cleanup: migrate foreign keys pointing to legacy duplicate categories, then remove them
-          await customStatement('''
-            UPDATE transactions
-            SET category_id = (
-              SELECT new_c.id FROM categories new_c
-              JOIN categories old_c ON old_c.name = new_c.name
-              WHERE old_c.id = transactions.category_id
-                AND old_c.id != new_c.id
-                AND old_c.name IN ('Transport', 'Health', 'Education', 'Other')
-              ORDER BY new_c.id DESC LIMIT 1
-            )
-            WHERE category_id IN (
-              SELECT old_c.id FROM categories old_c
-              WHERE old_c.name IN ('Transport', 'Health', 'Education', 'Other')
-                AND old_c.id NOT IN (
-                  SELECT MAX(id) FROM categories GROUP BY name
-                )
-            );
-          ''');
-
-          await customStatement('''
-            UPDATE recurring_transactions
-            SET category_id = (
-              SELECT new_c.id FROM categories new_c
-              JOIN categories old_c ON old_c.name = new_c.name
-              WHERE old_c.id = recurring_transactions.category_id
-                AND old_c.id != new_c.id
-                AND old_c.name IN ('Transport', 'Health', 'Education', 'Other')
-              ORDER BY new_c.id DESC LIMIT 1
-            )
-            WHERE category_id IN (
-              SELECT old_c.id FROM categories old_c
-              WHERE old_c.name IN ('Transport', 'Health', 'Education', 'Other')
-                AND old_c.id NOT IN (
-                  SELECT MAX(id) FROM categories GROUP BY name
-                )
-            );
-          ''');
-
-          await customStatement('''
-            UPDATE budgets
-            SET category_id = (
-              SELECT new_c.id FROM categories new_c
-              JOIN categories old_c ON old_c.name = new_c.name
-              WHERE old_c.id = budgets.category_id
-                AND old_c.id != new_c.id
-                AND old_c.name IN ('Transport', 'Health', 'Education', 'Other')
-              ORDER BY new_c.id DESC LIMIT 1
-            )
-            WHERE category_id IN (
-              SELECT old_c.id FROM categories old_c
-              WHERE old_c.name IN ('Transport', 'Health', 'Education', 'Other')
-                AND old_c.id NOT IN (
-                  SELECT MAX(id) FROM categories GROUP BY name
-                )
-            );
-          ''');
-
-          // Delete obsolete and duplicate old categories
-          await customStatement('''
-            DELETE FROM categories 
-            WHERE name IN ('Food & Dining', 'Shopping', 'Bills & Utilities', 'Entertainment', 'Savings', 'Income', 'Transfer')
-              AND is_default = 1
-              AND id NOT IN (SELECT DISTINCT category_id FROM transactions WHERE category_id IS NOT NULL);
-          ''');
-
-          // Remove duplicate older rows of Transport, Health, Education, Other (keep the newest)
-          await customStatement('''
-            DELETE FROM categories
-            WHERE name IN ('Transport', 'Health', 'Education', 'Other')
-              AND is_default = 1
-              AND id NOT IN (
-                SELECT MAX(id) FROM categories GROUP BY name, transaction_type
-              )
-              AND id NOT IN (SELECT DISTINCT category_id FROM transactions WHERE category_id IS NOT NULL);
-          ''');
+          await customStatement('PRAGMA foreign_keys = ON');
         },
       );
+
+  Future<void> _createPerformanceIndexes() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_header ON transactions (header)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_header_cat ON transactions (header, category_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories (transaction_type)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions (transaction_date)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions (account_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_to_account_id ON transactions (to_account_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_category_id ON transactions (category_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_debt_id ON transactions (debt_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_debt_repayments_debt_id ON debt_repayments (debt_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_goal_contributions_goal_id ON goal_contributions (goal_id)',
+    );
+  }
+
+  Future<void> _cleanupLegacyDuplicateCategories() async {
+    // Cleanup: migrate foreign keys pointing to legacy duplicate categories, then remove them
+    await customStatement('''
+      UPDATE transactions
+      SET category_id = (
+        SELECT new_c.id FROM categories new_c
+        JOIN categories old_c ON old_c.name = new_c.name
+        WHERE old_c.id = transactions.category_id
+          AND old_c.id != new_c.id
+          AND old_c.name IN ('Transport', 'Health', 'Education', 'Other')
+        ORDER BY new_c.id DESC LIMIT 1
+      )
+      WHERE category_id IN (
+        SELECT old_c.id FROM categories old_c
+        WHERE old_c.name IN ('Transport', 'Health', 'Education', 'Other')
+          AND old_c.id NOT IN (
+            SELECT MAX(id) FROM categories GROUP BY name
+          )
+      );
+    ''');
+
+    await customStatement('''
+      UPDATE recurring_transactions
+      SET category_id = (
+        SELECT new_c.id FROM categories new_c
+        JOIN categories old_c ON old_c.name = new_c.name
+        WHERE old_c.id = recurring_transactions.category_id
+          AND old_c.id != new_c.id
+          AND old_c.name IN ('Transport', 'Health', 'Education', 'Other')
+        ORDER BY new_c.id DESC LIMIT 1
+      )
+      WHERE category_id IN (
+        SELECT old_c.id FROM categories old_c
+        WHERE old_c.name IN ('Transport', 'Health', 'Education', 'Other')
+          AND old_c.id NOT IN (
+            SELECT MAX(id) FROM categories GROUP BY name
+          )
+      );
+    ''');
+
+    await customStatement('''
+      UPDATE budgets
+      SET category_id = (
+        SELECT new_c.id FROM categories new_c
+        JOIN categories old_c ON old_c.name = new_c.name
+        WHERE old_c.id = budgets.category_id
+          AND old_c.id != new_c.id
+          AND old_c.name IN ('Transport', 'Health', 'Education', 'Other')
+        ORDER BY new_c.id DESC LIMIT 1
+      )
+      WHERE category_id IN (
+        SELECT old_c.id FROM categories old_c
+        WHERE old_c.name IN ('Transport', 'Health', 'Education', 'Other')
+          AND old_c.id NOT IN (
+            SELECT MAX(id) FROM categories GROUP BY name
+          )
+      );
+    ''');
+
+    // Delete obsolete and duplicate old categories
+    await customStatement('''
+      DELETE FROM categories
+      WHERE name IN ('Food & Dining', 'Shopping', 'Bills & Utilities', 'Entertainment', 'Savings', 'Income', 'Transfer')
+        AND is_default = 1
+        AND id NOT IN (SELECT DISTINCT category_id FROM transactions WHERE category_id IS NOT NULL);
+    ''');
+
+    // Remove duplicate older rows of Transport, Health, Education, Other (keep the newest)
+    await customStatement('''
+      DELETE FROM categories
+      WHERE name IN ('Transport', 'Health', 'Education', 'Other')
+        AND is_default = 1
+        AND id NOT IN (
+          SELECT MAX(id) FROM categories GROUP BY name, transaction_type
+        )
+        AND id NOT IN (SELECT DISTINCT category_id FROM transactions WHERE category_id IS NOT NULL);
+    ''');
+  }
 
   static QueryExecutor _openConnection() {
     return driftDatabase(name: 'budget_app_db');

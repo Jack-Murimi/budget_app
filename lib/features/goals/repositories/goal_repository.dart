@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/database/converters/cents_converter.dart';
 
 class GoalRepository {
   const GoalRepository(this._db);
@@ -15,13 +16,14 @@ class GoalRepository {
     required double targetAmount,
     DateTime? targetDate,
   }) {
-    if (name.trim().isEmpty || targetAmount <= 0) {
+    final targetCents = CentsConverter.toCents(targetAmount);
+    if (name.trim().isEmpty || targetCents <= 0) {
       throw ArgumentError('A name and positive target are required');
     }
     return _db.into(_db.savingsGoals).insert(
           SavingsGoalsCompanion.insert(
             name: name.trim(),
-            targetAmount: targetAmount,
+            targetAmount: CentsConverter.fromCents(targetCents),
             targetDate: Value(targetDate),
           ),
         );
@@ -33,7 +35,9 @@ class GoalRepository {
     int? accountId,
     DateTime? contributionDate,
   }) async {
-    if (amount <= 0) throw ArgumentError('Contribution must be positive');
+    final amountCents = CentsConverter.toCents(amount);
+    if (amountCents <= 0) throw ArgumentError('Contribution must be positive');
+    final normalizedAmount = CentsConverter.fromCents(amountCents);
     await _db.transaction(() async {
       final goal = await (_db.select(_db.savingsGoals)
             ..where((row) => row.id.equals(goalId)))
@@ -44,7 +48,7 @@ class GoalRepository {
           : await _db.into(_db.transactions).insert(
                 TransactionsCompanion.insert(
                   header: 'Goal contribution: ${goal.name}',
-                  amount: amount,
+                  amount: normalizedAmount,
                   type: const Value('transfer'),
                   accountId: Value(accountId),
                   transactionDate: date,
@@ -53,17 +57,19 @@ class GoalRepository {
       await _db.into(_db.goalContributions).insert(
             GoalContributionsCompanion.insert(
               goalId: goalId,
-              amount: amount,
+              amount: normalizedAmount,
               accountId: Value(accountId),
               transactionId: Value(transactionId),
               contributionDate: date,
             ),
           );
+      final updatedCents =
+          CentsConverter.toCents(goal.currentAmount) + amountCents;
       await (_db.update(_db.savingsGoals)
             ..where((row) => row.id.equals(goalId)))
           .write(
         SavingsGoalsCompanion(
-          currentAmount: Value(goal.currentAmount + amount),
+          currentAmount: Value(CentsConverter.fromCents(updatedCents)),
         ),
       );
     });

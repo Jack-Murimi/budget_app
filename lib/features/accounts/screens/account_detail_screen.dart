@@ -160,9 +160,16 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
       ),
     );
     if (confirmed == true) {
-      await ref.read(accountRepositoryProvider).deleteAccount(_account.id);
-      if (!mounted) return;
-      Navigator.of(context).pop();
+      try {
+        await ref.read(accountRepositoryProvider).deleteAccount(_account.id);
+        if (!mounted) return;
+        Navigator.of(context).pop();
+      } on StateError catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
     }
   }
 

@@ -504,6 +504,10 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
       matchedDebt = match.debt;
     }
 
+    final rawRef = widget.parseResult?.mpesaRef.trim();
+    final normalizedRef =
+        (rawRef == null || rawRef.isEmpty) ? null : rawRef;
+
     final companion = TransactionsCompanion.insert(
       header: _headerCtrl.text.trim(),
       description: Value(payee),
@@ -514,7 +518,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
       type: Value(_type),
       categoryId: Value(_selectedCategory?.id),
       transactionDate: _date,
-      mpesaRef: Value(widget.parseResult?.mpesaRef),
+      mpesaRef: Value(normalizedRef),
       counterpartyName: Value(payee),
       counterpartyAccount: Value(widget.parseResult?.counterpartyAccount ?? ''),
       isParsed: Value(widget.parseResult != null),
@@ -536,6 +540,16 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
             counterparty: payee,
             actualReceived: credited,
           );
+    } else if (isLoanRepaymentReceived && matchedDebt != null) {
+      id = await ref.read(debtRepositoryProvider).recordRepaymentWithTransaction(
+            debtId: matchedDebt.id,
+            transaction: companion,
+          );
+    } else if (isLoanRepayment && matchedBorrowedDebt != null) {
+      id = await ref.read(debtRepositoryProvider).recordRepaymentWithTransaction(
+            debtId: matchedBorrowedDebt.id,
+            transaction: companion,
+          );
     } else {
       id = await ref
           .read(transactionRepositoryProvider)
@@ -547,24 +561,6 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
       _toast('Already saved — this M-Pesa transaction was recorded before.');
       _finish();
       return;
-    }
-
-    if (isLoanRepaymentReceived && matchedDebt != null) {
-      await ref.read(debtRepositoryProvider).repay(
-            debt: matchedDebt,
-            amount: _parseMoney(_amountCtrl.text)!,
-            accountId: from,
-            paymentDate: _date,
-            transactionId: id,
-          );
-    } else if (isLoanRepayment && matchedBorrowedDebt != null) {
-      await ref.read(debtRepositoryProvider).repay(
-            debt: matchedBorrowedDebt,
-            amount: _parseMoney(_amountCtrl.text)!,
-            accountId: from,
-            paymentDate: _date,
-            transactionId: id,
-          );
     }
 
     _learnPayee();
@@ -1005,7 +1001,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
   }
 
   Widget _buildLoanReceivedExtraFields() {
-    return TextField(
+    return TextFormField(
       controller: _actualCreditedCtrl,
       keyboardType:
           const TextInputType.numberWithOptions(decimal: true),
@@ -1017,6 +1013,18 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
         prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
+      validator: (v) {
+        if (v == null || v.trim().isEmpty) return null;
+        final credited = _parseMoney(v);
+        if (credited == null || !credited.isFinite || credited <= 0) {
+          return 'Enter a valid positive amount';
+        }
+        final principal = _parseMoney(_amountCtrl.text);
+        if (principal != null && principal > 0 && credited > principal) {
+          return 'Cannot exceed borrowed amount';
+        }
+        return null;
+      },
     );
   }
 

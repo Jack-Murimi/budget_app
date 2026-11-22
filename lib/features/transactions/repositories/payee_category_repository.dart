@@ -7,52 +7,56 @@ class PayeeCategoryRepository {
 
   static String _normalise(String payee) => payee.trim().toLowerCase();
 
-  /// Record that [payee] was categorised as [categoryId].
+  /// Record that [payee] was categorised as [categoryId], atomically
+  /// reinforcing [hitCount] on repeated calls.
   Future<void> learn(String payee, int categoryId) async {
     final key = _normalise(payee);
     if (key.isEmpty) return;
-    await _db.into(_db.payeeCategoryRules).insertOnConflictUpdate(
-          PayeeCategoryRulesCompanion.insert(
-            payeePattern: key,
-            categoryId: categoryId,
-            updatedAt: DateTime.now(),
-            hitCount: const Value(1),
-          ),
-        );
-    // Increment hit count
-    await (_db.update(_db.payeeCategoryRules)
-          ..where((r) => r.payeePattern.equals(key)))
-        .write(PayeeCategoryRulesCompanion(
-      hitCount: Value(await _hitCount(key) + 1),
-      updatedAt: Value(DateTime.now()),
-      categoryId: Value(categoryId),
-    ));
-  }
-
-  Future<int> _hitCount(String key) async {
-    final row = await (_db.select(_db.payeeCategoryRules)
-          ..where((r) => r.payeePattern.equals(key)))
-        .getSingleOrNull();
-    return row?.hitCount ?? 0;
+    await _db.customInsert(
+      '''
+      INSERT INTO payee_category_rules (payee_pattern, category_id, hit_count, updated_at)
+      VALUES (?, ?, 1, ?)
+      ON CONFLICT(payee_pattern) DO UPDATE SET
+        category_id = excluded.category_id,
+        hit_count = payee_category_rules.hit_count + 1,
+        updated_at = excluded.updated_at
+      ''',
+      variables: [
+        Variable.withString(key),
+        Variable.withInt(categoryId),
+        Variable.withDateTime(DateTime.now()),
+      ],
+      updates: {_db.payeeCategoryRules},
+    );
   }
 
   /// Returns the best-guess category id for [payee], or null.
   Future<int?> suggest(String payee) async {
     final key = _normalise(payee);
     if (key.isEmpty) return null;
-    // Exact match
+    // Exact match first
     final exact = await (_db.select(_db.payeeCategoryRules)
           ..where((r) => r.payeePattern.equals(key)))
         .getSingleOrNull();
     if (exact != null) return exact.categoryId;
 
-    // Prefix / substring match — highest hit count wins
-    final rows = await (_db.select(_db.payeeCategoryRules)
-          ..where((r) => r.payeePattern.contains(key))
-          ..orderBy([(r) => OrderingTerm.desc(r.hitCount)])
-          ..limit(1))
-        .get();
-    return rows.isEmpty ? null : rows.first.categoryId;
+    // Bidirectional containment match — highest hit count wins, then longest pattern
+    final rows = await _db.customSelect(
+      '''
+      SELECT category_id
+      FROM payee_category_rules
+      WHERE INSTR(LOWER(payee_pattern), ?) > 0
+         OR INSTR(?, LOWER(payee_pattern)) > 0
+      ORDER BY hit_count DESC, LENGTH(payee_pattern) DESC
+      LIMIT 1
+      ''',
+      variables: [
+        Variable.withString(key),
+        Variable.withString(key),
+      ],
+      readsFrom: {_db.payeeCategoryRules},
+    ).get();
+    return rows.isEmpty ? null : rows.first.read<int>('category_id');
   }
 
   Future<List<PayeeCategoryRule>> getAll() =>

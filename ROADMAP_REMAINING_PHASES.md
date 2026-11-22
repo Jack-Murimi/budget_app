@@ -55,17 +55,17 @@ Related: [[Budget KE/context|context]] · [[Budget KE/decisions|decisions]] · [
 ## Phase 2 — Database Integrity, Atomicity & Backup/Portability
 
 ### SQLite Foreign Keys, Indexes & Migrations
-- [ ] Enable `PRAGMA foreign_keys = ON` in `AppDatabase.beforeOpen` (`lib/core/database/app_database.dart:339`).
-- [ ] Add schema migration `v18` creating indexes on `transactions(transaction_date)`, `transactions(account_id)`, `transactions(to_account_id)`, `transactions(category_id)`, `transactions(debt_id)`, `debt_repayments(debt_id)`, and `goal_contributions(goal_id)`.
-- [ ] Move one-time legacy category deduplication out of `beforeOpen` (`lib/core/database/app_database.dart:349-433`) into an explicit migration/pref flag, and stop using `'Food & Groceries'` presence as a re-seed trigger.
+- [x] Enable `PRAGMA foreign_keys = ON` in `AppDatabase.beforeOpen` (`lib/core/database/app_database.dart:339`).
+- [x] Add schema migration `v18` creating indexes on `transactions(transaction_date)`, `transactions(account_id)`, `transactions(to_account_id)`, `transactions(category_id)`, `transactions(debt_id)`, `debt_repayments(debt_id)`, and `goal_contributions(goal_id)`.
+- [x] Move one-time legacy category deduplication out of `beforeOpen` (`lib/core/database/app_database.dart:349-433`) into an explicit migration/pref flag, and stop using `'Food & Groceries'` presence as a re-seed trigger.
 
 ### Encrypted Backup & Restore
-- [ ] Update `DatabaseBackupService` (`lib/features/portability/services/database_backup_service.dart:10-93`):
+- [x] Update `DatabaseBackupService` (`lib/features/portability/services/database_backup_service.dart:10-93`):
   - Include `payee_category_rules` and `sms_inbox_items` in `_tables`.
   - Order parent tables before dependents (`transactions` before `goal_contributions` and `debt_repayments`; top-level `categories` before child categories) so restore succeeds with `PRAGMA foreign_keys = ON`.
   - Replace raw string-interpolated SQL inserts with bound `Variable` parameters.
   - Call `_db.markTablesUpdated(_db.allTables)` after restore so active Drift/Riverpod streams refresh immediately without an app restart.
-- [ ] Harden `EncryptedBackupService` & `DataPortabilityScreen` (`lib/features/portability/services/encrypted_backup_service.dart`, `lib/features/portability/screens/data_portability_screen.dart`):
+- [x] Harden `EncryptedBackupService` & `DataPortabilityScreen` (`lib/features/portability/services/encrypted_backup_service.dart`, `lib/features/portability/screens/data_portability_screen.dart`):
   - Offload PBKDF2 key derivation to `Isolate.run` to keep the UI responsive.
   - Increase PBKDF2 iterations for new backups (e.g., 600,000, stored in envelope metadata while staying backward-compatible with `v1` 100,000-iteration backups).
   - Add passphrase confirmation + minimum validation when creating a backup.
@@ -73,24 +73,24 @@ Related: [[Budget KE/context|context]] · [[Budget KE/decisions|decisions]] · [
   - Add loading indicators and error handling across all 4 export/import/backup/restore actions, and bundle CSV exports (or use folder picker / single archive) instead of 3 consecutive OS save dialogs.
 
 ### CSV Portability
-- [ ] Expand `CsvPortabilityService` (`lib/features/portability/services/csv_portability_service.dart`) to export/import category, account, transfer `to_account_id`, fees (`transaction_cost`, `fuliza_amount`, `fuliza_fee`), and `exclude_from_budget`.
-- [ ] Sanitize CSV cells starting with `=`, `+`, `-`, `@`, `\t`, or `\r` against spreadsheet formula injection.
-- [ ] Wrap `importTransactionsCsv` (`csv_portability_service.dart:69-121`) in `_db.transaction(...)`, check `mpesaRef` duplicates before inserting, and assign the default `accountId` when omitted.
+- [x] Expand `CsvPortabilityService` (`lib/features/portability/services/csv_portability_service.dart`) to export/import category, account, transfer `to_account_id`, fees (`transaction_cost`, `fuliza_amount`, `fuliza_fee`), and `exclude_from_budget`.
+- [x] Sanitize CSV cells starting with `=`, `+`, `-`, `@`, `\t`, or `\r` against spreadsheet formula injection.
+- [x] Wrap `importTransactionsCsv` (`csv_portability_service.dart:69-121`) in `_db.transaction(...)`, check `mpesaRef` duplicates before inserting, and assign the default `accountId` when omitted.
 
 ### Atomic Multi-Step Writes & Cross-Table Consistency
-- [ ] In `TransactionForm._saveNew` (`lib/features/add_transaction/widgets/transaction_form.dart:517-568`): convert empty `mpesaRef` (`""`) to `null`, enforce `mpesaRef` duplicate checks on `recordLoanGiven` / `recordLoanReceived`, wrap Loan Repayment transaction insert + `debtRepository.repay(...)` in one DB transaction, and validate `_actualCreditedCtrl` via `TextFormField`.
-- [ ] Reconcile linked `Debts`, `DebtRepayments`, and `GoalContributions` when linked transactions are edited or deleted.
-- [ ] Wrap `RecurringRepository.markAsPaid` (`lib/features/recurring/repositories/recurring_repository.dart:170-214`) in `_db.transaction(...)` and populate `recurrenceId` and `isRecurring: Value(true)` on the generated transaction.
-- [ ] Wrap `AccountRepository.setDefault` (`lib/features/accounts/repositories/account_repository.dart:91-95`) in a transaction, set `excludeFromBudget: Value(true)` in `correctBalance` (`account_repository.dart:101-133`), and guard `deleteAccount` against deleting the last/default account or leaving orphaned FK rows.
-- [ ] Fix `DebtRepository` (`lib/features/debts/repositories/debt_repository.dart`) & `GoalRepository` (`lib/features/goals/repositories/goal_repository.dart`):
+- [x] In `TransactionForm._saveNew` (`lib/features/add_transaction/widgets/transaction_form.dart:517-568`): convert empty `mpesaRef` (`""`) to `null`, enforce `mpesaRef` duplicate checks on `recordLoanGiven` / `recordLoanReceived`, wrap Loan Repayment transaction insert + `debtRepository.repay(...)` in one DB transaction, and validate `_actualCreditedCtrl` via `TextFormField`.
+- [x] Reconcile linked `Debts`, `DebtRepayments`, and `GoalContributions` when linked transactions are edited or deleted.
+- [x] Wrap `RecurringRepository.markAsPaid` (`lib/features/recurring/repositories/recurring_repository.dart:170-214`) in `_db.transaction(...)` and populate `recurrenceId` and `isRecurring: Value(true)` on the generated transaction.
+- [x] Wrap `AccountRepository.setDefault` (`lib/features/accounts/repositories/account_repository.dart:91-95`) in a transaction, set `excludeFromBudget: Value(true)` in `correctBalance` (`account_repository.dart:101-133`), and guard `deleteAccount` against deleting the last/default account or leaving orphaned FK rows.
+- [x] Fix `DebtRepository` (`lib/features/debts/repositories/debt_repository.dart`) & `GoalRepository` (`lib/features/goals/repositories/goal_repository.dart`):
   - Watch `debt_repayments` and `transactions` in `DebtRepository.watchAll` and fix its non-antisymmetric `dueDate` comparator (`?? 1` when both are `null`).
   - Set `debtId` on the transaction created in `DebtRepository.create()` and record `principal - disbursementShortfall` as the credited cash amount for Bridge loans.
   - Re-read `debt` inside `DebtRepository.repay()` transaction instead of trusting stale `debt.outstanding`, and convert arithmetic in `DebtRepository` & `GoalRepository` to integer cents via `CentsConverter`.
-- [ ] Fix `PayeeCategoryRepository.learn` (`lib/features/transactions/repositories/payee_category_repository.dart:11-30`) so `insertOnConflictUpdate` does not reset `hitCount` to `1` before incrementing (use atomic upsert increment), and check bidirectional containment in `suggest()`.
+- [x] Fix `PayeeCategoryRepository.learn` (`lib/features/transactions/repositories/payee_category_repository.dart:11-30`) so `insertOnConflictUpdate` does not reset `hitCount` to `1` before incrementing (use atomic upsert increment), and check bidirectional containment in `suggest()`.
 
 ### Phase 2 Verification
-- [ ] Add/update tests covering `PRAGMA foreign_keys = ON`, full-table backup/restore with stream refresh, CSV `mpesaRef` dedupe + formula escaping, atomic debt/goal/recurring transactions, and `PayeeCategoryRepository` `hitCount` increments.
-- [ ] Run `flutter analyze && flutter test`.
+- [x] Add/update tests covering `PRAGMA foreign_keys = ON`, full-table backup/restore with stream refresh, CSV `mpesaRef` dedupe + formula escaping, atomic debt/goal/recurring transactions, and `PayeeCategoryRepository` `hitCount` increments.
+- [x] Run `flutter analyze && flutter test`.
 
 ---
 

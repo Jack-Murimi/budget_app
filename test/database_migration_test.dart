@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/accounts/repositories/account_repository.dart';
+import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/open.dart';
@@ -112,7 +113,10 @@ void main() {
     expect(txns, hasLength(3));
 
     final versionRow = await db.customSelect('PRAGMA user_version').getSingle();
-    expect(versionRow.read<int>('user_version'), 17);
+    expect(versionRow.read<int>('user_version'), 18);
+
+    final fkRow = await db.customSelect('PRAGMA foreign_keys').getSingle();
+    expect(fkRow.read<int>('foreign_keys'), 1);
 
     await expectMoneyColumnsAreInteger(db);
 
@@ -384,5 +388,62 @@ void main() {
     expect(indexNames, contains('idx_transactions_header'));
     expect(indexNames, contains('idx_transactions_header_cat'));
     expect(indexNames, contains('idx_fuliza_records_mpesa_ref'));
+    expect(indexNames, contains('idx_transactions_date'));
+    expect(indexNames, contains('idx_transactions_account_id'));
+    expect(indexNames, contains('idx_transactions_to_account_id'));
+    expect(indexNames, contains('idx_transactions_category_id'));
+    expect(indexNames, contains('idx_transactions_debt_id'));
+    expect(indexNames, contains('idx_debt_repayments_debt_id'));
+    expect(indexNames, contains('idx_goal_contributions_goal_id'));
+  });
+
+  test('v18 enables foreign_keys, creates performance indexes, and does not re-seed when Food & Groceries is renamed',
+      () async {
+    final tempDir = await Directory.systemTemp.createTemp('budget_v18_open_');
+    final dbFile = File('${tempDir.path}/test_v18.sqlite');
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    final db1 = AppDatabase.forTesting(NativeDatabase(dbFile));
+    final fkRow = await db1.customSelect('PRAGMA foreign_keys').getSingle();
+    expect(fkRow.read<int>('foreign_keys'), 1);
+
+    final initialCats = await db1.select(db1.categories).get();
+    final food = initialCats.firstWhere((c) => c.name == 'Food & Groceries');
+    await db1.customUpdate(
+      "UPDATE categories SET name = 'Food Renamed' WHERE id = ?",
+      variables: [Variable.withInt(food.id)],
+      updates: {db1.categories},
+    );
+    await db1.close();
+
+    final db2 = AppDatabase.forTesting(NativeDatabase(dbFile));
+    addTearDown(db2.close);
+    final reopenedCats = await db2.select(db2.categories).get();
+    expect(reopenedCats.length, initialCats.length);
+    expect(reopenedCats.any((c) => c.name == 'Food & Groceries'), isFalse);
+    expect(reopenedCats.any((c) => c.name == 'Food Renamed'), isTrue);
+
+    final indexes = await db2
+        .customSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND name IS NOT NULL",
+        )
+        .get();
+    final indexNames = indexes.map((r) => r.read<String>('name')).toSet();
+    expect(
+      indexNames,
+      containsAll([
+        'idx_transactions_date',
+        'idx_transactions_account_id',
+        'idx_transactions_to_account_id',
+        'idx_transactions_category_id',
+        'idx_transactions_debt_id',
+        'idx_debt_repayments_debt_id',
+        'idx_goal_contributions_goal_id',
+      ]),
+    );
   });
 }

@@ -39,13 +39,37 @@ void main() {
     expect(await repo.suggest('UNKNOWN MERCHANT'), null);
   });
 
-  test('learn increments hit count', () async {
+  test('learn increments hit count sequentially and updates category', () async {
     final catId = await db.into(db.categories).insert(
           CategoriesCompanion.insert(name: 'Bills'),
         );
+    final catId2 = await db.into(db.categories).insert(
+          CategoriesCompanion.insert(name: 'Utilities'),
+        );
     await repo.learn('KPLC', catId);
+    expect((await repo.getAll()).single.hitCount, 1);
+
     await repo.learn('KPLC', catId);
-    final rows = await repo.getAll();
-    expect(rows.first.hitCount, greaterThan(1));
+    expect((await repo.getAll()).single.hitCount, 2);
+
+    await repo.learn('KPLC', catId2);
+    final row = (await repo.getAll()).single;
+    expect(row.hitCount, 3);
+    expect(row.categoryId, catId2);
+  });
+
+  test('suggest matches bidirectionally across query and stored patterns',
+      () async {
+    final foodId = await db.into(db.categories).insert(
+          CategoriesCompanion.insert(name: 'Groceries'),
+        );
+    await repo.learn('Naivas', foodId);
+    expect(await repo.suggest('NAIVAS SUPERMARKET WESTLANDS'), foodId);
+
+    final transId = await db.into(db.categories).insert(
+          CategoriesCompanion.insert(name: 'Fuel'),
+        );
+    await repo.learn('TotalEnergies Waiyaki Way', transId);
+    expect(await repo.suggest('totalenergies'), transId);
   });
 }

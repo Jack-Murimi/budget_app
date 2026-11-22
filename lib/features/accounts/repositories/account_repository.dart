@@ -89,13 +89,61 @@ class AccountRepository {
   }
 
   Future<void> setDefault(int id) async {
-    await (db.update(db.accounts)).write(const AccountsCompanion(isDefault: Value(false)));
-    await (db.update(db.accounts)..where((a) => a.id.equals(id)))
-        .write(const AccountsCompanion(isDefault: Value(true)));
+    await db.transaction(() async {
+      await (db.update(db.accounts))
+          .write(const AccountsCompanion(isDefault: Value(false)));
+      await (db.update(db.accounts)..where((a) => a.id.equals(id)))
+          .write(const AccountsCompanion(isDefault: Value(true)));
+    });
   }
 
   Future<void> deleteAccount(int id) async {
-    await (db.delete(db.accounts)..where((a) => a.id.equals(id))).go();
+    await db.transaction(() async {
+      final allAccounts = await db.select(db.accounts).get();
+      if (allAccounts.length <= 1) {
+        throw StateError('Cannot delete the last remaining account');
+      }
+      final target = allAccounts.where((a) => a.id == id).firstOrNull;
+      if (target == null) return;
+      if (target.isDefault) {
+        throw StateError(
+          'Cannot delete the default account. Set another account as default first.',
+        );
+      }
+
+      final hasTxn = await (db.select(db.transactions)
+            ..where((t) => t.accountId.equals(id) | t.toAccountId.equals(id))
+            ..limit(1))
+          .getSingleOrNull();
+      final hasRecurring = await (db.select(db.recurringTransactions)
+            ..where((r) => r.accountId.equals(id))
+            ..limit(1))
+          .getSingleOrNull();
+      final hasDebt = await (db.select(db.debts)
+            ..where((d) => d.accountId.equals(id))
+            ..limit(1))
+          .getSingleOrNull();
+      final hasRepay = await (db.select(db.debtRepayments)
+            ..where((r) => r.accountId.equals(id))
+            ..limit(1))
+          .getSingleOrNull();
+      final hasGoal = await (db.select(db.goalContributions)
+            ..where((c) => c.accountId.equals(id))
+            ..limit(1))
+          .getSingleOrNull();
+
+      if (hasTxn != null ||
+          hasRecurring != null ||
+          hasDebt != null ||
+          hasRepay != null ||
+          hasGoal != null) {
+        throw StateError(
+          'Cannot delete an account with linked transactions or records. Archive it instead.',
+        );
+      }
+
+      await (db.delete(db.accounts)..where((a) => a.id.equals(id))).go();
+    });
   }
 
   Future<int?> correctBalance({
@@ -103,30 +151,34 @@ class AccountRepository {
     required double currentBalance,
     required double targetBalance,
   }) async {
-    if ((targetBalance - currentBalance).abs() < 0.001) return null;
+    final diffCents = CentsConverter.toCents(targetBalance) -
+        CentsConverter.toCents(currentBalance);
+    if (diffCents == 0) return null;
 
-    if (targetBalance > currentBalance) {
-      final diff = targetBalance - currentBalance;
+    if (diffCents > 0) {
       return await db.into(db.transactions).insert(
         TransactionsCompanion.insert(
           type: const Value('income'),
           header: 'Balance Adjustment',
-          description: Value('Corrected balance to KES ${targetBalance.toStringAsFixed(2)}'),
-          amount: diff,
+          description: Value(
+              'Corrected balance to KES ${targetBalance.toStringAsFixed(2)}'),
+          amount: CentsConverter.fromCents(diffCents),
           accountId: Value(accountId),
           transactionDate: DateTime.now(),
+          excludeFromBudget: const Value(true),
         ),
       );
     } else {
-      final diff = currentBalance - targetBalance;
       return await db.into(db.transactions).insert(
         TransactionsCompanion.insert(
           type: const Value('expense'),
           header: 'Balance Adjustment',
-          description: Value('Corrected balance to KES ${targetBalance.toStringAsFixed(2)}'),
-          amount: diff,
+          description: Value(
+              'Corrected balance to KES ${targetBalance.toStringAsFixed(2)}'),
+          amount: CentsConverter.fromCents(-diffCents),
           accountId: Value(accountId),
           transactionDate: DateTime.now(),
+          excludeFromBudget: const Value(true),
         ),
       );
     }

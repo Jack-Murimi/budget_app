@@ -157,11 +157,18 @@ class RecurringRepository {
   }
 
   Future<void> delete(int id) async {
-    await _db.customUpdate(
-      'DELETE FROM recurring_transactions WHERE id = ?',
-      variables: [Variable<int>(id)],
-      updates: {_db.recurringTransactions},
-    );
+    await _db.transaction(() async {
+      await _db.customUpdate(
+        'UPDATE transactions SET recurrence_id = NULL WHERE recurrence_id = ?',
+        variables: [Variable<int>(id)],
+        updates: {_db.transactions},
+      );
+      await _db.customUpdate(
+        'DELETE FROM recurring_transactions WHERE id = ?',
+        variables: [Variable<int>(id)],
+        updates: {_db.recurringTransactions},
+      );
+    });
   }
 
   /// Mark as paid:
@@ -175,42 +182,46 @@ class RecurringRepository {
     final transactionDate = paidDate ?? DateTime.now();
     final amount = actualAmount ?? r.amount;
 
-    await _db.into(_db.transactions).insert(
-      TransactionsCompanion.insert(
-        header: r.payee.isNotEmpty ? r.payee : 'Recurring ${r.type}',
-        description: Value(r.notes),
-        amount: amount,
-        type: Value(r.type),
-        categoryId: Value(r.categoryId),
-        accountId: Value(r.accountId),
-        transactionDate: transactionDate,
-        isParsed: const Value(false),
-      ),
-    );
+    await _db.transaction(() async {
+      await _db.into(_db.transactions).insert(
+            TransactionsCompanion.insert(
+              header: r.payee.isNotEmpty ? r.payee : 'Recurring ${r.type}',
+              description: Value(r.notes),
+              amount: amount,
+              type: Value(r.type),
+              categoryId: Value(r.categoryId),
+              accountId: Value(r.accountId),
+              transactionDate: transactionDate,
+              recurrenceId: Value(r.id),
+              isRecurring: const Value(true),
+              isParsed: const Value(false),
+            ),
+          );
 
-    // Compute next due date
-    final nextDate = RecurrenceEngine.nextDue(r);
-    final now = DateTime.now().millisecondsSinceEpoch;
+      // Compute next due date
+      final nextDate = RecurrenceEngine.nextDue(r);
+      final now = DateTime.now().millisecondsSinceEpoch;
 
-    // Check if end_date reached
-    final shouldDeactivate = r.endDate != null && nextDate.isAfter(r.endDate!);
+      // Check if end_date reached
+      final shouldDeactivate = r.endDate != null && nextDate.isAfter(r.endDate!);
 
-    await _db.customUpdate(
-      '''
-      UPDATE recurring_transactions SET
-        next_due_date = ?,
-        is_active = ?,
-        updated_at = ?
-      WHERE id = ?
-      ''',
-      variables: [
-        Variable.withDateTime(nextDate),
-        Variable<int>(shouldDeactivate ? 0 : 1),
-        Variable.withDateTime(DateTime.fromMillisecondsSinceEpoch(now)),
-        Variable<int>(r.id),
-      ],
-      updates: {_db.recurringTransactions},
-    );
+      await _db.customUpdate(
+        '''
+        UPDATE recurring_transactions SET
+          next_due_date = ?,
+          is_active = ?,
+          updated_at = ?
+        WHERE id = ?
+        ''',
+        variables: [
+          Variable.withDateTime(nextDate),
+          Variable<int>(shouldDeactivate ? 0 : 1),
+          Variable.withDateTime(DateTime.fromMillisecondsSinceEpoch(now)),
+          Variable<int>(r.id),
+        ],
+        updates: {_db.recurringTransactions},
+      );
+    });
   }
 
   /// Skip current occurrence without recording a transaction.

@@ -2,6 +2,8 @@ import 'dart:ffi';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:budget_app/core/database/app_database.dart';
+import 'package:budget_app/features/debts/repositories/debt_repository.dart';
+import 'package:budget_app/features/goals/repositories/goal_repository.dart';
 import 'package:budget_app/features/transactions/repositories/transaction_repository.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 // ignore: depend_on_referenced_packages
@@ -391,6 +393,111 @@ void main() {
       expect(suggestions.first.header, 'KPLC Tokens');
       expect(suggestions.first.categoryDisplay, 'Utilities');
       expect(suggestions.first.categoryId, catId);
+    });
+  });
+
+  group('Phase 2 normalization & linked record reconciliation', () {
+    test('insertOrIgnoreDuplicate normalizes blank mpesaRef to null', () async {
+      final id1 = await repo.insertOrIgnoreDuplicate(
+        TransactionsCompanion.insert(
+          header: 'Blank 1',
+          amount: 100.0,
+          transactionDate: DateTime(2026, 11, 1),
+          mpesaRef: const Value(''),
+        ),
+      );
+      final id2 = await repo.insertOrIgnoreDuplicate(
+        TransactionsCompanion.insert(
+          header: 'Blank 2',
+          amount: 200.0,
+          transactionDate: DateTime(2026, 11, 2),
+          mpesaRef: const Value('   '),
+        ),
+      );
+      expect(id1, isNotNull);
+      expect(id2, isNotNull);
+
+      final rows = await db.select(db.transactions).get();
+      expect(rows.every((t) => t.mpesaRef == null), isTrue);
+    });
+
+    test('deleting or editing a goal contribution transaction reconciles goal currentAmount',
+        () async {
+      final accountId = (await db.select(db.accounts).get()).first.id;
+      final goalRepo = GoalRepository(db);
+      final goalId = await goalRepo.create(name: 'Laptop', targetAmount: 50000);
+      await goalRepo.contribute(
+        goalId: goalId,
+        amount: 3000,
+        accountId: accountId,
+      );
+
+      final contrib = await db.select(db.goalContributions).getSingle();
+      final txId = contrib.transactionId!;
+
+      await repo.updateTransaction(
+        TransactionsCompanion(
+          id: Value(txId),
+          amount: const Value(4500),
+        ),
+      );
+      var goal = await (db.select(db.savingsGoals)
+            ..where((g) => g.id.equals(goalId)))
+          .getSingle();
+      expect(goal.currentAmount, 4500.0);
+
+      await repo.delete(txId);
+      goal = await (db.select(db.savingsGoals)
+            ..where((g) => g.id.equals(goalId)))
+          .getSingle();
+      expect(goal.currentAmount, 0.0);
+      expect(await db.select(db.goalContributions).get(), isEmpty);
+    });
+
+    test('deleting or editing a debt repayment or disbursement reconciles debt balances',
+        () async {
+      final accountId = (await db.select(db.accounts).get()).first.id;
+      final debtRepo = DebtRepository(db);
+      final disbTxId = await debtRepo.recordLoanGiven(
+        counterparty: 'Sam',
+        transaction: TransactionsCompanion.insert(
+          header: 'Loan to Sam',
+          amount: 1000,
+          accountId: Value(accountId),
+          transactionDate: DateTime(2026, 11, 1),
+        ),
+      );
+      expect(disbTxId, isNotNull);
+      var debt = await db.select(db.debts).getSingle();
+
+      final repayTxId = await debtRepo.recordRepaymentWithTransaction(
+        debtId: debt.id,
+        transaction: TransactionsCompanion.insert(
+          header: 'Sam repays',
+          amount: 400,
+          type: const Value('income'),
+          accountId: Value(accountId),
+          transactionDate: DateTime(2026, 11, 5),
+        ),
+      );
+      expect(repayTxId, isNotNull);
+
+      // Editing repayment from 400 -> 600 lowers outstanding from 600 -> 400.
+      await repo.updateTransaction(
+        TransactionsCompanion(id: Value(repayTxId!), amount: const Value(600)),
+      );
+      debt = await db.select(db.debts).getSingle();
+      expect(debt.outstanding, 400.0);
+
+      // Deleting repayment restores outstanding back to 1000.
+      await repo.delete(repayTxId);
+      debt = await db.select(db.debts).getSingle();
+      expect(debt.outstanding, 1000.0);
+      expect(await db.select(db.debtRepayments).get(), isEmpty);
+
+      // Deleting sole disbursement removes the debt record cleanly.
+      await repo.delete(disbTxId!);
+      expect(await db.select(db.debts).get(), isEmpty);
     });
   });
 }

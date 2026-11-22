@@ -99,4 +99,119 @@ void main() {
     expect(txn.amount, 123.45);
     expect(txn.transactionCost, 5.50);
   });
+
+  test(
+      'restores all 12 tables with parent/child categories, SQL-special strings, FKs, and refreshes active streams',
+      () async {
+    final source = AppDatabase.forTesting(NativeDatabase.memory());
+    final destination = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(source.close);
+    addTearDown(destination.close);
+
+    // Ensure seeded accounts exist before inserting dependent rows.
+    final mpesa = (await source.select(source.accounts).get()).first;
+    final parentCatId = await source.into(source.categories).insert(
+          CategoriesCompanion.insert(name: "O'Brien & Co"),
+        );
+    final childCatId = await source.into(source.categories).insert(
+          CategoriesCompanion.insert(
+            name: 'Subcat',
+            parentId: Value(parentCatId),
+          ),
+        );
+    final debtId = await source.into(source.debts).insert(
+          DebtsCompanion.insert(
+            direction: 'lent',
+            counterparty: 'Alice',
+            principal: 1000,
+            outstanding: 500,
+            accountId: Value(mpesa.id),
+          ),
+        );
+    final goalId = await source.into(source.savingsGoals).insert(
+          SavingsGoalsCompanion.insert(
+            name: 'Emergency',
+            targetAmount: 5000,
+            currentAmount: const Value(500),
+          ),
+        );
+    final txnId = await source.into(source.transactions).insert(
+          TransactionsCompanion.insert(
+            header: "O'Brien; DROP TABLE accounts;--",
+            amount: 500,
+            categoryId: Value(childCatId),
+            accountId: Value(mpesa.id),
+            debtId: Value(debtId),
+            transactionDate: DateTime.utc(2026, 11, 10),
+          ),
+        );
+    await source.into(source.debtRepayments).insert(
+          DebtRepaymentsCompanion.insert(
+            debtId: debtId,
+            amount: 500,
+            accountId: Value(mpesa.id),
+            transactionId: Value(txnId),
+            paymentDate: DateTime.utc(2026, 11, 10),
+          ),
+        );
+    await source.into(source.goalContributions).insert(
+          GoalContributionsCompanion.insert(
+            goalId: goalId,
+            amount: 500,
+            accountId: Value(mpesa.id),
+            transactionId: Value(txnId),
+            contributionDate: DateTime.utc(2026, 11, 10),
+          ),
+        );
+    await source.into(source.payeeCategoryRules).insert(
+          PayeeCategoryRulesCompanion.insert(
+            payeePattern: 'naivas',
+            categoryId: childCatId,
+            updatedAt: DateTime.utc(2026, 11, 10),
+          ),
+        );
+    await source.into(source.smsInboxItems).insert(
+          SmsInboxItemsCompanion.insert(
+            rawBody: 'Confirmed Ksh500 sent',
+            parsedAmount: const Value(500),
+            createdAt: DateTime.utc(2026, 11, 10),
+          ),
+        );
+
+    final emissions = <List<Transaction>>[];
+    final sub = destination
+        .select(destination.transactions)
+        .watch()
+        .listen(emissions.add);
+    addTearDown(sub.cancel);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    final snapshot = await DatabaseBackupService(source).snapshot();
+    expect(
+      (snapshot['tables'] as Map).keys,
+      containsAll(['payee_category_rules', 'sms_inbox_items']),
+    );
+
+    await DatabaseBackupService(destination).restore(snapshot);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(
+      emissions.last.any(
+        (t) => t.header == "O'Brien; DROP TABLE accounts;--",
+      ),
+      isTrue,
+    );
+    expect(
+      (await destination.select(destination.payeeCategoryRules).get()).single.payeePattern,
+      'naivas',
+    );
+    expect(
+      (await destination.select(destination.smsInboxItems).get()).single.parsedAmount,
+      500.0,
+    );
+    expect(
+      (await destination.select(destination.goalContributions).get()).single.transactionId,
+      txnId,
+    );
+  });
 }

@@ -216,5 +216,50 @@ void main() {
       expect(accountsWithBalance[1].name, 'Bank');
       expect(accountsWithBalance[2].name, 'Cash');
     });
+
+    test('correctBalance marks adjustment transactions excludeFromBudget', () async {
+      final accounts = await repo.getAll();
+      final mpesa = accounts.firstWhere((a) => a.name == 'M-Pesa');
+
+      final adjId = await repo.correctBalance(
+        accountId: mpesa.id,
+        currentBalance: 0,
+        targetBalance: 1200,
+      );
+      expect(adjId, isNotNull);
+      final txn = await (db.select(db.transactions)
+            ..where((t) => t.id.equals(adjId!)))
+          .getSingle();
+      expect(txn.excludeFromBudget, isTrue);
+    });
+
+    test('deleteAccount guards default, linked, and last accounts; deletes unused non-default',
+        () async {
+      final accounts = await repo.getAll();
+      final mpesa = accounts.firstWhere((a) => a.isDefault);
+      final cash = accounts.firstWhere((a) => a.name == 'Cash');
+      final bank = accounts.firstWhere((a) => a.name == 'Bank');
+
+      // Cannot delete default account.
+      await expectLater(repo.deleteAccount(mpesa.id), throwsStateError);
+
+      // Cannot delete account with linked transaction.
+      await db.into(db.transactions).insert(
+            TransactionsCompanion.insert(
+              header: 'Cash lunch',
+              amount: 200,
+              accountId: Value(cash.id),
+              transactionDate: DateTime(2026, 11, 10),
+            ),
+          );
+      await expectLater(repo.deleteAccount(cash.id), throwsStateError);
+
+      // Unused non-default account deletes cleanly.
+      await repo.deleteAccount(bank.id);
+      expect(
+        (await repo.getAll(includeArchived: true)).any((a) => a.id == bank.id),
+        isFalse,
+      );
+    });
   });
 }

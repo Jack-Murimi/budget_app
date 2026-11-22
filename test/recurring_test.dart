@@ -110,17 +110,24 @@ void main() {
       // Mark as paid
       await repo.markAsPaid(inserted, paidDate: DateTime(2026, 11, 10));
 
-      // 1. Transaction should exist in ledger
+      // 1. Transaction should exist in ledger with recurrence link
       final txns = await db.select(db.transactions).get();
       expect(txns.length, 1);
       expect(txns.first.header, 'KPLC Electricity');
       expect(txns.first.amount, 2500.0);
+      expect(txns.first.recurrenceId, id);
+      expect(txns.first.isRecurring, isTrue);
 
       // 2. Next due date should have advanced to December
       final updated = (await db.select(db.recurringTransactions).get())
           .firstWhere((r) => r.id == id);
       expect(updated.nextDueDate.month, 12);
       expect(updated.nextDueDate.day, 10);
+
+      // 3. Deleting recurring rule succeeds under PRAGMA foreign_keys = ON
+      await repo.delete(id);
+      final afterDeleteTxns = await db.select(db.transactions).get();
+      expect(afterDeleteTxns.single.recurrenceId, isNull);
     });
 
     test('skip advances nextDueDate without logging transaction', () async {

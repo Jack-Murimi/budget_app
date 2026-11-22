@@ -244,4 +244,140 @@ void main() {
     expect(bridgeLoan.debt.disbursementShortfall + bridgeLoan.debt.interest,
         closeTo(33.68, 0.001));
   });
+
+  test('create with shortfall sets debtId and records net credited cash', () async {
+    final accountId = (await db.select(db.accounts).get()).first.id;
+    final debtId = await repo.create(
+      direction: 'borrowed',
+      counterparty: 'Bridge',
+      principal: 600,
+      interest: 0,
+      product: 'bridge',
+      disbursementShortfall: 30,
+      accountId: accountId,
+    );
+
+    final txn = await (db.select(db.transactions)
+          ..where((t) => t.debtId.equals(debtId)))
+        .getSingle();
+    expect(txn.amount, 570.0);
+    expect(txn.debtId, debtId);
+  });
+
+  test('recordLoanGiven, recordLoanReceived, and recordRepaymentWithTransaction deduplicate mpesaRef atomically',
+      () async {
+    final accountId = (await db.select(db.accounts).get()).first.id;
+
+    final givenId = await repo.recordLoanGiven(
+      counterparty: 'John',
+      transaction: TransactionsCompanion.insert(
+        header: 'Lent John',
+        amount: 500,
+        accountId: Value(accountId),
+        mpesaRef: const Value('REF_LENT_1'),
+        transactionDate: DateTime(2026, 11, 1),
+      ),
+    );
+    expect(givenId, isNotNull);
+
+    final dupGiven = await repo.recordLoanGiven(
+      counterparty: 'John',
+      transaction: TransactionsCompanion.insert(
+        header: 'Lent John dup',
+        amount: 500,
+        accountId: Value(accountId),
+        mpesaRef: const Value('REF_LENT_1'),
+        transactionDate: DateTime(2026, 11, 1),
+      ),
+    );
+    expect(dupGiven, isNull);
+    var johnDebt = (await db.select(db.debts).get())
+        .firstWhere((d) => d.counterparty == 'John');
+    expect(johnDebt.principal, 500.0);
+
+    final repayId = await repo.recordRepaymentWithTransaction(
+      debtId: johnDebt.id,
+      transaction: TransactionsCompanion.insert(
+        header: 'John repaid',
+        amount: 200,
+        type: const Value('income'),
+        accountId: Value(accountId),
+        mpesaRef: const Value('REF_REPAY_1'),
+        transactionDate: DateTime(2026, 11, 2),
+      ),
+    );
+    expect(repayId, isNotNull);
+
+    final dupRepay = await repo.recordRepaymentWithTransaction(
+      debtId: johnDebt.id,
+      transaction: TransactionsCompanion.insert(
+        header: 'John repaid dup',
+        amount: 200,
+        type: const Value('income'),
+        accountId: Value(accountId),
+        mpesaRef: const Value('REF_REPAY_1'),
+        transactionDate: DateTime(2026, 11, 2),
+      ),
+    );
+    expect(dupRepay, isNull);
+    johnDebt = (await db.select(db.debts).get())
+        .firstWhere((d) => d.counterparty == 'John');
+    expect(johnDebt.outstanding, 300.0);
+
+    // Duplicate mpesaRef on recordLoanReceived must not create a debt row.
+    final recDup = await repo.recordLoanReceived(
+      counterparty: 'Bridge',
+      transaction: TransactionsCompanion.insert(
+        header: 'Bridge dup',
+        amount: 600,
+        type: const Value('income'),
+        accountId: Value(accountId),
+        mpesaRef: const Value('REF_LENT_1'),
+        transactionDate: DateTime(2026, 11, 3),
+      ),
+    );
+    expect(recDup, isNull);
+    expect(
+      (await db.select(db.debts).get())
+          .any((d) => d.counterparty == 'Bridge'),
+      isFalse,
+    );
+  });
+
+  test('repay re-reads fresh debt state and watchAll sorts null dueDates stably',
+      () async {
+    final debtId1 = await repo.create(
+      direction: 'lent',
+      counterparty: 'Zack',
+      principal: 500,
+      interest: 0,
+      product: 'personal',
+    );
+    await repo.create(
+      direction: 'lent',
+      counterparty: 'Amy',
+      principal: 300,
+      interest: 0,
+      product: 'personal',
+    );
+    final staleSnapshot = await (db.select(db.debts)
+          ..where((row) => row.id.equals(debtId1)))
+        .getSingle();
+
+    final stream = repo.watchAll();
+    final nextEmission = stream.skip(1).first;
+
+    // First repayment lowers live outstanding to 200.
+    await repo.repay(debt: staleSnapshot, amount: 300);
+
+    // Stale snapshot still claims 500 outstanding, but live check rejects 400.
+    await expectLater(
+      repo.repay(debt: staleSnapshot, amount: 400),
+      throwsArgumentError,
+    );
+
+    final emitted = await nextEmission;
+    expect(emitted.length, 2);
+    expect(emitted.first.debt.id, debtId1);
+  });
 }
