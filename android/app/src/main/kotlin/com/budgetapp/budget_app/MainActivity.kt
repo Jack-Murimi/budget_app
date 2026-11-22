@@ -41,12 +41,12 @@ class MainActivity : FlutterFragmentActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "updateWidgetData" -> {
-                        val manager = AppWidgetManager.getInstance(context)
+                        val manager = AppWidgetManager.getInstance(applicationContext)
                         val ids = manager.getAppWidgetIds(
-                            ComponentName(context, BudgetWidget::class.java)
+                            ComponentName(applicationContext, BudgetWidget::class.java)
                         )
                         for (id in ids) {
-                            BudgetWidget.updateWidget(context, manager, id)
+                            BudgetWidget.updateWidget(applicationContext, manager, id)
                         }
                         result.success(null)
                     }
@@ -90,7 +90,7 @@ class MainActivity : FlutterFragmentActivity() {
         // Filter: address contains MPESA (case-insensitive) or body contains Confirmed
         val selection = "address LIKE ? OR body LIKE ?"
         val selectionArgs = arrayOf("%MPESA%", "%Confirmed%")
-        val cursor: Cursor? = context.contentResolver.query(
+        val cursor: Cursor? = contentResolver.query(
             uri, projection, selection, selectionArgs, "date DESC"
         )
         cursor?.use { c ->
