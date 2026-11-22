@@ -5,11 +5,14 @@ import android.content.ComponentName
 import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.Executors
 
 class MainActivity : FlutterFragmentActivity() {
     private val securityChannel = "budget_app/security"
@@ -18,6 +21,8 @@ class MainActivity : FlutterFragmentActivity() {
     private val smsChannel = "budget_app/sms"
     private var pendingLink: String? = null
     private var eventSink: EventChannel.EventSink? = null
+    private val smsExecutor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -54,15 +59,20 @@ class MainActivity : FlutterFragmentActivity() {
                 }
             }
 
-        // SMS inbox reader
+        // SMS inbox reader — runs ContentResolver query off the UI thread to prevent ANRs
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, smsChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "readMpesaSms" -> {
-                        try {
-                            result.success(readMpesaSmsMessages())
-                        } catch (e: Exception) {
-                            result.error("SMS_ERROR", e.message, null)
+                        smsExecutor.execute {
+                            try {
+                                val messages = readMpesaSmsMessages()
+                                mainHandler.post { result.success(messages) }
+                            } catch (e: Exception) {
+                                mainHandler.post {
+                                    result.error("SMS_ERROR", e.message, null)
+                                }
+                            }
                         }
                     }
                     else -> result.notImplemented()
@@ -87,9 +97,9 @@ class MainActivity : FlutterFragmentActivity() {
         val messages = mutableListOf<Map<String, Any>>()
         val uri = Uri.parse("content://sms/inbox")
         val projection = arrayOf("_id", "address", "body", "date")
-        // Filter: address contains MPESA (case-insensitive) or body contains Confirmed
-        val selection = "address LIKE ? OR body LIKE ?"
-        val selectionArgs = arrayOf("%MPESA%", "%Confirmed%")
+        val selection =
+            "(UPPER(address) LIKE ? OR UPPER(address) LIKE ? OR UPPER(body) LIKE ? OR UPPER(body) LIKE ?) AND body LIKE ?"
+        val selectionArgs = arrayOf("%MPESA%", "%M-PESA%", "%MPESA%", "%M-PESA%", "%Confirmed%")
         val cursor: Cursor? = contentResolver.query(
             uri, projection, selection, selectionArgs, "date DESC"
         )
@@ -99,12 +109,18 @@ class MainActivity : FlutterFragmentActivity() {
             val bodyIdx = c.getColumnIndex("body")
             val dateIdx = c.getColumnIndex("date")
             while (c.moveToNext()) {
-                messages.add(mapOf(
-                    "id" to c.getString(idIdx),
-                    "address" to (c.getString(addrIdx) ?: ""),
-                    "body" to (c.getString(bodyIdx) ?: ""),
-                    "date" to c.getLong(dateIdx),
-                ))
+                val id = if (idIdx >= 0) (c.getString(idIdx) ?: "") else ""
+                val address = if (addrIdx >= 0) (c.getString(addrIdx) ?: "") else ""
+                val body = if (bodyIdx >= 0) (c.getString(bodyIdx) ?: "") else ""
+                val date = if (dateIdx >= 0) c.getLong(dateIdx) else 0L
+                messages.add(
+                    mapOf(
+                        "id" to id,
+                        "address" to address,
+                        "body" to body,
+                        "date" to date,
+                    )
+                )
             }
         }
         return messages
@@ -116,5 +132,10 @@ class MainActivity : FlutterFragmentActivity() {
             if (eventSink != null) eventSink?.success(link)
             else pendingLink = link
         }
+    }
+
+    override fun onDestroy() {
+        smsExecutor.shutdown()
+        super.onDestroy()
     }
 }

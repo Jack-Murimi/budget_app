@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/converters/cents_converter.dart';
@@ -26,9 +28,10 @@ class AccountRepository {
             if (t.type == 'income') {
               balanceCents += CentsConverter.toCents(t.amount);
             } else if (t.type == 'expense') {
-              balanceCents -= CentsConverter.toCents(t.amount) +
-                  CentsConverter.toCents(t.transactionCost) +
-                  CentsConverter.toCents(t.fulizaFee);
+              final totalOutflowCents = CentsConverter.toCents(t.amount) +
+                  CentsConverter.toCents(t.transactionCost);
+              final fulizaCoveredCents = CentsConverter.toCents(t.fulizaAmount);
+              balanceCents -= math.max(0, totalOutflowCents - fulizaCoveredCents);
             } else if (t.type == 'transfer') {
               balanceCents -= CentsConverter.toCents(t.amount) +
                   CentsConverter.toCents(t.transactionCost);

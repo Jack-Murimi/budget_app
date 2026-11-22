@@ -14,3 +14,7 @@ final fulizaRecordsProvider = StreamProvider<List<FulizaRecord>>((ref) {
 final latestFulizaProvider = StreamProvider<FulizaRecord?>((ref) {
   return ref.watch(fulizaRepositoryProvider).watchLatest();
 });
+
+final fulizaTotalFeesProvider = StreamProvider<double>((ref) {
+  return ref.watch(fulizaRepositoryProvider).watchTotalFees();
+});

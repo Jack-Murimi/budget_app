@@ -5,12 +5,12 @@ import '../../transactions/models/mpesa_parse_result.dart';
 class SmsInboxScanner {
   static const _channel = MethodChannel('budget_app/sms');
 
-  /// Reads all SMS from the inbox filtered by address containing "MPESA"
-  /// or body containing "Confirmed" (the M-Pesa pattern).
+  /// Reads all SMS from the inbox filtered by address/body containing "MPESA"
+  /// and body containing "Confirmed". Rethrows [PlatformException] so UI can
+  /// surface permission/provider errors instead of hiding them.
   static Future<List<RawSms>> readMpesaSms() async {
     try {
-      final List result =
-          await _channel.invokeMethod('readMpesaSms') as List;
+      final List result = await _channel.invokeMethod('readMpesaSms') as List;
       return result
           .map((e) => RawSms(
                 id: e['id'] as String,
@@ -21,15 +21,14 @@ class SmsInboxScanner {
           .toList();
     } on MissingPluginException {
       return []; // not on Android
-    } on PlatformException {
-      return [];
     }
   }
 
-  /// Parses the inbox and returns categorised results.
+  /// Parses the inbox and returns categorised results, using each SMS's
+  /// timestamp as fallbackDate when the message text lacks an explicit date.
   static List<SmsParseItem> scanAndParse(List<RawSms> messages) {
     return messages.map((sms) {
-      final result = MpesaParser.parse(sms.body);
+      final result = MpesaParser.parse(sms.body, fallbackDate: sms.date);
       return SmsParseItem(
         raw: sms,
         result: result,

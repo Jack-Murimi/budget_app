@@ -499,5 +499,52 @@ void main() {
       await repo.delete(disbTxId!);
       expect(await db.select(db.debts).get(), isEmpty);
     });
+
+    test('insertReversalAndMarkOriginal marks original reversed and excludes both from budget',
+        () async {
+      await repo.insert(
+        TransactionsCompanion.insert(
+          header: 'Wrong Transfer',
+          description: const Value('John Doe'),
+          amount: 500.0,
+          type: const Value('expense'),
+          mpesaRef: const Value('ORIG123'),
+          transactionDate: DateTime(2026, 11, 10),
+        ),
+      );
+
+      final revId = await repo.insertReversalAndMarkOriginal(
+        TransactionsCompanion.insert(
+          header: 'Reversal',
+          description: const Value('Reversal'),
+          amount: 500.0,
+          type: const Value('income'),
+          mpesaRef: const Value('REV456'),
+          counterpartyAccount: const Value('ORIG123'),
+          transactionDate: DateTime(2026, 11, 10, 12),
+        ),
+        'ORIG123',
+      );
+      expect(revId, isNotNull);
+
+      final orig = await repo.getByRef('ORIG123');
+      final rev = await repo.getByRef('REV456');
+      expect(orig!.description, '[REVERSED] John Doe');
+      expect(orig.excludeFromBudget, isTrue);
+      expect(rev!.excludeFromBudget, isTrue);
+
+      // Duplicate reversal ref must be ignored.
+      final dupRev = await repo.insertReversalAndMarkOriginal(
+        TransactionsCompanion.insert(
+          header: 'Reversal dup',
+          amount: 500.0,
+          type: const Value('income'),
+          mpesaRef: const Value('REV456'),
+          transactionDate: DateTime(2026, 11, 10, 12),
+        ),
+        'ORIG123',
+      );
+      expect(dupRev, isNull);
+    });
   });
 }

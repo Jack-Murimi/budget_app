@@ -80,6 +80,54 @@ class TransactionRepository {
     return row?.toModel();
   }
 
+  /// Inserts a reversal transaction (excluded from budget) and atomically marks
+  /// the matching [originalMpesaRef] transaction as reversed and excluded from budget.
+  /// Returns the new reversal ID, or `null` if the reversal [mpesaRef] already exists.
+  Future<int?> insertReversalAndMarkOriginal(
+    TransactionsCompanion reversal,
+    String originalMpesaRef,
+  ) async {
+    return db.transaction(() async {
+      final rawRef =
+          reversal.mpesaRef.present ? reversal.mpesaRef.value?.trim() : null;
+      final normalizedRef =
+          (rawRef == null || rawRef.isEmpty) ? null : rawRef;
+      if (normalizedRef != null) {
+        final existing = await (db.select(db.transactions)
+              ..where((t) => t.mpesaRef.equals(normalizedRef)))
+            .getSingleOrNull();
+        if (existing != null) return null;
+      }
+
+      final reversalId = await db.into(db.transactions).insert(
+            reversal.copyWith(
+              mpesaRef: Value(normalizedRef),
+              excludeFromBudget: const Value(true),
+            ),
+          );
+
+      final origRef = originalMpesaRef.trim();
+      if (origRef.isNotEmpty) {
+        final original = await (db.select(db.transactions)
+              ..where((t) => t.mpesaRef.equals(origRef)))
+            .getSingleOrNull();
+        if (original != null) {
+          final updatedDesc = original.description.startsWith('[REVERSED]')
+              ? original.description
+              : '[REVERSED] ${original.description}'.trim();
+          await (db.update(db.transactions)
+                ..where((t) => t.id.equals(original.id)))
+              .write(TransactionsCompanion(
+            description: Value(updatedDesc),
+            excludeFromBudget: const Value(true),
+          ));
+        }
+      }
+
+      return reversalId;
+    });
+  }
+
   /// Deletes transaction [id] and reconciles any linked goal contributions,
   /// debt repayments, and debt disbursement records atomically.
   Future<void> delete(int id) async {

@@ -10,16 +10,18 @@ class MpesaParseResult {
   final String counterpartyName;
   final String counterpartyAccount;
   final MpesaTransactionType type;
+  final String? transactionTypeOverride;
   final double newBalance;
   final bool isValid;
   final String? errorMessage;
 
-  // Fuliza fields — populated when parsing a fulizaDrawdown message
-  // These get attached to the paired transaction by the caller
-  final double fulizaAmount;    // how much Fuliza credited
+  // Fuliza fields — populated when parsing a fulizaDrawdown or fulizaRepayment message
+  final double fulizaAmount; // how much Fuliza credited
   final double fulizaAccessFee; // Fuliza's daily access fee
-  final double outstandingTotal; // total Fuliza outstanding after this drawdown
+  final double outstandingTotal; // total Fuliza outstanding after drawdown/repayment
   final DateTime? fulizaDueDate; // repayment due date
+  final bool isFullFulizaRepayment;
+  final bool hasExplicitFulizaOutstanding;
 
   const MpesaParseResult({
     required this.mpesaRef,
@@ -29,6 +31,7 @@ class MpesaParseResult {
     required this.counterpartyName,
     required this.counterpartyAccount,
     required this.type,
+    this.transactionTypeOverride,
     required this.newBalance,
     required this.isValid,
     this.errorMessage,
@@ -36,27 +39,44 @@ class MpesaParseResult {
     this.fulizaAccessFee = 0.0,
     this.outstandingTotal = 0.0,
     this.fulizaDueDate,
+    this.isFullFulizaRepayment = false,
+    this.hasExplicitFulizaOutstanding = false,
   });
+
+  /// Effective ledger transaction type ('income' | 'expense' | 'transfer'),
+  /// respecting per-message direction overrides for Pochi & M-Shwari savings.
+  String get resolvedTransactionType =>
+      transactionTypeOverride ?? type.transactionType;
 
   MpesaParseResult copyWith({
     double? fulizaAmount,
     double? fulizaAccessFee,
-  }) => MpesaParseResult(
-    mpesaRef: mpesaRef,
-    amount: amount,
-    transactionCost: transactionCost,
-    transactionDate: transactionDate,
-    counterpartyName: counterpartyName,
-    counterpartyAccount: counterpartyAccount,
-    type: type,
-    newBalance: newBalance,
-    isValid: isValid,
-    errorMessage: errorMessage,
-    fulizaAmount: fulizaAmount ?? this.fulizaAmount,
-    fulizaAccessFee: fulizaAccessFee ?? this.fulizaAccessFee,
-    outstandingTotal: outstandingTotal,
-    fulizaDueDate: fulizaDueDate,
-  );
+    String? transactionTypeOverride,
+    bool? isFullFulizaRepayment,
+    bool? hasExplicitFulizaOutstanding,
+  }) =>
+      MpesaParseResult(
+        mpesaRef: mpesaRef,
+        amount: amount,
+        transactionCost: transactionCost,
+        transactionDate: transactionDate,
+        counterpartyName: counterpartyName,
+        counterpartyAccount: counterpartyAccount,
+        type: type,
+        transactionTypeOverride:
+            transactionTypeOverride ?? this.transactionTypeOverride,
+        newBalance: newBalance,
+        isValid: isValid,
+        errorMessage: errorMessage,
+        fulizaAmount: fulizaAmount ?? this.fulizaAmount,
+        fulizaAccessFee: fulizaAccessFee ?? this.fulizaAccessFee,
+        outstandingTotal: outstandingTotal,
+        fulizaDueDate: fulizaDueDate,
+        isFullFulizaRepayment:
+            isFullFulizaRepayment ?? this.isFullFulizaRepayment,
+        hasExplicitFulizaOutstanding:
+            hasExplicitFulizaOutstanding ?? this.hasExplicitFulizaOutstanding,
+      );
 
   /// Auto-generated description from counterparty name.
   String get autoDescription =>
@@ -82,15 +102,15 @@ enum MpesaTransactionType {
   paybill,
   buyGoods,
   withdraw,
-  agentCashout,       // "Give Ksh... cash to NAME"
-  fulizaDrawdown,     // Fuliza credit — paired with send, skip saving
-  fulizaRepayment,    // Paying back Fuliza
+  agentCashout, // "Give Ksh... cash to NAME"
+  fulizaDrawdown, // Fuliza credit — paired with send, skip saving
+  fulizaRepayment, // Paying back Fuliza
   airtime,
-  pochiLaBiashara,    // Pochi la Biashara inflow/outflow
-  mShwariLoan,        // M-Shwari loan disbursement
-  mShwariRepayment,   // M-Shwari loan repayment
-  mShwariSavings,     // M-Shwari lock/unlock savings
-  reversal,           // Safaricom transaction reversal
+  pochiLaBiashara, // Pochi la Biashara inflow/outflow
+  mShwariLoan, // M-Shwari loan disbursement
+  mShwariRepayment, // M-Shwari loan repayment
+  mShwariSavings, // M-Shwari lock/unlock/deposit/withdraw savings
+  reversal, // Safaricom transaction reversal
   unknown;
 
   String get defaultDescription => switch (this) {
@@ -113,8 +133,9 @@ enum MpesaTransactionType {
 
   String get transactionType => switch (this) {
         MpesaTransactionType.receiveMoney => 'income',
-        MpesaTransactionType.pochiLaBiashara => 'income', // may be either; default income
+        MpesaTransactionType.pochiLaBiashara => 'income', // default; overridden per SMS
         MpesaTransactionType.mShwariLoan => 'income',
+        MpesaTransactionType.mShwariSavings => 'transfer', // default; overridden per SMS
         MpesaTransactionType.reversal => 'income', // money comes back
         _ => 'expense',
       };

@@ -8,7 +8,8 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:sqlite3/open.dart';
 
 void main() {
-  open.overrideFor(OperatingSystem.linux, () => DynamicLibrary.open('libsqlite3.so.0'));
+  open.overrideFor(
+      OperatingSystem.linux, () => DynamicLibrary.open('libsqlite3.so.0'));
 
   late AppDatabase db;
   late FulizaRepository repo;
@@ -42,5 +43,52 @@ void main() {
 
     final totalFees = await repo.totalFees();
     expect(totalFees, 0.70);
+  });
+
+  test('recordRepayment reduces and clears outstandingTotal and deduplicates mpesaRef',
+      () async {
+    await repo.insertDrawdown(
+      FulizaRecordsCompanion.insert(
+        mpesaRef: 'DR1',
+        fulizaAmount: 200.0,
+        accessFee: const Value(2.0),
+        outstandingTotal: const Value(202.0),
+        dueDate: Value(DateTime(2026, 12, 1)),
+        createdAt: Value(DateTime(2026, 11, 1)),
+      ),
+    );
+
+    final dup1 = await repo.recordRepayment(
+      mpesaRef: 'REP1',
+      amount: 52.0,
+      isFull: false,
+      date: DateTime(2026, 11, 2),
+    );
+    expect(dup1, isFalse);
+
+    var latest = await repo.watchLatest().first;
+    expect(latest!.outstandingTotal, 150.0);
+    expect(latest.fulizaAmount, -52.0);
+    expect(latest.dueDate, DateTime(2026, 12, 1));
+
+    // Duplicate repayment ref must be skipped.
+    final dup2 = await repo.recordRepayment(
+      mpesaRef: 'REP1',
+      amount: 52.0,
+      isFull: false,
+    );
+    expect(dup2, isTrue);
+
+    // Full settlement clears outstandingTotal and dueDate.
+    await repo.recordRepayment(
+      mpesaRef: 'REP2',
+      amount: 150.0,
+      isFull: true,
+      date: DateTime(2026, 11, 3),
+    );
+    latest = await repo.watchLatest().first;
+    expect(latest!.outstandingTotal, 0.0);
+    expect(latest.dueDate, isNull);
+    expect(await repo.watchTotalFees().first, 2.0);
   });
 }

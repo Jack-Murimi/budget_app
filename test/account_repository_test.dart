@@ -261,5 +261,41 @@ void main() {
         isFalse,
       );
     });
+
+    test('Fuliza-covered expenses do not double-deduct from M-Pesa wallet balance',
+        () async {
+      final accounts = await repo.getAll();
+      final mpesa = accounts.firstWhere((a) => a.name == 'M-Pesa');
+
+      await db.into(db.transactions).insert(
+            TransactionsCompanion.insert(
+              type: const Value('income'),
+              header: 'Deposit',
+              amount: 100.0,
+              accountId: Value(mpesa.id),
+              transactionDate: DateTime(2026, 11, 10),
+            ),
+          );
+
+      // Spent 170 total, where 70 was covered by Fuliza with 0.70 Fuliza fee.
+      // Only 100 came out of M-Pesa wallet cash; Fuliza portion/fee is Fuliza debt.
+      await db.into(db.transactions).insert(
+            TransactionsCompanion.insert(
+              type: const Value('expense'),
+              header: 'Paybill with Fuliza',
+              amount: 170.0,
+              transactionCost: const Value(0.0),
+              fulizaAmount: const Value(70.0),
+              fulizaFee: const Value(0.70),
+              accountId: Value(mpesa.id),
+              transactionDate: DateTime(2026, 11, 10),
+            ),
+          );
+
+      final updated = await repo.watchAccountsWithBalance().first;
+      final mpesaBalance =
+          updated.firstWhere((a) => a.id == mpesa.id).balance;
+      expect(mpesaBalance, 0.0);
+    });
   });
 }

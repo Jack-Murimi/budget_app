@@ -297,4 +297,115 @@ void main() {
       expect(result.type.transactionType, 'income');
     });
   });
+
+  group('Phase 3 parser hardening', () {
+    test('Pochi la Biashara differentiates inflow vs outflow and extracts counterparty', () {
+      const inflowMsg =
+          'PB3QX11U87 Confirmed. You have received Ksh200.00 from MARY WANJIKU 0712345678 via Pochi La Biashara on 2/11/26 at 10:00 AM. New M-PESA balance is Ksh800.00.';
+      final inflow = MpesaParser.parse(inflowMsg);
+      expect(inflow.isValid, isTrue);
+      expect(inflow.type, MpesaTransactionType.pochiLaBiashara);
+      expect(inflow.resolvedTransactionType, 'income');
+      expect(inflow.counterpartyName, 'MARY WANJIKU');
+      expect(inflow.counterpartyAccount, '0712345678');
+
+      const outflowMsg =
+          "PO4CD55E66 Confirmed. Ksh450.00 paid to MAMA MBOGA O'CONNOR 0722334455 via Pochi La Biashara on 2/11/26 at 1:15 PM. New M-PESA balance is Ksh350.00.";
+      final outflow = MpesaParser.parse(outflowMsg);
+      expect(outflow.isValid, isTrue);
+      expect(outflow.type, MpesaTransactionType.pochiLaBiashara);
+      expect(outflow.resolvedTransactionType, 'expense');
+      expect(outflow.counterpartyName, "MAMA MBOGA O'CONNOR");
+      expect(outflow.counterpartyAccount, '0722334455');
+    });
+
+    test('M-Shwari savings differentiates deposit transfer vs withdrawal income', () {
+      const depositMsg =
+          'MW1AA22B33 Confirmed. Ksh1,000.00 transferred to M-Shwari account on 5/11/26 at 9:00 AM. New M-PESA balance is Ksh2,000.00.';
+      final deposit = MpesaParser.parse(depositMsg);
+      expect(deposit.isValid, isTrue);
+      expect(deposit.type, MpesaTransactionType.mShwariSavings);
+      expect(deposit.resolvedTransactionType, 'transfer');
+
+      const withdrawMsg =
+          'MW2CC33D44 Confirmed. Ksh500.00 transferred from M-Shwari account on 6/11/26 at 4:00 PM. New M-PESA balance is Ksh2,500.00.';
+      final withdraw = MpesaParser.parse(withdrawMsg);
+      expect(withdraw.isValid, isTrue);
+      expect(withdraw.type, MpesaTransactionType.mShwariSavings);
+      expect(withdraw.resolvedTransactionType, 'income');
+    });
+
+    test('Fuliza repayment matches both full and partial phrasing', () {
+      const partialMsg =
+          'FP1XY22Z33 Confirmed. Ksh50.00 from your M-PESA has been used to partially pay your outstanding Fuliza M-PESA balance on 12/11/26 at 3:00 PM. Your Fuliza M-PESA outstanding amount is Ksh150.00. New M-PESA balance is Ksh0.00.';
+      final partial = MpesaParser.parse(partialMsg);
+      expect(partial.isValid, isTrue);
+      expect(partial.type, MpesaTransactionType.fulizaRepayment);
+      expect(partial.amount, 50.00);
+      expect(partial.isFullFulizaRepayment, isFalse);
+      expect(partial.hasExplicitFulizaOutstanding, isTrue);
+      expect(partial.outstandingTotal, 150.00);
+
+      const fullMsg =
+          'DS2YZ00D11 Confirmed. Ksh102.68 used to fully pay your outstanding fuliza M-PESA balance on 10/11/26 at 5:00 PM. New M-PESA balance is Ksh500.00.';
+      final full = MpesaParser.parse(fullMsg);
+      expect(full.isValid, isTrue);
+      expect(full.type, MpesaTransactionType.fulizaRepayment);
+      expect(full.isFullFulizaRepayment, isTrue);
+      expect(full.outstandingTotal, 0.0);
+    });
+
+    test('Fuliza drawdown uses SMS date/fallbackDate instead of due date or DateTime.now()', () {
+      final fallback = DateTime(2026, 11, 3, 18, 20);
+      const noTxnDateMsg =
+          'BQ0WZ88B33 Confirmed. Fuliza M-PESA amount is Ksh70.00. Access Fee charged Ksh0.70. Total Fuliza M-PESA outstanding amount is Ksh102.68 due on 3/12/26.';
+      final withFallback = MpesaParser.parse(noTxnDateMsg, fallbackDate: fallback);
+      expect(withFallback.transactionDate, fallback);
+      expect(withFallback.fulizaDueDate, DateTime(2026, 12, 3));
+
+      const explicitDateMsg =
+          'BQ1WZ88B44 Confirmed. Fuliza M-PESA amount is Ksh70.00 on 4/11/26 at 8:15 AM. Access Fee charged Ksh0.70. Total Fuliza M-PESA outstanding amount is Ksh102.68 due on 4/12/26.';
+      final withExplicit = MpesaParser.parse(explicitDateMsg, fallbackDate: fallback);
+      expect(withExplicit.transactionDate, DateTime(2026, 11, 4, 8, 15));
+      expect(withExplicit.fulizaDueDate, DateTime(2026, 12, 4));
+    });
+
+    test('extracts Kenyan counterparties with hyphens, apostrophes, ampersands, digits, and +254', () {
+      const coop =
+          'CP1AA22B33 Confirmed. Ksh2,000.00 sent to CO-OP BANK for account 0110012345 on 1/11/26 at 9:00 AM. New M-PESA balance is Ksh3,000.00. Transaction cost, Ksh23.00';
+      final rCoop = MpesaParser.parse(coop);
+      expect(rCoop.type, MpesaTransactionType.paybill);
+      expect(rCoop.counterpartyName, 'CO-OP BANK');
+      expect(rCoop.counterpartyAccount, '0110012345');
+
+      const imBank =
+          'IM1AA22B33 Confirmed. Ksh1,500.00 sent to I&M BANK for account 400-123 on 1/11/26 at 9:05 AM. New M-PESA balance is Ksh1,500.00.';
+      final rIm = MpesaParser.parse(imBank);
+      expect(rIm.type, MpesaTransactionType.paybill);
+      expect(rIm.counterpartyName, 'I&M BANK');
+      expect(rIm.counterpartyAccount, '400-123');
+
+      const oConnor =
+          "OC1AA22B33 Confirmed. Ksh300.00 sent to PATRICK O'CONNOR +254712345678 on 1/11/26 at 9:10 AM. New M-PESA balance is Ksh1,200.00.";
+      final rOc = MpesaParser.parse(oConnor);
+      expect(rOc.type, MpesaTransactionType.sendMoney);
+      expect(rOc.counterpartyName, "PATRICK O'CONNOR");
+      expect(rOc.counterpartyAccount, '+254712345678');
+
+      const till =
+          'AR1AA22B33 Confirmed. Ksh850.00 paid to ARTCAFFE - WESTGATE. on 1/11/26 at 1:00 PM. New M-PESA balance is Ksh350.00.';
+      final rTill = MpesaParser.parse(till);
+      expect(rTill.type, MpesaTransactionType.buyGoods);
+      expect(rTill.counterpartyName, 'ARTCAFFE - WESTGATE');
+    });
+
+    test('never parses daily transaction limit as M-Pesa balance when balance clause is absent', () {
+      const limitMsg =
+          'DL1AA22B33 Confirmed. Ksh500.00 paid to NAIVAS. on 1/11/26 at 2:00 PM. Amount you can transact within the day is 499,500.00. Transaction cost, Ksh0.00. Daily limit Ksh499,500.00.';
+      final res = MpesaParser.parse(limitMsg);
+      expect(res.isValid, isTrue);
+      expect(res.amount, 500.00);
+      expect(res.newBalance, 0.0);
+    });
+  });
 }

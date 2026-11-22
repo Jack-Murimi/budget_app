@@ -98,7 +98,8 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
             : '',
       );
       _date = p?.transactionDate ?? DateTime.now();
-      _type = p?.type.transactionType ?? 'expense';
+      _type = p?.resolvedTransactionType ?? 'expense';
+      _excludeFromBudget = p?.type == MpesaTransactionType.reversal;
       if (p != null && p.counterpartyName.isNotEmpty) {
         _loadSuggestedCategory(p.counterpartyName);
       }
@@ -550,6 +551,13 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
             debtId: matchedBorrowedDebt.id,
             transaction: companion,
           );
+    } else if (widget.parseResult?.type == MpesaTransactionType.reversal) {
+      id = await ref
+          .read(transactionRepositoryProvider)
+          .insertReversalAndMarkOriginal(
+            companion,
+            widget.parseResult!.counterpartyAccount,
+          );
     } else {
       id = await ref
           .read(transactionRepositoryProvider)
@@ -559,14 +567,14 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
     if (!mounted) return;
     if (id == null) {
       _toast('Already saved — this M-Pesa transaction was recorded before.');
-      _finish();
+      _finish(false);
       return;
     }
 
     _learnPayee();
     HapticFeedback.lightImpact();
     _toast('Transaction saved!');
-    _finish();
+    _finish(true);
   }
 
   void _learnPayee() {

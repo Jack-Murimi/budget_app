@@ -1,15 +1,12 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/database/app_database.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/utils/date_formatter.dart';
 import '../../add_transaction/screens/add_transaction_screen.dart';
-import '../../fuliza/providers/fuliza_providers.dart';
 import '../../transactions/models/mpesa_parse_result.dart';
-import '../../transactions/providers/transaction_providers.dart';
 import '../../transactions/services/mpesa_parser.dart';
+import '../../transactions/services/mpesa_result_handler.dart';
 
 class HomeFloatingActionButtons extends ConsumerStatefulWidget {
   const HomeFloatingActionButtons({super.key});
@@ -21,8 +18,6 @@ class HomeFloatingActionButtons extends ConsumerStatefulWidget {
 
 class _HomeFloatingActionButtonsState
     extends ConsumerState<HomeFloatingActionButtons> {
-  static const _reversedTag = '[REVERSED]';
-
   // Guards against double-taps starting two parse/save flows at once.
   bool _busy = false;
 
@@ -91,112 +86,54 @@ class _HomeFloatingActionButtonsState
   }
 
   Future<void> _handleParseResult(MpesaParseResult result) async {
+    final handler = ref.read(mpesaResultHandlerProvider);
+
     if (result.type == MpesaTransactionType.fulizaDrawdown) {
-      return _handleFulizaDrawdown(result);
-    }
-    if (result.type == MpesaTransactionType.fulizaRepayment) {
-      return _handleFulizaRepayment(result);
-    }
-
-    final txnRepo = ref.read(transactionRepositoryProvider);
-
-    // Duplicate check FIRST. This also stops a re-pasted reversal from
-    // annotating the original transaction a second time.
-    if (result.mpesaRef.isNotEmpty) {
-      final existing = await txnRepo.getByRef(result.mpesaRef);
+      final outcome = await handler.handleNonFormResult(result);
       if (!mounted) return;
-      if (existing != null) {
+      if (outcome.isDuplicate) {
+        _toast('Already recorded — this Fuliza was saved before.', seconds: 3);
+      } else {
         _toast(
-          'Already recorded — ${result.mpesaRef} was saved on '
-          '${DateFormatter.formatDate(existing.transactionDate)}.',
+          outcome.linkedExisting
+              ? 'Fuliza linked ✓  Transaction updated with Fuliza details.'
+              : 'Fuliza recorded ✓  Paste the paired M-Pesa send message next.',
         );
-        return;
       }
+      return;
     }
 
-    if (result.type == MpesaTransactionType.reversal) {
-      await _markOriginalReversed(result);
-      // Fall through: open the form so the user confirms the reversal income.
+    if (result.type == MpesaTransactionType.fulizaRepayment) {
+      final outcome = await handler.handleNonFormResult(result);
+      if (!mounted) return;
+      if (outcome.isDuplicate) {
+        _toast(
+          'Already recorded — this Fuliza repayment was saved before.',
+          seconds: 3,
+        );
+      } else {
+        _toast(
+          'Fuliza repaid: ${CurrencyFormatter.format(result.amount)}  •  Recorded ✓',
+          color: Colors.green.shade700,
+          seconds: 5,
+        );
+      }
+      return;
     }
 
-    // Enrich the form if a Fuliza record was already saved for this ref.
-    final fulizaRecord = result.mpesaRef.isEmpty
-        ? null
-        : await ref.read(fulizaRepositoryProvider).getByRef(result.mpesaRef);
+    final prep = await handler.prepareForForm(result);
     if (!mounted) return;
-
-    final enriched = fulizaRecord == null
-        ? result
-        : result.copyWith(
-            fulizaAmount: fulizaRecord.fulizaAmount,
-            fulizaAccessFee: fulizaRecord.accessFee,
-          );
+    if (prep.duplicate != null) {
+      _toast(
+        'Already recorded — ${result.mpesaRef} was saved on '
+        '${DateFormatter.formatDate(prep.duplicate!.transactionDate)}.',
+      );
+      return;
+    }
 
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-          builder: (_) => AddTransactionScreen(parseResult: enriched)),
-    );
-  }
-
-  Future<void> _handleFulizaDrawdown(MpesaParseResult result) async {
-    final isDuplicate = await ref.read(fulizaRepositoryProvider).insertDrawdown(
-          FulizaRecordsCompanion.insert(
-            mpesaRef: result.mpesaRef,
-            fulizaAmount: result.fulizaAmount,
-            accessFee: Value(result.fulizaAccessFee),
-            outstandingTotal: Value(result.outstandingTotal),
-            dueDate: Value(result.fulizaDueDate),
-          ),
-        );
-    if (!mounted) return;
-
-    if (isDuplicate) {
-      _toast('Already recorded — this Fuliza was saved before.', seconds: 3);
-      return;
-    }
-
-    // New record: also update the paired transaction if it's already saved.
-    final updated =
-        await ref.read(transactionRepositoryProvider).updateFulizaFields(
-              mpesaRef: result.mpesaRef,
-              fulizaAmount: result.fulizaAmount,
-              fulizaFee: result.fulizaAccessFee,
-            );
-
-    _toast(
-      updated
-          ? 'Fuliza linked ✓  Transaction updated with Fuliza details.'
-          : 'Fuliza recorded ✓  Paste the paired M-Pesa send message next.',
-    );
-  }
-
-  // Fuliza repayment is auto-deducted by M-Pesa, so it's info only here.
-  void _handleFulizaRepayment(MpesaParseResult result) {
-    _toast(
-      'Fuliza repaid: ${CurrencyFormatter.format(result.amount)}  •  '
-      'New balance: ${CurrencyFormatter.format(result.newBalance)}',
-      color: Colors.green.shade700,
-      seconds: 5,
-    );
-  }
-
-  Future<void> _markOriginalReversed(MpesaParseResult result) async {
-    final origRef =
-        result.counterpartyAccount; // original M-Pesa ref lives here
-    if (origRef.isEmpty) return;
-
-    final repo = ref.read(transactionRepositoryProvider);
-    final original = await repo.getByRef(origRef);
-
-    // Idempotent: never stack "[REVERSED] [REVERSED] ..."
-    if (original == null || original.description.startsWith(_reversedTag)) {
-      return;
-    }
-
-    await repo.updateTransaction(
-      TransactionsCompanion(
-        id: Value(original.id),
-        description: Value('$_reversedTag ${original.description}'),
+        builder: (_) => AddTransactionScreen(parseResult: prep.enriched),
       ),
     );
   }

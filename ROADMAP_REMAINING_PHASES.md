@@ -97,30 +97,30 @@ Related: [[Budget KE/context|context]] · [[Budget KE/decisions|decisions]] · [
 ## Phase 3 — M-Pesa Parser, Fuliza Lifecycle & SMS Inbox Scanner
 
 ### `MpesaParser` & `MpesaParseResult`
-- [ ] Differentiate `pochiLaBiashara` inflow (`income`) vs outflow (`expense`) and `mShwariSavings` deposit vs withdrawal/transfer in `MpesaParseResult` / `MpesaParser` (`lib/features/transactions/models/mpesa_parse_result.dart:114-120`, `lib/features/transactions/services/mpesa_parser.dart`).
-- [ ] Match both full and partial Fuliza repayments (`used to (?:fully|partially) pay your outstanding Fuliza`) in `MpesaParser._detectType` (`mpesa_parser.dart:103`).
-- [ ] Add optional `DateTime? fallbackDate` to `MpesaParser.parse` (passing `sms.date` from `SmsInboxScanner`) and parse SMS dates in `_parseFulizaDrawdown` instead of hardcoding `DateTime.now()` (`mpesa_parser.dart:312`).
-- [ ] Expand counterparty extraction regexes (`mpesa_parser.dart:146-256`) to handle Kenyan names and payees with hyphens, apostrophes, dots, ampersands, digits, and `+254` phone numbers (e.g., `CO-OP BANK`, `I&M BANK`, `O'CONNOR`).
-- [ ] Remove the unsafe `allAmounts.last` balance fallback (`mpesa_parser.dart:71`) so daily transaction limits (e.g. `499,500.00`) are never parsed as the M-Pesa balance.
+- [x] Differentiate `pochiLaBiashara` inflow (`income`) vs outflow (`expense`) and `mShwariSavings` deposit vs withdrawal/transfer in `MpesaParseResult` / `MpesaParser` (`lib/features/transactions/models/mpesa_parse_result.dart:114-120`, `lib/features/transactions/services/mpesa_parser.dart`).
+- [x] Match both full and partial Fuliza repayments (`used to (?:fully|partially) pay your outstanding Fuliza`) in `MpesaParser._detectType` (`mpesa_parser.dart:103`).
+- [x] Add optional `DateTime? fallbackDate` to `MpesaParser.parse` (passing `sms.date` from `SmsInboxScanner`) and parse SMS dates in `_parseFulizaDrawdown` instead of hardcoding `DateTime.now()` (`mpesa_parser.dart:312`).
+- [x] Expand counterparty extraction regexes (`mpesa_parser.dart:146-256`) to handle Kenyan names and payees with hyphens, apostrophes, dots, ampersands, digits, and `+254` phone numbers (e.g., `CO-OP BANK`, `I&M BANK`, `O'CONNOR`).
+- [x] Remove the unsafe `allAmounts.last` balance fallback (`mpesa_parser.dart:71`) so daily transaction limits (e.g. `499,500.00`) are never parsed as the M-Pesa balance.
 
 ### Fuliza & Reversal Lifecycles
-- [ ] Update `FulizaRepository` and `_handleFulizaRepayment` (`lib/features/home/widgets/floating_action_buttons.dart:174-181`) to record Fuliza repayments (reducing/clearing `outstandingTotal` instead of only showing a toast), add manual settle/repay support and total fees display on `FulizaScreen` (`lib/features/fuliza/screens/fuliza_screen.dart`).
-- [ ] Fix M-Pesa wallet balance calculation in `AccountRepository` (`lib/features/accounts/repositories/account_repository.dart:29-31`) when `fulizaAmount > 0` so Fuliza-covered portions of an expense are not double-deducted from the M-Pesa wallet balance.
-- [ ] Defer `_markOriginalReversed` (`floating_action_buttons.dart:117-120`) until the reversal transaction is actually saved, and mark the reversed pair `excludeFromBudget: true`.
+- [x] Update `FulizaRepository` and `_handleFulizaRepayment` (`lib/features/home/widgets/floating_action_buttons.dart:174-181`) to record Fuliza repayments (reducing/clearing `outstandingTotal` instead of only showing a toast), add manual settle/repay support and total fees display on `FulizaScreen` (`lib/features/fuliza/screens/fuliza_screen.dart`).
+- [x] Fix M-Pesa wallet balance calculation in `AccountRepository` (`lib/features/accounts/repositories/account_repository.dart:29-31`) when `fulizaAmount > 0` so Fuliza-covered portions of an expense are not double-deducted from the M-Pesa wallet balance.
+- [x] Defer `_markOriginalReversed` (`floating_action_buttons.dart:117-120`) until the reversal transaction is actually saved, and mark the reversed pair `excludeFromBudget: true`.
 
 ### SMS Inbox Scanner
-- [ ] Move `readMpesaSmsMessages()` in `MainActivity.kt` (`android/app/src/main/kotlin/com/budgetapp/budget_app/MainActivity.kt:86-111`) onto a background coroutine/executor so large SMS inboxes never cause Android ANRs, and tighten the SQLite `selection` filter.
-- [ ] Remove unused `RECEIVE_SMS` permission from `android/app/src/main/AndroidManifest.xml:5` (Play Store policy compliance).
-- [ ] Upgrade `SmsInboxScreen` (`lib/features/sms/screens/sms_inbox_screen.dart`) & `SmsInboxScanner`:
+- [x] Move `readMpesaSmsMessages()` in `MainActivity.kt` (`android/app/src/main/kotlin/com/budgetapp/budget_app/MainActivity.kt:86-111`) onto a background coroutine/executor so large SMS inboxes never cause Android ANRs, and tighten the SQLite `selection` filter.
+- [x] Remove unused `RECEIVE_SMS` permission from `android/app/src/main/AndroidManifest.xml:5` (Play Store policy compliance).
+- [x] Upgrade `SmsInboxScreen` (`lib/features/sms/screens/sms_inbox_screen.dart`) & `SmsInboxScanner`:
   - Deduplicate scanned messages against saved `transactions.mpesaRef` and `fuliza_records.mpesaRef`.
   - Route item actions through the shared M-Pesa result handler (supporting Fuliza drawdowns/repayments and reversal linking).
   - Add batch/bulk import for high-confidence items and surface `PlatformException` errors cleanly instead of swallowing them.
   - Either persist `pending` / `approved` / `dismissed` state in `sms_inbox_items` or remove the dead table cleanly in a migration.
 
 ### Phase 3 Verification
-- [ ] Expand `test/mpesa_parser_test.dart` for Pochi inflow/outflow, M-Shwari deposit/withdraw, partial Fuliza repayment, Fuliza drawdown dates, hyphenated/apostrophe/ampersand counterparties, and daily-limit non-balance messages.
-- [ ] Add Fuliza settlement, reversal-on-save, and `SmsInboxScreen` widget tests.
-- [ ] Run `flutter analyze && flutter test`.
+- [x] Expand `test/mpesa_parser_test.dart` for Pochi inflow/outflow, M-Shwari deposit/withdraw, partial Fuliza repayment, Fuliza drawdown dates, hyphenated/apostrophe/ampersand counterparties, and daily-limit non-balance messages.
+- [x] Add Fuliza settlement, reversal-on-save, and `SmsInboxScreen` widget tests.
+- [x] Run `flutter analyze && flutter test`.
 
 ---
 
