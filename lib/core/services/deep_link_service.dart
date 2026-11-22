@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -12,15 +13,26 @@ class DeepLinkService {
       _channel.receiveBroadcastStream().cast<String>();
 
   /// Register handlers on a navigator key. Call once after app start.
-  static void listen(GlobalKey<NavigatorState> navigatorKey,
-      {required VoidCallback onAddTransaction,
-      required VoidCallback onScanSms}) {
-    links.listen((link) {
-      if (link.startsWith('budgetke://add_transaction')) {
-        onAddTransaction();
-      } else if (link.startsWith('budgetke://scan_sms')) {
-        onScanSms();
-      }
-    });
+  static StreamSubscription<String> listen(
+    GlobalKey<NavigatorState> navigatorKey, {
+    required VoidCallback onAddTransaction,
+    required VoidCallback onScanSms,
+    void Function(String link)? onLink,
+    Stream<String>? stream,
+  }) {
+    return (stream ?? links).listen(
+      (link) {
+        if (onLink != null) {
+          onLink(link);
+          return;
+        }
+        if (link.startsWith('budgetke://add_transaction')) {
+          onAddTransaction();
+        } else if (link.startsWith('budgetke://scan_sms')) {
+          onScanSms();
+        }
+      },
+      onError: (_) {},
+    );
   }
 }

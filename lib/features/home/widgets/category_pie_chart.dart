@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/database/converters/cents_converter.dart';
+import '../../../shared/utils/cashflow_calculator.dart';
 import '../../categories/providers/category_providers.dart';
 import '../../transactions/models/transaction_model.dart';
 
@@ -57,7 +59,7 @@ class _CategoryPieChartSectionState
   /// Pure aggregation: no state mutation during build.
   List<_Slice> _buildSlices(List<Category> categories) {
     final byId = {for (final c in categories) c.id: c};
-    final totals = <int?, double>{};
+    final totalsCents = <int?, int>{};
     final cats = <int?, Category?>{};
 
     for (final t in widget.transactions) {
@@ -71,25 +73,29 @@ class _CategoryPieChartSectionState
       }
 
       final key = cat?.id;
-      totals[key] = (totals[key] ?? 0) + t.amount;
+      totalsCents[key] =
+          (totalsCents[key] ?? 0) + CashflowCalculator.expenseTotalCents(t);
       cats[key] = cat;
     }
 
-    final entries = totals.entries.toList()
+    final entries = totalsCents.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
     final slices = <_Slice>[
       for (final e in entries.take(_maxSlices))
         _Slice(
           cats[e.key]?.name ?? 'Uncategorized',
-          e.value,
+          CentsConverter.fromCents(e.value),
           cats[e.key] == null ? _uncategorizedColor : _colorFor(cats[e.key]!),
         ),
     ];
 
-    final rest =
-        entries.skip(_maxSlices).fold<double>(0, (s, e) => s + e.value);
-    if (rest > 0) slices.add(_Slice('Other', rest, _otherColor));
+    final restCents =
+        entries.skip(_maxSlices).fold<int>(0, (s, e) => s + e.value);
+    if (restCents > 0) {
+      slices.add(
+          _Slice('Other', CentsConverter.fromCents(restCents), _otherColor));
+    }
     return slices;
   }
 

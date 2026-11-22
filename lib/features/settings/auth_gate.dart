@@ -13,17 +13,15 @@ class AuthGate extends ConsumerStatefulWidget {
 
 class _AuthGateState extends ConsumerState<AuthGate> with WidgetsBindingObserver {
   DateTime? _backgroundedAt;
+  bool _authenticating = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Lock immediately on first launch if biometric is on
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (ref.read(biometricEnabledProvider)) {
-        ref.read(appLockedProvider.notifier).state = true;
-      }
-    });
+    if (ref.read(appLockedProvider)) {
+      ref.read(authServiceProvider).setSecureFlag(true);
+    }
   }
 
   @override
@@ -35,30 +33,40 @@ class _AuthGateState extends ConsumerState<AuthGate> with WidgetsBindingObserver
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final bioEnabled = ref.read(biometricEnabledProvider);
-    if (!bioEnabled) return;
+    if (!bioEnabled || _authenticating) return;
 
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      _backgroundedAt = DateTime.now();
-      setSecureFlag(true); // hide in app switcher immediately
+    final auth = ref.read(authServiceProvider);
+    if (state == AppLifecycleState.inactive) {
+      auth.setSecureFlag(true);
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _backgroundedAt ??= DateTime.now();
+      auth.setSecureFlag(true);
     } else if (state == AppLifecycleState.resumed) {
       final lockAfter = ref.read(autoLockSecondsProvider);
       final bg = _backgroundedAt;
       if (bg != null &&
           DateTime.now().difference(bg).inSeconds >= lockAfter) {
-        ref.read(appLockedProvider.notifier).state = true;
-      } else {
-        setSecureFlag(false); // coming back without locking — show again
+        ref.read(appLockedProvider.notifier).lock();
+      } else if (!ref.read(appLockedProvider)) {
+        auth.setSecureFlag(false);
       }
       _backgroundedAt = null;
     }
   }
 
   Future<void> _unlock() async {
-    final ok = await authenticate();
-    if (ok && mounted) {
-      ref.read(appLockedProvider.notifier).state = false;
-      setSecureFlag(false);
+    if (_authenticating) return;
+    _authenticating = true;
+    try {
+      final auth = ref.read(authServiceProvider);
+      final ok = await auth.authenticate();
+      if (ok && mounted) {
+        ref.read(appLockedProvider.notifier).unlock();
+        await auth.setSecureFlag(false);
+      }
+    } finally {
+      _authenticating = false;
     }
   }
 

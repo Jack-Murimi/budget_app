@@ -30,12 +30,15 @@ class CategoryRepository {
     return query.get();
   }
 
-  Future<List<Category>> getTopLevel({bool includeArchived = false}) {
+  Future<List<Category>> getTopLevel({bool includeArchived = false, String? transactionType}) {
     final query = db.select(db.categories)
       ..where((c) => c.parentId.isNull())
-      ..orderBy([(c) => OrderingTerm.asc(c.sortOrder)]);
+      ..orderBy([(c) => OrderingTerm.asc(c.sortOrder), (c) => OrderingTerm.asc(c.name)]);
     if (!includeArchived) {
       query.where((c) => c.isArchived.equals(false));
+    }
+    if (transactionType != null) {
+      query.where((c) => c.transactionType.equals(transactionType));
     }
     return query.get();
   }
@@ -56,8 +59,12 @@ class CategoryRepository {
   Future<int> insertCategory(CategoriesCompanion category) =>
       db.into(db.categories).insert(category);
 
-  Future<bool> updateCategory(CategoriesCompanion category) =>
-      db.update(db.categories).replace(category);
+  Future<bool> updateCategory(CategoriesCompanion category) async {
+    final count = await (db.update(db.categories)
+          ..where((c) => c.id.equals(category.id.value)))
+        .write(category);
+    return count > 0;
+  }
 
   Future<void> archiveCategory(int id, {bool archive = true}) =>
       (db.update(db.categories)..where((c) => c.id.equals(id)))

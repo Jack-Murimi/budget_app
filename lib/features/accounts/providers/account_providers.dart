@@ -12,6 +12,13 @@ final accountsWithBalanceProvider = StreamProvider<List<AccountWithBalance>>((re
   return ref.watch(accountRepositoryProvider).watchAccountsWithBalance();
 });
 
+final allAccountsWithBalanceProvider =
+    StreamProvider<List<AccountWithBalance>>((ref) {
+  return ref
+      .watch(accountRepositoryProvider)
+      .watchAccountsWithBalance(includeArchived: true);
+});
+
 final totalNetWorthProvider = Provider<AsyncValue<double>>((ref) {
   final accountsAsync = ref.watch(accountsWithBalanceProvider);
   return accountsAsync.whenData((accounts) {

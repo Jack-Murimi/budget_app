@@ -22,18 +22,21 @@ void main() {
     await db.close();
   });
 
-  Widget buildTestApp() {
-    return ProviderScope(
-      overrides: [dbProvider.overrideWithValue(db)],
+  Widget buildTestApp(ProviderContainer container) {
+    return UncontrolledProviderScope(
+      container: container,
       child: const MaterialApp(home: CategoriesScreen()),
     );
   }
 
   testWidgets('renders categories list', (tester) async {
-    await tester.pumpWidget(buildTestApp());
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(buildTestApp(container));
     await tester.pump();
     
-    // Wait for FutureBuilder to complete
+    // Wait for stream to emit
     await tester.pump(const Duration(milliseconds: 100));
     
     expect(find.text('Categories'), findsOneWidget);
@@ -41,7 +44,10 @@ void main() {
   });
 
   testWidgets('toggle archived filter', (tester) async {
-    await tester.pumpWidget(buildTestApp());
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(buildTestApp(container));
     await tester.pumpAndSettle();
 
     expect(find.text('Archived'), findsOneWidget);
@@ -53,7 +59,10 @@ void main() {
   });
 
   testWidgets('open add category dialog', (tester) async {
-    await tester.pumpWidget(buildTestApp());
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(buildTestApp(container));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byType(FloatingActionButton));
@@ -65,7 +74,10 @@ void main() {
   });
 
   testWidgets('create new category', (tester) async {
-    await tester.pumpWidget(buildTestApp());
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(buildTestApp(container));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byType(FloatingActionButton));
@@ -84,7 +96,10 @@ void main() {
   });
 
   testWidgets('archive category', (tester) async {
-    await tester.pumpWidget(buildTestApp());
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(buildTestApp(container));
     await tester.pumpAndSettle();
 
     final archiveButton = find.byIcon(Icons.archive).first;
@@ -96,7 +111,10 @@ void main() {
   });
 
   testWidgets('expand category shows subcategories', (tester) async {
-    await tester.pumpWidget(buildTestApp());
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(buildTestApp(container));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Food & Groceries'));
@@ -104,5 +122,78 @@ void main() {
 
     expect(find.text('Supermarket'), findsOneWidget);
     expect(find.text('Eating Out'), findsOneWidget);
+  });
+
+  testWidgets('editing a subcategory preserves parentId', (tester) async {
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(buildTestApp(container));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Food & Groceries'));
+    await tester.pumpAndSettle();
+
+    final subTile = find.ancestor(
+      of: find.text('Supermarket'),
+      matching: find.byType(ListTile),
+    );
+    final editBtn = find.descendant(of: subTile, matching: find.byIcon(Icons.edit));
+    await tester.ensureVisible(editBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(editBtn);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Supermarket Updated');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final cats = await db.select(db.categories).get();
+    final food = cats.firstWhere((c) => c.name == 'Food & Groceries');
+    final edited = cats.firstWhere((c) => c.name == 'Supermarket Updated');
+    expect(edited.parentId, food.id);
+  });
+
+  testWidgets('drag handles have sequential indices matching item position', (tester) async {
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(buildTestApp(container));
+    await tester.pumpAndSettle();
+
+    final handles = tester
+        .widgetList<ReorderableDragStartListener>(
+          find.byType(ReorderableDragStartListener),
+        )
+        .toList();
+    expect(handles.length, greaterThan(1));
+    for (var i = 0; i < handles.length; i++) {
+      expect(handles[i].index, i);
+    }
+  });
+
+  testWidgets('switching type tab filters categories and defaults new category type', (tester) async {
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(buildTestApp(container));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Income'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Salary'), findsOneWidget);
+    expect(find.text('Food & Groceries'), findsNothing);
+
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Freelance Gig');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final cats = await db.select(db.categories).get();
+    final created = cats.firstWhere((c) => c.name == 'Freelance Gig');
+    expect(created.transactionType, 'income');
   });
 }

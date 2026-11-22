@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
+import '../../../shared/utils/cashflow_calculator.dart';
 import '../../../main.dart';
 import '../repositories/transaction_repository.dart';
 import '../models/transaction_model.dart';
@@ -31,18 +32,10 @@ final monthSummaryProvider = StreamProvider<MonthSummary>((ref) {
   final repo = ref.watch(transactionRepositoryProvider);
   final now = DateTime.now();
   return repo.watchMonthSummary(year: now.year, month: now.month).map((rows) {
-    double expenses = 0;
-    double income = 0;
-    for (final t in rows) {
-      if (t.type == 'income') {
-        income += t.amount;
-      } else {
-        expenses += t.amount;
-      }
-    }
+    final summary = CashflowCalculator.summarize(rows);
     return MonthSummary(
-      totalExpenses: expenses,
-      totalIncome: income,
+      totalExpenses: summary.expenses,
+      totalIncome: summary.income,
       month: DateFormat('MMMM yyyy').format(now),
     );
   });

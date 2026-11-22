@@ -83,18 +83,40 @@ class SettingsScreen extends ConsumerWidget {
                 SwitchListTile(
                   value: bioEnabled,
                   onChanged: (v) async {
+                    final auth = ref.read(authServiceProvider);
                     if (v) {
-                      final available = await biometricAvailable();
-                      if (!available && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content:
-                                  Text('Biometrics not available on this device')),
-                        );
+                      final available = await auth.biometricAvailable();
+                      if (!available) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Screen lock or biometrics not available on this device'),
+                            ),
+                          );
+                        }
                         return;
                       }
+                      final ok = await auth.authenticate();
+                      if (!ok) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Authentication required to enable lock'),
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                      await ref.read(biometricEnabledProvider.notifier).set(true);
+                    } else {
+                      await ref
+                          .read(biometricEnabledProvider.notifier)
+                          .set(false);
+                      ref.read(appLockedProvider.notifier).unlock();
+                      await auth.setSecureFlag(false);
                     }
-                    ref.read(biometricEnabledProvider.notifier).set(v);
                   },
                   title: const Text('Biometric lock'),
                   subtitle: const Text('Fingerprint or face to open app'),

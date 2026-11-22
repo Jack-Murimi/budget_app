@@ -10,3 +10,11 @@ final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
 final categoriesStreamProvider = StreamProvider<List<Category>>((ref) {
   return ref.watch(categoryRepositoryProvider).watchAll();
 });
+
+final categoriesByFilterProvider = StreamProvider.family<
+    List<Category>, ({bool includeArchived, String? transactionType})>(
+  (ref, filter) => ref.watch(categoryRepositoryProvider).watchAll(
+        includeArchived: filter.includeArchived,
+        transactionType: filter.transactionType,
+      ),
+);

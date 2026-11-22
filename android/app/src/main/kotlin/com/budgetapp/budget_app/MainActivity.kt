@@ -6,12 +6,12 @@ import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
 import android.view.WindowManager
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val securityChannel = "budget_app/security"
     private val deepLinkChannel = "budget_app/deep_link"
     private val widgetChannel = "budget_app/widget"

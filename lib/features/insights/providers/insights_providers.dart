@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/database/converters/cents_converter.dart';
+import '../../../shared/utils/cashflow_calculator.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../../transactions/models/transaction_model.dart';
 import '../../transactions/providers/transaction_providers.dart';
@@ -85,11 +87,12 @@ final insightsSummaryProvider = Provider<AsyncValue<InsightsSummary>>((ref) {
 final netWorthTrendProvider =
     Provider<AsyncValue<Map<DateTime, double>>>((ref) {
   final range = ref.watch(insightsRangeProvider);
-  final accounts = ref.watch(accountsWithBalanceProvider);
+  final accounts = ref.watch(allAccountsWithBalanceProvider);
   final transactions = ref.watch(allTransactionsProvider);
   return accounts.whenData((items) {
-    final openingBalance =
-        items.fold<double>(0, (sum, item) => sum + item.account.initialBalance);
+    final openingCents = items.fold<int>(
+        0, (sum, item) => sum + CentsConverter.toCents(item.account.initialBalance));
+    final openingBalance = CentsConverter.fromCents(openingCents);
     return transactions
             .whenData(
               (rows) => buildNetWorthTrend(rows, range, openingBalance),
@@ -104,66 +107,85 @@ Map<DateTime, double> buildNetWorthTrend(
   DateRange range,
   double openingBalance,
 ) {
-  var balance = openingBalance;
-  final dailyChanges = <DateTime, double>{};
+  var balanceCents = CentsConverter.toCents(openingBalance);
+  final dailyChangesCents = <DateTime, int>{};
   for (final item in items) {
     if (item.accountId == null) continue;
-    final change = switch (item.type) {
-      'income' => item.amount,
-      'expense' => -item.amount - item.transactionCost - item.fulizaFee,
-      'transfer' => -item.transactionCost,
-      _ => 0.0,
+    final changeCents = switch (item.type) {
+      'income' => CentsConverter.toCents(item.amount),
+      'expense' => -CashflowCalculator.expenseTotalCents(item),
+      'transfer' => -CentsConverter.toCents(item.transactionCost),
+      _ => 0,
     };
     if (item.transactionDate.isBefore(range.start)) {
-      balance += change;
+      balanceCents += changeCents;
     } else if (range.contains(item.transactionDate)) {
       final day = DateTime(item.transactionDate.year,
           item.transactionDate.month, item.transactionDate.day);
-      dailyChanges[day] = (dailyChanges[day] ?? 0) + change;
+      dailyChangesCents[day] = (dailyChangesCents[day] ?? 0) + changeCents;
     }
   }
   final trend = <DateTime, double>{};
   for (var day = range.start;
       day.isBefore(range.end);
-      day = day.add(const Duration(days: 1))) {
-    balance += dailyChanges[day] ?? 0;
-    trend[day] = balance;
+      day = DateTime(day.year, day.month, day.day + 1)) {
+    balanceCents += dailyChangesCents[day] ?? 0;
+    trend[day] = CentsConverter.fromCents(balanceCents);
   }
   return trend;
 }
 
+DateTime _previousPeriodStart(DateRange range) {
+  final start = range.start;
+  final end = range.end;
+  if (start.day == 1 && end == DateTime(start.year, start.month + 1, 1)) {
+    return DateTime(start.year, start.month - 1, 1);
+  }
+  if (start.month == 1 &&
+      start.day == 1 &&
+      end == DateTime(start.year + 1, 1, 1)) {
+    return DateTime(start.year - 1, 1, 1);
+  }
+  return start.subtract(end.difference(start));
+}
+
 InsightsSummary buildInsightsSummary(
     List<TransactionModel> items, DateRange range) {
-  var income = 0.0;
-  var expenses = 0.0;
-  var previousExpenses = 0.0;
-  final daily = <DateTime, List<double>>{};
-  final previousStart = range.start.subtract(range.end.difference(range.start));
+  var incomeCents = 0;
+  var expensesCents = 0;
+  var previousExpensesCents = 0;
+  final dailyCents = <DateTime, List<int>>{};
+  final previousStart = _previousPeriodStart(range);
   for (final item in items) {
     if (range.contains(item.transactionDate)) {
       final day = DateTime(item.transactionDate.year,
           item.transactionDate.month, item.transactionDate.day);
-      final totals = daily.putIfAbsent(day, () => [0, 0]);
+      final totals = dailyCents.putIfAbsent(day, () => [0, 0]);
       if (item.type == 'income') {
-        income += item.amount;
-        totals[0] += item.amount;
+        final amountCents = CentsConverter.toCents(item.amount);
+        incomeCents += amountCents;
+        totals[0] += amountCents;
       } else if (item.type == 'expense') {
-        expenses += item.amount;
-        totals[1] += item.amount;
+        final expenseCents = CashflowCalculator.expenseTotalCents(item);
+        expensesCents += expenseCents;
+        totals[1] += expenseCents;
       }
     } else if (!item.transactionDate.isBefore(previousStart) &&
         item.transactionDate.isBefore(range.start) &&
         item.type == 'expense') {
-      previousExpenses += item.amount;
+      previousExpensesCents += CashflowCalculator.expenseTotalCents(item);
     }
   }
   return InsightsSummary(
-    income: income,
-    expenses: expenses,
-    previousExpenses: previousExpenses,
+    income: CentsConverter.fromCents(incomeCents),
+    expenses: CentsConverter.fromCents(expensesCents),
+    previousExpenses: CentsConverter.fromCents(previousExpensesCents),
     byDay: {
-      for (final entry in daily.entries)
-        entry.key: Cashflow(entry.value[0], entry.value[1])
+      for (final entry in dailyCents.entries)
+        entry.key: Cashflow(
+          CentsConverter.fromCents(entry.value[0]),
+          CentsConverter.fromCents(entry.value[1]),
+        )
     },
   );
 }

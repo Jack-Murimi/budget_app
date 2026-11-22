@@ -9,17 +9,49 @@ const _kAutoLock = 'auto_lock_seconds'; // 0=immediate, 60=1min, 300=5min
 final _localAuth = LocalAuthentication();
 const _secureChannel = MethodChannel('budget_app/security');
 
-/// Toggle FLAG_SECURE so the app content is hidden in the app switcher.
-Future<void> setSecureFlag(bool enable) async {
-  try {
-    await _secureChannel
-        .invokeMethod('setSecureFlag', {'enable': enable});
-  } on MissingPluginException {
-    // Not on Android — ignore
-  } on PlatformException {
-    // ignore
+class AuthService {
+  const AuthService();
+
+  /// Toggle FLAG_SECURE so the app content is hidden in the app switcher.
+  Future<void> setSecureFlag(bool enable) async {
+    try {
+      await _secureChannel.invokeMethod('setSecureFlag', {'enable': enable});
+    } on MissingPluginException {
+      // Not on Android — ignore
+    } on PlatformException {
+      // ignore
+    }
+  }
+
+  Future<bool> biometricAvailable() async {
+    try {
+      return await _localAuth.isDeviceSupported();
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  Future<bool> authenticate() async {
+    try {
+      return await _localAuth.authenticate(
+        localizedReason: 'Authenticate to open Budget KE',
+        persistAcrossBackgrounding: true,
+      );
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
   }
 }
+
+final authServiceProvider = Provider<AuthService>((_) => const AuthService());
+
+/// Toggle FLAG_SECURE so the app content is hidden in the app switcher.
+Future<void> setSecureFlag(bool enable) =>
+    const AuthService().setSecureFlag(enable);
 
 // ── Biometric enabled toggle ──────────────────────────────────────────────────
 class BiometricEnabledNotifier extends Notifier<bool> {
@@ -56,25 +88,19 @@ final autoLockSecondsProvider =
     NotifierProvider<AutoLockNotifier, int>(AutoLockNotifier.new);
 
 // ── App lock state ────────────────────────────────────────────────────────────
-final appLockedProvider = StateProvider<bool>((ref) => false);
+class AppLockNotifier extends Notifier<bool> {
+  @override
+  bool build() => ref.read(biometricEnabledProvider);
 
-// ── Auth service ──────────────────────────────────────────────────────────────
-Future<bool> biometricAvailable() async {
-  try {
-    return await _localAuth.isDeviceSupported() &&
-        await _localAuth.canCheckBiometrics;
-  } on PlatformException {
-    return false;
-  }
+  void lock() => state = true;
+
+  void unlock() => state = false;
 }
 
-Future<bool> authenticate() async {
-  try {
-    return await _localAuth.authenticate(
-      localizedReason: 'Authenticate to open Budget KE',
-      persistAcrossBackgrounding: true,
-    );
-  } on PlatformException {
-    return false;
-  }
-}
+final appLockedProvider =
+    NotifierProvider<AppLockNotifier, bool>(AppLockNotifier.new);
+
+// ── Auth service helpers ──────────────────────────────────────────────────────
+Future<bool> biometricAvailable() => const AuthService().biometricAvailable();
+
+Future<bool> authenticate() => const AuthService().authenticate();

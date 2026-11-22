@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../shared/utils/cashflow_calculator.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../../categories/providers/category_providers.dart';
@@ -265,15 +266,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                   );
                 }
 
-                double income = 0, expense = 0;
-                for (final t in txns) {
-                  if (t.type == 'income') {
-                    income += t.amount;
-                  } else {
-                    expense += t.amount + t.transactionCost + t.fulizaFee;
-                  }
-                }
-                final net = income - expense;
+                final summary = CashflowCalculator.summarize(txns);
+                final income = summary.income;
+                final expense = summary.expenses;
+                final net = summary.net;
 
                 final Map<String, List<TransactionModel>> grouped = {};
                 for (final t in txns) {
@@ -312,15 +308,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         builder: (context) {
                           // Calculate net daily delta: Income - (Expenses + Fees)
                           // Transfers are intra-account shifts, so they are excluded from net cashflow.
-                          double net = 0.0;
-                          for (final t in entry.value) {
-                            if (t.type == 'income') {
-                              net += t.amount;
-                            } else if (t.type == 'expense') {
-                              final totalCost = t.amount + t.transactionCost + t.fulizaFee;
-                              net -= totalCost;
-                            }
-                          }
+                          final net = CashflowCalculator.summarize(entry.value).net;
 
                           final isPositive = net > 0;
                           final isNegative = net < 0;

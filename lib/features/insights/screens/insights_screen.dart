@@ -2,8 +2,11 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../core/database/converters/cents_converter.dart';
+import '../../../shared/utils/cashflow_calculator.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../categories/providers/category_providers.dart';
+import '../../transactions/models/transaction_model.dart';
 import '../../transactions/providers/transaction_providers.dart';
 import '../providers/insights_providers.dart';
 
@@ -11,17 +14,23 @@ class InsightsScreen extends ConsumerWidget {
   const InsightsScreen({super.key});
 
   Future<void> _pickRange(BuildContext context, WidgetRef ref) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final range = ref.read(insightsRangeProvider);
+    final rawEnd = range.end.subtract(const Duration(days: 1));
+    final safeEnd = rawEnd.isAfter(today) ? today : rawEnd;
+    final safeStart = range.start.isAfter(safeEnd) ? safeEnd : range.start;
     final picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(
-          start: range.start, end: range.end.subtract(const Duration(days: 1))),
+      lastDate: today,
+      initialDateRange: DateTimeRange(start: safeStart, end: safeEnd),
     );
     if (picked == null) return;
-    ref.read(insightsCustomRangeProvider.notifier).state =
-        DateRange(picked.start, picked.end.add(const Duration(days: 1)));
+    ref.read(insightsCustomRangeProvider.notifier).state = DateRange(
+      picked.start,
+      DateTime(picked.end.year, picked.end.month, picked.end.day + 1),
+    );
     ref.read(insightsPeriodProvider.notifier).state = InsightsPeriod.custom;
   }
 
@@ -136,7 +145,7 @@ class _SummaryCard extends StatelessWidget {
                 Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: Text(
-                      '${delta >= 0 ? 'Up' : 'Down'} ${delta.abs().toStringAsFixed(0)}% from previous period',
+                      '${delta >= 0 ? 'Up' : 'Down'} ${(delta.abs() * 100).toStringAsFixed(0)}% from previous period',
                       style: theme.textTheme.bodySmall,
                     )),
             ])));
@@ -224,20 +233,23 @@ class _CashflowChart extends StatelessWidget {
 }
 
 class _CategoryChart extends StatelessWidget {
-  final List<dynamic> items;
+  final List<TransactionModel> items;
   final Map<int, String> categoryNames;
   const _CategoryChart({required this.items, required this.categoryNames});
   @override
   Widget build(BuildContext context) {
-    final grouped = <String, double>{};
+    final groupedCents = <String, int>{};
     for (final item in items.where((item) => item.type == 'expense')) {
       final name = item.categoryId == null
           ? 'Uncategorized'
           : (categoryNames[item.categoryId] ?? 'Uncategorized');
-      grouped[name] = (grouped[name] ?? 0) + item.amount;
+      groupedCents[name] =
+          (groupedCents[name] ?? 0) + CashflowCalculator.expenseTotalCents(item);
     }
-    final entries = grouped.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    final entries = [
+      for (final e in groupedCents.entries)
+        MapEntry(e.key, CentsConverter.fromCents(e.value))
+    ]..sort((a, b) => b.value.compareTo(a.value));
     if (entries.isEmpty) {
       return const _EmptyCard(message: 'No expenses in this period');
     }

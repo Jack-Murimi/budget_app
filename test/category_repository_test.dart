@@ -74,20 +74,30 @@ void main() {
     expect(all.any((c) => c.name == 'Test Category'), true);
   });
 
-  test('updateCategory modifies existing category', () async {
+  test('updateCategory modifies existing category without wiping metadata', () async {
     final topLevel = await repo.getTopLevel();
     final cat = topLevel.first;
-    
+    final sub = (await repo.getChildren(cat.id)).first;
+    await repo.reorderCategories([sub.id]);
+
+    final beforeUpdate = (await repo.getCategoryById(sub.id))!;
+
     await repo.updateCategory(
       CategoriesCompanion(
-        id: Value(cat.id),
-        name: const Value('Updated Name'),
+        id: Value(sub.id),
+        name: const Value('Updated Subcategory'),
+        parentId: Value(sub.parentId),
       ),
     );
-    
-    final all = await repo.getAll();
-    final updated = all.firstWhere((c) => c.id == cat.id);
-    expect(updated.name, 'Updated Name');
+
+    final updated = (await repo.getCategoryById(sub.id))!;
+    expect(updated.name, 'Updated Subcategory');
+    expect(updated.parentId, cat.id);
+    expect(updated.isDefault, beforeUpdate.isDefault);
+    expect(updated.sortOrder, beforeUpdate.sortOrder);
+    expect(updated.isArchived, beforeUpdate.isArchived);
+    expect(updated.transactionType, beforeUpdate.transactionType);
+    expect(updated.createdAt, beforeUpdate.createdAt);
   });
 
   test('archiveCategory hides category by default', () async {
