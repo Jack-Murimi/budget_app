@@ -342,6 +342,133 @@ class DebtRepository {
     ));
   }
 
+  Future<void> updateDebt({
+    required int id,
+    required String counterparty,
+    required String product,
+    required double principal,
+    required double interest,
+    double disbursementShortfall = 0.0,
+    DateTime? dueDate,
+    bool clearDueDate = false,
+    String notes = '',
+  }) async {
+    final principalCents = CentsConverter.toCents(principal);
+    final interestCents = CentsConverter.toCents(interest);
+    final shortfallCents = CentsConverter.toCents(disbursementShortfall);
+    if (principalCents <= 0 ||
+        interestCents < 0 ||
+        shortfallCents < 0 ||
+        counterparty.trim().isEmpty) {
+      throw ArgumentError('Invalid debt details');
+    }
+
+    await _db.transaction(() async {
+      final existing = await (_db.select(_db.debts)
+            ..where((d) => d.id.equals(id)))
+          .getSingle();
+      final repayments = await (_db.select(_db.debtRepayments)
+            ..where((r) => r.debtId.equals(id)))
+          .get();
+      final repaidCents = repayments.fold<int>(
+        0,
+        (sum, r) => sum + CentsConverter.toCents(r.amount),
+      );
+      final totalCents = principalCents + interestCents;
+      final newOutstandingCents = math.max(0, totalCents - repaidCents);
+
+      await (_db.update(_db.debts)..where((d) => d.id.equals(id))).write(
+        DebtsCompanion(
+          counterparty: Value(counterparty.trim()),
+          product: Value(product),
+          principal: Value(CentsConverter.fromCents(principalCents)),
+          interest: Value(CentsConverter.fromCents(interestCents)),
+          disbursementShortfall:
+              Value(CentsConverter.fromCents(shortfallCents)),
+          outstanding: Value(CentsConverter.fromCents(newOutstandingCents)),
+          dueDate: clearDueDate
+              ? const Value(null)
+              : (dueDate != null ? Value(dueDate) : Value(existing.dueDate)),
+          notes: Value(notes.trim()),
+        ),
+      );
+    });
+  }
+
+  Future<void> deleteDebt(
+    int id, {
+    bool deleteLinkedTransactions = false,
+  }) async {
+    await _db.transaction(() async {
+      final repayments = await (_db.select(_db.debtRepayments)
+            ..where((r) => r.debtId.equals(id)))
+          .get();
+      final repaymentTxnIds = repayments
+          .map((r) => r.transactionId)
+          .whereType<int>()
+          .toList();
+
+      await (_db.delete(_db.debtRepayments)
+            ..where((r) => r.debtId.equals(id)))
+          .go();
+
+      if (deleteLinkedTransactions) {
+        await (_db.delete(_db.transactions)
+              ..where((t) => t.debtId.equals(id)))
+            .go();
+        if (repaymentTxnIds.isNotEmpty) {
+          await (_db.delete(_db.transactions)
+                ..where((t) => t.id.isIn(repaymentTxnIds)))
+              .go();
+        }
+      } else {
+        await (_db.update(_db.transactions)
+              ..where((t) => t.debtId.equals(id)))
+            .write(const TransactionsCompanion(debtId: Value(null)));
+      }
+
+      await (_db.delete(_db.debts)..where((d) => d.id.equals(id))).go();
+    });
+  }
+
+  Future<void> deleteRepayment(
+    int repaymentId, {
+    bool deleteLinkedTransaction = false,
+  }) async {
+    await _db.transaction(() async {
+      final repayment = await (_db.select(_db.debtRepayments)
+            ..where((r) => r.id.equals(repaymentId)))
+          .getSingleOrNull();
+      if (repayment == null) return;
+
+      final debt = await (_db.select(_db.debts)
+            ..where((d) => d.id.equals(repayment.debtId)))
+          .getSingleOrNull();
+
+      await (_db.delete(_db.debtRepayments)
+            ..where((r) => r.id.equals(repaymentId)))
+          .go();
+
+      if (deleteLinkedTransaction && repayment.transactionId != null) {
+        await (_db.delete(_db.transactions)
+              ..where((t) => t.id.equals(repayment.transactionId!)))
+            .go();
+      }
+
+      if (debt != null) {
+        final restoredOutstandingCents =
+            CentsConverter.toCents(debt.outstanding) +
+                CentsConverter.toCents(repayment.amount);
+        await (_db.update(_db.debts)..where((d) => d.id.equals(debt.id))).write(
+          DebtsCompanion(
+            outstanding:
+                Value(CentsConverter.fromCents(restoredOutstandingCents)),
+          ),
+        );
+      }
+    });
+  }
+
   Stream<List<DebtWithRepayments>> watchBridgeDebts({
     DateTime? from,
     DateTime? to,

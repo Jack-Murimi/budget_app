@@ -168,7 +168,12 @@ class _OutstandingCard extends StatelessWidget {
     final theme = Theme.of(context);
     final outstanding = latest?.outstandingTotal ?? 0;
     final dueDate = latest?.dueDate;
-    final overdue = dueDate != null && dueDate.isBefore(DateTime.now());
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = dueDate == null
+        ? null
+        : DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final overdue = dueDay != null && dueDay.isBefore(today);
 
     final cardColor = outstanding > 0
         ? (overdue

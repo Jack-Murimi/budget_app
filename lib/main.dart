@@ -8,6 +8,7 @@ import 'core/database/app_database.dart';
 import 'core/services/deep_link_service.dart';
 import 'features/add_transaction/screens/add_transaction_screen.dart';
 import 'features/home/screens/main_navigation_screen.dart';
+import 'features/recurring/providers/recurring_providers.dart';
 import 'features/settings/auth_gate.dart';
 import 'features/settings/auth_service.dart';
 import 'features/sms/screens/sms_inbox_screen.dart';
@@ -64,6 +65,12 @@ class _BudgetAppState extends ConsumerState<BudgetApp> {
       onScanSms: () => _handleDeepLink('budgetke://scan_sms'),
       onLink: _handleDeepLink,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        ref.read(recurringRepositoryProvider).processAutoRecordDue().catchError((_) => 0),
+      );
+    });
   }
 
   @override

@@ -1,6 +1,6 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:drift/drift.dart' show Value;
 import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
 import '../../../shared/utils/currency_formatter.dart';
@@ -9,45 +9,10 @@ import '../../transactions/models/transaction_model.dart';
 import '../models/account_model.dart';
 import '../providers/account_providers.dart';
 
-class AccountDetailScreen extends ConsumerStatefulWidget {
+class AccountDetailScreen extends ConsumerWidget {
   final AccountWithBalance account;
 
   const AccountDetailScreen({super.key, required this.account});
-
-  @override
-  ConsumerState<AccountDetailScreen> createState() => _AccountDetailScreenState();
-}
-
-class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
-  late AccountWithBalance _account;
-
-  @override
-  void initState() {
-    super.initState();
-    _account = widget.account;
-  }
-
-  String _formatDate(DateTime dt) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final txDate = DateTime(dt.year, dt.month, dt.day);
-    if (txDate == today) return 'Today';
-    if (txDate == today.subtract(const Duration(days: 1))) return 'Yesterday';
-    return DateFormat('EEE, d MMM yyyy').format(dt);
-  }
-
-  Widget _buildLeadingIcon(ThemeData theme, String type) {
-    final (IconData icon, Color bg, Color fg) = switch (type) {
-      'income' => (Icons.arrow_downward_rounded, theme.colorScheme.primaryContainer, theme.colorScheme.primary),
-      'transfer' => (Icons.swap_horiz_rounded, theme.colorScheme.tertiaryContainer, theme.colorScheme.tertiary),
-      _ => (Icons.arrow_upward_rounded, theme.colorScheme.errorContainer, theme.colorScheme.error),
-    };
-    return Container(
-      width: 40, height: 40,
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-      child: Icon(icon, color: fg, size: 20),
-    );
-  }
 
   static const _colorOptions = {
     '#1B5E20': 'Dark Green',
@@ -61,111 +26,92 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
     '#607D8B': 'Grey',
   };
 
-  Future<void> _showEditDialog() async {
-    final nameCtrl = TextEditingController(text: _account.name);
-    const validTypes = ['mpesa', 'cash', 'bank', 'airtel', 'other'];
-    String selectedType = validTypes.contains(_account.type.toLowerCase())
-        ? _account.type.toLowerCase()
-        : 'other';
-    // fall back to first option if stored hex not in list
-    String selectedColor = _colorOptions.containsKey(_account.colorHex)
-        ? _account.colorHex
-        : _colorOptions.keys.first;
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: const Text('Edit Account'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
-                  value: selectedType,
-                  items: const ['mpesa', 'cash', 'bank', 'airtel', 'other']
-                      .map((t) => DropdownMenuItem(value: t, child: Text(t.toUpperCase())))
-                      .toList(),
-                  onChanged: (v) { if (v != null) setS(() => selectedType = v); },
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: 'Color', border: OutlineInputBorder()),
-                  value: selectedColor,
-                  items: _colorOptions.entries.map((e) => DropdownMenuItem(
-                    value: e.key,
-                    child: Row(children: [
-                      Container(width: 16, height: 16, margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(color: Color(int.parse(e.key.replaceFirst('#', '0xFF'))), shape: BoxShape.circle)),
-                      Text(e.value),
-                    ]),
-                  )).toList(),
-                  onChanged: (v) { if (v != null) setS(() => selectedColor = v); },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () async {
-                if (nameCtrl.text.trim().isEmpty) return;
-                await ref.read(accountRepositoryProvider).updateAccount(
-                  AccountsCompanion(
-                    id: Value(_account.id),
-                    name: Value(nameCtrl.text.trim()),
-                    type: Value(selectedType),
-                    colorHex: Value(selectedColor),
-                  ),
-                );
-                if (!ctx.mounted) return;
-                Navigator.pop(ctx, true);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (result == true) {
-      // Refresh account data from provider
-      final updated = await ref.read(accountRepositoryProvider).getAll(includeArchived: true);
-      final match = updated.where((a) => a.id == _account.id).firstOrNull;
-      if (match != null && mounted) {
-        setState(() => _account = AccountWithBalance(account: match, balance: _account.balance));
-      }
-    }
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final txDate = DateTime(dt.year, dt.month, dt.day);
+    if (txDate == today) return 'Today';
+    if (txDate == today.subtract(const Duration(days: 1))) return 'Yesterday';
+    return DateFormat('EEE, d MMM yyyy').format(dt);
   }
 
-  Future<void> _confirmDelete() async {
+  Widget _buildLeadingIcon(ThemeData theme, String type) {
+    final (IconData icon, Color bg, Color fg) = switch (type) {
+      'income' => (
+          Icons.arrow_downward_rounded,
+          theme.colorScheme.primaryContainer,
+          theme.colorScheme.primary
+        ),
+      'transfer' => (
+          Icons.swap_horiz_rounded,
+          theme.colorScheme.tertiaryContainer,
+          theme.colorScheme.tertiary
+        ),
+      _ => (
+          Icons.arrow_upward_rounded,
+          theme.colorScheme.errorContainer,
+          theme.colorScheme.error
+        ),
+    };
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, color: fg, size: 20),
+    );
+  }
+
+  Future<void> _showEditDialog(
+    BuildContext context,
+    AccountWithBalance currentAccount,
+  ) async {
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => _EditAccountDialog(
+        account: currentAccount,
+        colorOptions: _colorOptions,
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    AccountWithBalance currentAccount,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Account'),
-        content: Text('Delete "${_account.name}"? All linked transactions will lose their account reference.'),
+        content: Text(
+          'Delete "${currentAccount.name}"? All linked transactions will lose their account reference.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),
         ],
       ),
     );
-    if (confirmed == true) {
+    if (confirmed == true && context.mounted) {
       try {
-        await ref.read(accountRepositoryProvider).deleteAccount(_account.id);
-        if (!mounted) return;
+        await ref.read(accountRepositoryProvider).deleteAccount(currentAccount.id);
+        if (!context.mounted) return;
         Navigator.of(context).pop();
       } on StateError catch (e) {
-        if (!mounted) return;
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message)),
         );
@@ -173,80 +119,118 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
     }
   }
 
-  Future<void> _adjustBalance(double currentBalance) async {
-    final ctrl = TextEditingController(text: currentBalance.toStringAsFixed(2));
-    await showDialog<void>(
+  Future<void> _adjustBalance(
+    BuildContext context,
+    AccountWithBalance currentAccount,
+    double currentBalance,
+  ) async {
+    await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Adjust Balance'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: 'New Balance', border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () async {
-              final newBal = double.tryParse(ctrl.text.replaceAll(',', ''));
-              if (newBal != null) {
-                await ref.read(accountRepositoryProvider).correctBalance(
-                  accountId: _account.id,
-                  currentBalance: currentBalance,
-                  targetBalance: newBal,
-                );
-                if (!ctx.mounted) return;
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Update'),
-          ),
-        ],
+      builder: (_) => _AdjustBalanceDialog(
+        accountId: currentAccount.id,
+        currentBalance: currentBalance,
       ),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final txnsAsync = ref.watch(accountTransactionsProvider(_account.id));
-    final accountColor = Color(int.parse(_account.colorHex.replaceFirst('#', '0xFF')));
+    final allAccounts =
+        ref.watch(allAccountsWithBalanceProvider).asData?.value ?? const [];
+    final currentAccount =
+        allAccounts.where((a) => a.id == account.id).firstOrNull ?? account;
+    final txnsAsync = ref.watch(accountTransactionsProvider(currentAccount.id));
+    final accountColor =
+        Color(int.parse(currentAccount.colorHex.replaceFirst('#', '0xFF')));
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_account.name),
+        title: Text(currentAccount.name),
         actions: [
           PopupMenuButton<String>(
             onSelected: (v) async {
               switch (v) {
-                case 'edit': await _showEditDialog();
+                case 'edit':
+                  await _showEditDialog(context, currentAccount);
                 case 'default':
-                  await ref.read(accountRepositoryProvider).setDefault(_account.id);
-                  if (!mounted) return;
+                  await ref
+                      .read(accountRepositoryProvider)
+                      .setDefault(currentAccount.id);
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${_account.name} set as default')),
+                    SnackBar(
+                      content: Text('${currentAccount.name} set as default'),
+                    ),
                   );
                 case 'archive':
-                  await ref.read(accountRepositoryProvider).archiveAccount(_account.id, archive: !_account.isArchived);
-                  if (!mounted) return;
-                  Navigator.pop(context);
-                case 'delete': await _confirmDelete();
+                  final nextArchived = !currentAccount.isArchived;
+                  await ref
+                      .read(accountRepositoryProvider)
+                      .archiveAccount(currentAccount.id, archive: nextArchived);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        nextArchived
+                            ? '${currentAccount.name} archived'
+                            : '${currentAccount.name} unarchived',
+                      ),
+                    ),
+                  );
+                  if (nextArchived) {
+                    Navigator.pop(context);
+                  }
+                case 'delete':
+                  await _confirmDelete(context, ref, currentAccount);
               }
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Edit'), dense: true)),
-              if (!_account.isDefault)
-                const PopupMenuItem(value: 'default', child: ListTile(leading: Icon(Icons.star_outline), title: Text('Set as Default'), dense: true)),
-              PopupMenuItem(value: 'archive', child: ListTile(
-                leading: Icon(_account.isArchived ? Icons.unarchive_outlined : Icons.archive_outlined),
-                title: Text(_account.isArchived ? 'Unarchive' : 'Archive'),
-                dense: true,
-              )),
-              PopupMenuItem(value: 'delete', child: ListTile(
-                leading: Icon(Icons.delete_outline, color: theme.colorScheme.error),
-                title: Text('Delete', style: TextStyle(color: theme.colorScheme.error)),
-                dense: true,
-              )),
+              const PopupMenuItem(
+                value: 'edit',
+                child: ListTile(
+                  leading: Icon(Icons.edit_outlined),
+                  title: Text('Edit'),
+                  dense: true,
+                ),
+              ),
+              if (!currentAccount.isDefault)
+                const PopupMenuItem(
+                  value: 'default',
+                  child: ListTile(
+                    leading: Icon(Icons.star_outline),
+                    title: Text('Set as Default'),
+                    dense: true,
+                  ),
+                ),
+              PopupMenuItem(
+                value: 'archive',
+                child: ListTile(
+                  leading: Icon(
+                    currentAccount.isArchived
+                        ? Icons.unarchive_outlined
+                        : Icons.archive_outlined,
+                  ),
+                  title: Text(
+                    currentAccount.isArchived ? 'Unarchive' : 'Archive',
+                  ),
+                  dense: true,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: ListTile(
+                  leading: Icon(
+                    Icons.delete_outline,
+                    color: theme.colorScheme.error,
+                  ),
+                  title: Text(
+                    'Delete',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+                  dense: true,
+                ),
+              ),
             ],
           ),
         ],
@@ -255,15 +239,9 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (rawTxns) {
-          // Compute balance from account data in provider (stays reactive)
-          final accountsAsync = ref.watch(accountsWithBalanceProvider);
-          final liveAccount = accountsAsync.asData?.value.where((a) => a.id == _account.id).firstOrNull;
-          final balance = liveAccount?.balance ?? _account.balance;
-
-          // Convert to TransactionModel for display
+          final balance = currentAccount.balance;
           final txns = rawTxns.map((t) => t.toModel()).toList();
 
-          // Group by date
           final Map<String, List<TransactionModel>> grouped = {};
           for (final t in txns) {
             grouped.putIfAbsent(_formatDate(t.transactionDate), () => []).add(t);
@@ -287,36 +265,83 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                       children: [
                         CircleAvatar(
                           backgroundColor: Colors.white24,
-                          child: Text(_account.name.isNotEmpty ? _account.name[0].toUpperCase() : '?',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          child: Text(
+                            currentAccount.name.isNotEmpty
+                                ? currentAccount.name[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(_account.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                            Text(_account.type.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                            Text(
+                              currentAccount.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                            Text(
+                              currentAccount.type.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                         const Spacer(),
-                        if (_account.isDefault)
+                        if (currentAccount.isDefault)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8)),
-                            child: const Text('Default', style: TextStyle(color: Colors.white, fontSize: 11)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Default',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                              ),
+                            ),
                           ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Text('Balance', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13)),
-                    Text(CurrencyFormatter.format(balance),
-                        style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Balance',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      CurrencyFormatter.format(balance),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton.icon(
-                        style: TextButton.styleFrom(foregroundColor: Colors.white),
-                        onPressed: () => _adjustBalance(balance),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () =>
+                            _adjustBalance(context, currentAccount, balance),
                         icon: const Icon(Icons.tune, size: 16),
                         label: const Text('Adjust Balance'),
                       ),
@@ -332,8 +357,11 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                   children: [
                     Text('Transactions', style: theme.textTheme.titleSmall),
                     const Spacer(),
-                    Text('${txns.length} total',
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
+                    Text(
+                      '${txns.length} total',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.outline),
+                    ),
                   ],
                 ),
               ),
@@ -343,9 +371,16 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                   padding: const EdgeInsets.all(48),
                   child: Column(
                     children: [
-                      Icon(Icons.receipt_long_outlined, size: 48, color: theme.colorScheme.outline),
+                      Icon(
+                        Icons.receipt_long_outlined,
+                        size: 48,
+                        color: theme.colorScheme.outline,
+                      ),
                       const SizedBox(height: 8),
-                      Text('No transactions yet', style: theme.textTheme.bodyMedium),
+                      Text(
+                        'No transactions yet',
+                        style: theme.textTheme.bodyMedium,
+                      ),
                     ],
                   ),
                 )
@@ -353,30 +388,54 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                 for (final entry in grouped.entries) ...[
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    child: Text(entry.key,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                            color: theme.colorScheme.outline, fontWeight: FontWeight.w600)),
+                    child: Text(
+                      entry.key,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.outline,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                   for (final txn in entry.value)
-                    ListTile(
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => AddTransactionScreen(transactionToEdit: txn))),
-                      leading: _buildLeadingIcon(theme, txn.type),
-                      title: Text(txn.header,
-                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-                      subtitle: Text(
-                        txn.description.isNotEmpty ? txn.description : (txn.mpesaRef ?? ''),
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: Text(
-                        '${txn.type == 'income' ? '+' : '-'}${CurrencyFormatter.format(txn.amount)}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: txn.type == 'income' ? theme.colorScheme.primary : theme.colorScheme.error,
-                        ),
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final isIncoming = txn.type == 'income' ||
+                            (txn.type == 'transfer' &&
+                                txn.toAccountId == currentAccount.id);
+                        return ListTile(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  AddTransactionScreen(transactionToEdit: txn),
+                            ),
+                          ),
+                          leading: _buildLeadingIcon(theme, txn.type),
+                          title: Text(
+                            txn.header,
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            txn.description.isNotEmpty
+                                ? txn.description
+                                : (txn.mpesaRef ?? ''),
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: theme.colorScheme.outline),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: Text(
+                            '${isIncoming ? '+' : '-'}${CurrencyFormatter.format(txn.amount)}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: isIncoming
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.error,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                 ],
             ],
@@ -384,5 +443,214 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
         },
       ),
     );
+  }
+}
+
+class _EditAccountDialog extends ConsumerStatefulWidget {
+  final AccountWithBalance account;
+  final Map<String, String> colorOptions;
+
+  const _EditAccountDialog({
+    required this.account,
+    required this.colorOptions,
+  });
+
+  @override
+  ConsumerState<_EditAccountDialog> createState() => _EditAccountDialogState();
+}
+
+class _EditAccountDialogState extends ConsumerState<_EditAccountDialog> {
+  static const _validTypes = ['mpesa', 'cash', 'bank', 'airtel', 'other'];
+
+  late final TextEditingController _nameCtrl =
+      TextEditingController(text: widget.account.name);
+  late String _selectedType =
+      _validTypes.contains(widget.account.type.toLowerCase())
+          ? widget.account.type.toLowerCase()
+          : 'other';
+  late String _selectedColor =
+      widget.colorOptions.containsKey(widget.account.colorHex)
+          ? widget.account.colorHex
+          : widget.colorOptions.keys.first;
+  bool _isSaving = false;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Account'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Type',
+                border: OutlineInputBorder(),
+              ),
+              initialValue: _selectedType,
+              items: _validTypes
+                  .map(
+                    (t) => DropdownMenuItem(
+                      value: t,
+                      child: Text(t.toUpperCase()),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _selectedType = v);
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Color',
+                border: OutlineInputBorder(),
+              ),
+              initialValue: _selectedColor,
+              items: widget.colorOptions.entries
+                  .map(
+                    (e) => DropdownMenuItem(
+                      value: e.key,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 16,
+                            height: 16,
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: Color(
+                                int.parse(e.key.replaceFirst('#', '0xFF')),
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          Text(e.value),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _selectedColor = v);
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isSaving ? null : _submit,
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submit() async {
+    if (_nameCtrl.text.trim().isEmpty) return;
+    setState(() => _isSaving = true);
+    await ref.read(accountRepositoryProvider).updateAccount(
+          AccountsCompanion(
+            id: Value(widget.account.id),
+            name: Value(_nameCtrl.text.trim()),
+            type: Value(_selectedType),
+            colorHex: Value(_selectedColor),
+          ),
+        );
+    if (mounted) Navigator.pop(context, true);
+  }
+}
+
+class _AdjustBalanceDialog extends ConsumerStatefulWidget {
+  final int accountId;
+  final double currentBalance;
+
+  const _AdjustBalanceDialog({
+    required this.accountId,
+    required this.currentBalance,
+  });
+
+  @override
+  ConsumerState<_AdjustBalanceDialog> createState() =>
+      _AdjustBalanceDialogState();
+}
+
+class _AdjustBalanceDialogState extends ConsumerState<_AdjustBalanceDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _ctrl = TextEditingController(
+    text: widget.currentBalance.toStringAsFixed(2),
+  );
+  bool _isSaving = false;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Adjust Balance'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _ctrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            labelText: 'New Balance',
+            border: OutlineInputBorder(),
+          ),
+          validator: (v) {
+            final parsed =
+                double.tryParse((v ?? '').replaceAll(',', '').trim());
+            if (parsed == null || !parsed.isFinite) {
+              return 'Enter a valid balance';
+            }
+            return null;
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isSaving ? null : _submit,
+          child: const Text('Update'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    final newBal = double.parse(_ctrl.text.replaceAll(',', '').trim());
+    setState(() => _isSaving = true);
+    await ref.read(accountRepositoryProvider).correctBalance(
+          accountId: widget.accountId,
+          currentBalance: widget.currentBalance,
+          targetBalance: newBal,
+        );
+    if (mounted) Navigator.pop(context, true);
   }
 }

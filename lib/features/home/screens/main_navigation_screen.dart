@@ -53,7 +53,9 @@ class MainNavigationScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: const HomeFloatingActionButtons(),
+      floatingActionButton: (clampedIndex == 0 || clampedIndex == 1)
+          ? const HomeFloatingActionButtons()
+          : null,
     );
   }
 }

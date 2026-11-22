@@ -224,6 +224,58 @@ class RecurringRepository {
     });
   }
 
+  /// Records transactions automatically for active recurring rules with `autoRecord`
+  /// enabled whose `nextDueDate` is on or before [asOf] (by calendar day).
+  /// Returns the number of occurrences recorded.
+  Future<int> processAutoRecordDue({DateTime? asOf}) async {
+    final now = asOf ?? DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final rows = await _db.customSelect(
+      '''
+      SELECT
+        r.*,
+        a.name AS account_name,
+        c.name AS category_name,
+        c.color_hex AS category_color,
+        c.icon AS category_icon
+      FROM recurring_transactions r
+      LEFT JOIN accounts a ON r.account_id = a.id
+      LEFT JOIN categories c ON r.category_id = c.id
+      WHERE r.is_active = 1 AND r.auto_record = 1
+      ''',
+      readsFrom: {_db.recurringTransactions, _db.accounts, _db.categories},
+    ).get();
+
+    var recordedCount = 0;
+    for (final row in rows) {
+      var rule = _mapRow(row);
+      var iterations = 0;
+      while (rule.isActive && iterations < 24) {
+        final dueDay = DateTime(
+          rule.nextDueDate.year,
+          rule.nextDueDate.month,
+          rule.nextDueDate.day,
+        );
+        if (dueDay.isAfter(today)) break;
+        if (rule.endDate != null && rule.nextDueDate.isAfter(rule.endDate!)) {
+          await toggleActive(rule.id, false);
+          break;
+        }
+        await markAsPaid(rule, paidDate: rule.nextDueDate);
+        recordedCount++;
+        final nextDate = RecurrenceEngine.nextDue(rule);
+        final shouldDeactivate =
+            rule.endDate != null && nextDate.isAfter(rule.endDate!);
+        rule = rule.copyWith(
+          nextDueDate: nextDate,
+          isActive: !shouldDeactivate,
+        );
+        iterations++;
+      }
+    }
+    return recordedCount;
+  }
+
   /// Skip current occurrence without recording a transaction.
   Future<void> skip(RecurringModel r) async {
     final nextDate = RecurrenceEngine.nextDue(r);

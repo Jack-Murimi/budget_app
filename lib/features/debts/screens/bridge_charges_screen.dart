@@ -310,28 +310,37 @@ class _LoanChargeRow extends StatelessWidget {
             .reduce((a, b) => a.paymentDate.isAfter(b.paymentDate) ? a : b)
         : null;
 
+    final statusBg = isSettled
+        ? theme.colorScheme.primaryContainer
+        : theme.colorScheme.tertiaryContainer;
+    final statusFg = isSettled
+        ? theme.colorScheme.onPrimaryContainer
+        : theme.colorScheme.onTertiaryContainer;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor:
-              isSettled ? Colors.green.shade50 : Colors.orange.shade50,
+          backgroundColor: statusBg,
           child: Icon(
             Icons.account_balance,
-            color: isSettled ? Colors.green.shade700 : Colors.orange.shade700,
+            color: statusFg,
           ),
         ),
         title: Row(
           children: [
-            Text(
-              'Borrowed ${CurrencyFormatter.format(debt.principal)}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            Flexible(
+              child: Text(
+                'Borrowed ${CurrencyFormatter.format(debt.principal)}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: isSettled ? Colors.green.shade100 : Colors.orange.shade100,
+                color: statusBg,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -339,9 +348,7 @@ class _LoanChargeRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: isSettled
-                      ? Colors.green.shade800
-                      : Colors.orange.shade800,
+                  color: statusFg,
                 ),
               ),
             ),
@@ -359,7 +366,8 @@ class _LoanChargeRow extends StatelessWidget {
               Text('Outstanding: ${CurrencyFormatter.format(debt.outstanding)}'),
             if (lastRepayment != null)
               Text(
-                  'Settled: ${DateFormat('dd MMM yyyy').format(lastRepayment.paymentDate)}'),
+                '${isSettled ? 'Settled' : 'Last payment'}: ${DateFormat('dd MMM yyyy').format(lastRepayment.paymentDate)}',
+              ),
           ],
         ),
         trailing: Column(

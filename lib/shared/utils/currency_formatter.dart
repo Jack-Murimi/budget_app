@@ -5,8 +5,10 @@ class CurrencyFormatter {
 
   static String format(double amount) => 'KES ${_fmt.format(amount)}';
   static String formatCompact(double amount) {
-    if (amount >= 1000000) return 'KES ${(amount / 1000000).toStringAsFixed(1)}M';
-    if (amount >= 1000) return 'KES ${(amount / 1000).toStringAsFixed(1)}K';
-    return format(amount);
+    final sign = amount < 0 ? '-' : '';
+    final abs = amount.abs();
+    if (abs >= 1000000) return '${sign}KES ${(abs / 1000000).toStringAsFixed(1)}M';
+    if (abs >= 1000) return '${sign}KES ${(abs / 1000).toStringAsFixed(1)}K';
+    return '${sign}KES ${_fmt.format(abs)}';
   }
 }

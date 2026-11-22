@@ -48,6 +48,65 @@ void main() {
       expect(RecurrenceEngine.frequencyLabel('daily', 5), 'Every 5 days');
       expect(RecurrenceEngine.frequencyLabel('monthly', 3), 'Every 3 months');
     });
+
+    test('nextDue anchors month-end day across short months and leap years', () {
+      final jan31 = DateTime(2026, 1, 31, 9, 0);
+      final rule = RecurringModel(
+        id: 1,
+        amount: 1000,
+        startDate: jan31,
+        nextDueDate: jan31,
+        frequency: 'monthly',
+        createdAt: jan31,
+        updatedAt: jan31,
+      );
+      final feb = RecurrenceEngine.nextDue(rule);
+      expect(feb, DateTime(2026, 2, 28, 9, 0));
+
+      final mar = RecurrenceEngine.nextDue(rule.copyWith(nextDueDate: feb));
+      expect(mar, DateTime(2026, 3, 31, 9, 0));
+
+      final feb29 = DateTime(2024, 2, 29, 9, 0);
+      final yearly = RecurringModel(
+        id: 2,
+        amount: 2000,
+        startDate: feb29,
+        nextDueDate: feb29,
+        frequency: 'yearly',
+        createdAt: feb29,
+        updatedAt: feb29,
+      );
+      final y2025 = RecurrenceEngine.nextDue(yearly);
+      expect(y2025, DateTime(2025, 2, 28, 9, 0));
+      final y2028 = RecurrenceEngine.nextDue(
+        yearly.copyWith(nextDueDate: DateTime(2027, 2, 28, 9, 0)),
+      );
+      expect(y2028, DateTime(2028, 2, 29, 9, 0));
+    });
+  });
+
+  group('RecurringModel', () {
+    test('copyWith clears nullable fields and isOverdueAt uses calendar days', () {
+      final dueToday = DateTime(2026, 11, 22, 0, 0);
+      final item = RecurringModel(
+        id: 1,
+        amount: 500,
+        startDate: dueToday,
+        nextDueDate: dueToday,
+        endDate: DateTime(2027, 1, 1),
+        categoryId: 3,
+        createdAt: dueToday,
+        updatedAt: dueToday,
+      );
+
+      final cleared = item.copyWith(clearEndDate: true, clearCategoryId: true);
+      expect(cleared.endDate, isNull);
+      expect(cleared.categoryId, isNull);
+
+      expect(item.isOverdueAt(DateTime(2026, 11, 22, 18, 0)), isFalse);
+      expect(item.isDueSoonAt(DateTime(2026, 11, 22, 18, 0)), isTrue);
+      expect(item.isOverdueAt(DateTime(2026, 11, 23, 0, 1)), isTrue);
+    });
   });
 
   group('RecurringRepository', () {
@@ -205,6 +264,52 @@ void main() {
 
       final list = await repo.watchAll().first;
       expect(list, isEmpty);
+    });
+
+    test('processAutoRecordDue logs due autoRecord items and skips manual items', () async {
+      final start = DateTime(2026, 11, 1);
+      await repo.insert(
+        RecurringModel(
+          id: 0,
+          payee: 'Auto Rent',
+          amount: 12000.0,
+          type: 'expense',
+          frequency: 'monthly',
+          intervalCount: 1,
+          startDate: start,
+          nextDueDate: start,
+          autoRecord: true,
+          createdAt: start,
+          updatedAt: start,
+        ),
+      );
+      await repo.insert(
+        RecurringModel(
+          id: 0,
+          payee: 'Manual Water',
+          amount: 500.0,
+          type: 'expense',
+          frequency: 'monthly',
+          intervalCount: 1,
+          startDate: start,
+          nextDueDate: start,
+          autoRecord: false,
+          createdAt: start,
+          updatedAt: start,
+        ),
+      );
+
+      final count = await repo.processAutoRecordDue(asOf: DateTime(2026, 11, 10));
+      expect(count, 1);
+
+      final txns = await db.select(db.transactions).get();
+      expect(txns.length, 1);
+      expect(txns.single.header, 'Auto Rent');
+      expect(txns.single.isRecurring, isTrue);
+
+      final items = await repo.watchAll().first;
+      final autoRule = items.firstWhere((r) => r.payee == 'Auto Rent');
+      expect(autoRule.nextDueDate.month, 12);
     });
   });
 }

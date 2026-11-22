@@ -4,23 +4,54 @@ class RecurrenceEngine {
   /// Compute the next due date given a RecurringModel or frequency + interval.
   static DateTime nextDue(RecurringModel r, {DateTime? from}) {
     final base = from ?? r.nextDueDate;
-    return calculateNextDate(base, r.frequency, r.intervalCount);
+    return calculateNextDate(
+      base,
+      r.frequency,
+      r.intervalCount,
+      anchorDay: r.startDate.day,
+    );
   }
 
-  static DateTime calculateNextDate(DateTime from, String frequency, int count) {
+  static DateTime calculateNextDate(
+    DateTime from,
+    String frequency,
+    int count, {
+    int? anchorDay,
+  }) {
     final effectiveCount = count > 0 ? count : 1;
+    final targetDay = anchorDay ?? from.day;
     return switch (frequency.toLowerCase()) {
-      'daily' => from.add(Duration(days: effectiveCount)),
-      'weekly' => from.add(Duration(days: 7 * effectiveCount)),
-      'yearly' => DateTime(from.year + effectiveCount, from.month, from.day, from.hour, from.minute),
-      _ => _addMonths(from, effectiveCount), // monthly and custom
+      'daily' => DateTime(
+          from.year,
+          from.month,
+          from.day + effectiveCount,
+          from.hour,
+          from.minute,
+        ),
+      'weekly' => DateTime(
+          from.year,
+          from.month,
+          from.day + 7 * effectiveCount,
+          from.hour,
+          from.minute,
+        ),
+      'yearly' => () {
+          final y = from.year + effectiveCount;
+          final day = targetDay.clamp(1, _daysInMonth(y, from.month));
+          return DateTime(y, from.month, day, from.hour, from.minute);
+        }(),
+      _ => _addMonths(
+          from,
+          effectiveCount,
+          anchorDay: targetDay,
+        ), // monthly and custom
     };
   }
 
-  static DateTime _addMonths(DateTime d, int months) {
-    int y = d.year + (d.month - 1 + months) ~/ 12;
-    int m = (d.month - 1 + months) % 12 + 1;
-    int day = d.day.clamp(1, _daysInMonth(y, m));
+  static DateTime _addMonths(DateTime d, int months, {int? anchorDay}) {
+    final y = d.year + (d.month - 1 + months) ~/ 12;
+    final m = (d.month - 1 + months) % 12 + 1;
+    final day = (anchorDay ?? d.day).clamp(1, _daysInMonth(y, m));
     return DateTime(y, m, day, d.hour, d.minute);
   }
 

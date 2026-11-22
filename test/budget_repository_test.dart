@@ -370,5 +370,101 @@ void main() {
       expect(bp.progress, 1.0); // clamped to 1.0
       expect(bp.percentage, closeTo(120.8, 0.1));
     });
+
+    test('custom period uses startDate and inclusive endDate', () async {
+      final account = await db.into(db.accounts).insert(
+        AccountsCompanion.insert(name: 'M-Pesa'),
+      );
+      await repo.insertBudget(
+        BudgetsCompanion.insert(
+          name: 'Holiday Budget',
+          amount: 10000.0,
+          period: const Value('custom'),
+          startDate: DateTime(2026, 12, 10),
+          endDate: Value(DateTime(2026, 12, 20)),
+        ),
+      );
+
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'Before window',
+          amount: 500.0,
+          type: const Value('expense'),
+          transactionDate: DateTime(2026, 12, 9, 23, 59),
+          accountId: Value(account),
+        ),
+      );
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'On end date',
+          amount: 1200.0,
+          type: const Value('expense'),
+          transactionDate: DateTime(2026, 12, 20, 18, 0),
+          accountId: Value(account),
+        ),
+      );
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'After end date',
+          amount: 700.0,
+          type: const Value('expense'),
+          transactionDate: DateTime(2026, 12, 21, 0, 1),
+          accountId: Value(account),
+        ),
+      );
+
+      final progress = await repo
+          .watchBudgetsWithProgress(asOf: DateTime(2026, 12, 15))
+          .first;
+      expect(progress.single.spent, 1200.0);
+    });
+
+    test('rollover carries over unused amount from previous period only when eligible', () async {
+      final account = await db.into(db.accounts).insert(
+        AccountsCompanion.insert(name: 'M-Pesa'),
+      );
+      await repo.insertBudget(
+        BudgetsCompanion.insert(
+          name: 'Eligible Rollover',
+          amount: 5000.0,
+          period: const Value('monthly'),
+          startDate: DateTime(2026, 10, 1),
+          rollover: const Value(true),
+        ),
+      );
+      await repo.insertBudget(
+        BudgetsCompanion.insert(
+          name: 'Brand New Rollover',
+          amount: 4000.0,
+          period: const Value('monthly'),
+          startDate: DateTime(2026, 11, 5),
+          rollover: const Value(true),
+        ),
+      );
+
+      // Spent 3000 in October -> 2000 unspent rolls over to Eligible in November
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'Oct Spend',
+          amount: 3000.0,
+          type: const Value('expense'),
+          transactionDate: DateTime(2026, 10, 15),
+          accountId: Value(account),
+        ),
+      );
+
+      final list = await repo
+          .watchBudgetsWithProgress(asOf: DateTime(2026, 11, 15))
+          .first;
+      final eligible = list.firstWhere((b) => b.name == 'Eligible Rollover');
+      final brandNew = list.firstWhere((b) => b.name == 'Brand New Rollover');
+
+      expect(eligible.rolloverAmount, 2000.0);
+      expect(eligible.amount, 7000.0);
+      expect(eligible.remaining, 7000.0);
+
+      expect(brandNew.rolloverAmount, 0.0);
+      expect(brandNew.amount, 4000.0);
+    });
   });
 }

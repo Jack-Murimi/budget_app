@@ -3,6 +3,7 @@ import '../../../core/database/app_database.dart';
 class BudgetWithProgress {
   final Budget budget;
   final double spent;
+  final double rolloverAmount;
   final String? categoryName;
   final String? categoryColorHex;
   final String? categoryIcon;
@@ -10,6 +11,7 @@ class BudgetWithProgress {
   const BudgetWithProgress({
     required this.budget,
     required this.spent,
+    this.rolloverAmount = 0.0,
     this.categoryName,
     this.categoryColorHex,
     this.categoryIcon,
@@ -17,7 +19,8 @@ class BudgetWithProgress {
 
   int get id => budget.id;
   String get name => budget.name;
-  double get amount => budget.amount;
+  double get baseAmount => budget.amount;
+  double get amount => budget.amount + rolloverAmount;
   String get period => budget.period;
   int? get categoryId => budget.categoryId;
   bool get isOverall => budget.categoryId == null;

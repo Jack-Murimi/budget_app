@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
 import '../../../shared/utils/cashflow_calculator.dart';
 import '../../../main.dart';
+import '../../categories/providers/category_providers.dart';
 import '../repositories/transaction_repository.dart';
 import '../models/transaction_model.dart';
 
@@ -51,6 +52,13 @@ final allTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
   return ref.watch(transactionRepositoryProvider).watchAll();
 });
 
+final currentMonthTransactionsProvider =
+    StreamProvider<List<TransactionModel>>((ref) {
+  final repo = ref.watch(transactionRepositoryProvider);
+  final now = DateTime.now();
+  return repo.watchMonthSummary(year: now.year, month: now.month);
+});
+
 final transactionSearchQueryProvider = StateProvider<String>((ref) => '');
 final transactionTypeFilterProvider = StateProvider<String>((ref) => 'all'); // 'all', 'expense', 'income', 'transfer'
 final transactionCategoryFilterProvider = StateProvider<int?>((ref) => null);
@@ -62,8 +70,17 @@ final filteredTransactionsProvider = Provider<AsyncValue<List<TransactionModel>>
   final query = ref.watch(transactionSearchQueryProvider).trim().toLowerCase();
   final type = ref.watch(transactionTypeFilterProvider);
   final categoryId = ref.watch(transactionCategoryFilterProvider);
+  final categories = ref.watch(categoriesStreamProvider).valueOrNull ?? const [];
   final dateRange = ref.watch(transactionDateRangeFilterProvider);
   final accountId = ref.watch(transactionAccountFilterProvider);
+
+  final matchingCategoryIds = categoryId == null
+      ? null
+      : <int>{
+          categoryId,
+          for (final c in categories)
+            if (c.parentId == categoryId) c.id,
+        };
 
   return allAsync.whenData((txns) {
     return txns.where((t) {
@@ -81,7 +98,8 @@ final filteredTransactionsProvider = Provider<AsyncValue<List<TransactionModel>>
         return false;
       }
 
-      if (categoryId != null && t.categoryId != categoryId) {
+      if (matchingCategoryIds != null &&
+          !matchingCategoryIds.contains(t.categoryId)) {
         return false;
       }
 

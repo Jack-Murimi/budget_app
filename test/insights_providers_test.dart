@@ -176,4 +176,78 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(DateRangePickerDialog), findsOneWidget);
   });
+
+  test('aggregateCashflowBuckets aggregates weekly over >31d and monthly over >120d', () {
+    final byDay = {
+      DateTime(2026, 1, 5): const Cashflow(100, 40),
+      DateTime(2026, 1, 6): const Cashflow(200, 60),
+      DateTime(2026, 2, 10): const Cashflow(500, 120),
+    };
+
+    final weekly = aggregateCashflowBuckets(
+      byDay,
+      DateRange(DateTime(2026, 1, 1), DateTime(2026, 3, 15)),
+    );
+    expect(weekly.title, 'Weekly cashflow');
+    expect(weekly.buckets.length, 2);
+    expect(weekly.buckets.first.income, 300);
+    expect(weekly.buckets.first.expenses, 100);
+
+    final monthly = aggregateCashflowBuckets(
+      byDay,
+      DateRange(DateTime(2026, 1, 1), DateTime(2027, 1, 1)),
+    );
+    expect(monthly.title, 'Monthly cashflow');
+    expect(monthly.buckets.length, 2);
+    expect(monthly.buckets.first.label, 'Jan');
+    expect(monthly.buckets.first.expenses, 100);
+    expect(monthly.buckets.last.label, 'Feb');
+  });
+
+  testWidgets('InsightsScreen shows burn rate and rolls >5 categories into Other with KES values',
+      (tester) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    for (var i = 1; i <= 7; i++) {
+      final catId = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(name: 'Cat $i'),
+      );
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'Spend $i',
+          amount: (100 * i).toDouble(),
+          type: const Value('expense'),
+          categoryId: Value(catId),
+          transactionDate: today,
+        ),
+      );
+    }
+
+    final container = ProviderContainer(
+      overrides: [dbProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: InsightsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Avg daily spend:'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Other'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Other'), findsOneWidget);
+    // Cat 1 (100) + Cat 2 (200) = KES 300.00 in Other (Cat 3 is also 300.00)
+    expect(find.textContaining('KES 300.00'), findsNWidgets(2));
+  });
 }

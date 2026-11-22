@@ -18,6 +18,12 @@ final budgetsWithProgressProvider = StreamProvider<List<BudgetWithProgress>>((re
   return repo.watchBudgetsWithProgress();
 });
 
+final allBudgetsWithProgressProvider =
+    StreamProvider<List<BudgetWithProgress>>((ref) {
+  final repo = ref.watch(budgetRepositoryProvider);
+  return repo.watchBudgetsWithProgress(includeArchived: true);
+});
+
 final overallBudgetProvider = StreamProvider<BudgetWithProgress?>((ref) {
   final repo = ref.watch(budgetRepositoryProvider);
   return repo.watchBudgetsWithProgress().map(
@@ -25,9 +31,10 @@ final overallBudgetProvider = StreamProvider<BudgetWithProgress?>((ref) {
   );
 });
 
-final budgetTransactionsAsyncProvider = FutureProvider.autoDispose.family<List<Transaction>, Budget>((ref, budget) async {
+final budgetTransactionsAsyncProvider =
+    StreamProvider.family<List<Transaction>, Budget>((ref, budget) {
   final repo = ref.watch(budgetRepositoryProvider);
-  return await repo.watchBudgetTransactions(budget).first;
+  return repo.watchBudgetTransactions(budget);
 });
 
 

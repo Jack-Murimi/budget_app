@@ -1,7 +1,10 @@
 import 'dart:ffi';
 import 'package:budget_app/core/database/app_database.dart';
+import 'package:budget_app/features/accounts/models/account_model.dart';
+import 'package:budget_app/features/accounts/screens/account_detail_screen.dart';
 import 'package:budget_app/features/accounts/screens/accounts_screen.dart';
 import 'package:budget_app/main.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -139,5 +142,65 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(AlertDialog, 'Adjust Balance'), findsNothing);
+  });
+
+  testWidgets('AccountsScreen displays archived accounts, validates transfers, and shows incoming + on AccountDetailScreen',
+      (tester) async {
+    await db.into(db.accounts).insert(
+      AccountsCompanion.insert(
+        name: 'Old Mattress',
+        isArchived: const Value(true),
+      ),
+    );
+
+    final accounts = await db.select(db.accounts).get();
+    final mpesa = accounts.firstWhere((a) => a.name == 'M-Pesa');
+    final cash = accounts.firstWhere((a) => a.name == 'Cash');
+
+    // Transfer M-Pesa -> Cash
+    await db.into(db.transactions).insert(
+      TransactionsCompanion.insert(
+        header: 'ATM Withdrawal',
+        type: const Value('transfer'),
+        amount: 500.0,
+        accountId: Value(mpesa.id),
+        toAccountId: Value(cash.id),
+        transactionDate: DateTime.now(),
+      ),
+    );
+
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await pumpAccountsScreen(tester, container);
+
+    // Archived account visible and can be unarchived
+    expect(find.text('Archived'), findsWidgets);
+    expect(find.byTooltip('Unarchive'), findsOneWidget);
+    expect(find.text('Old Mattress'), findsOneWidget);
+
+    // Transfer validation rejects empty/invalid amount
+    await tester.tap(find.byIcon(Icons.swap_horiz));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Transfer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a positive amount'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // Verify AccountDetailScreen on Cash shows incoming transfer as +KES 500.00
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: AccountDetailScreen(
+            account: AccountWithBalance(account: cash, balance: 500),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('+KES 500.00'), findsOneWidget);
   });
 }

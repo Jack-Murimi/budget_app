@@ -1,11 +1,14 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:drift/drift.dart' show Value;
+import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
+import '../../../shared/utils/category_icon_helper.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../categories/widgets/category_picker.dart';
 import '../models/budget_model.dart';
 import '../providers/budget_providers.dart';
-import '../../categories/widgets/category_picker.dart';
+import '../repositories/budget_repository.dart';
 import 'budget_detail_screen.dart';
 
 class BudgetsScreen extends ConsumerStatefulWidget {
@@ -20,7 +23,7 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final budgetsAsync = ref.watch(budgetsWithProgressProvider);
+    final budgetsAsync = ref.watch(allBudgetsWithProgressProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -44,9 +47,9 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
           }
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(budgetsWithProgressProvider),
+            onRefresh: () async => ref.invalidate(allBudgetsWithProgressProvider),
             child: ListView(
-              padding: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.only(bottom: 96),
               children: [
                 ...filteredBudgets.map((b) => _buildBudgetCard(b)),
                 if (_showArchived && filteredBudgets.isEmpty)
@@ -74,17 +77,34 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
     );
   }
 
+  Color _parseColor(String? hex, Color fallback) {
+    if (hex == null || hex.isEmpty) return fallback;
+    try {
+      var normalized = hex.replaceFirst('#', '');
+      if (normalized.length == 6) normalized = 'FF$normalized';
+      return Color(int.parse(normalized, radix: 16));
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  String _periodLabel(String period) => switch (period) {
+        'monthly' => 'Monthly',
+        'weekly' => 'Weekly',
+        _ => 'Custom',
+      };
+
   Widget _buildBudgetCard(BudgetWithProgress b) {
     final theme = Theme.of(context);
+    final isOver = b.isOverBudget;
+    final progressColor = isOver
+        ? theme.colorScheme.error
+        : b.progress >= 0.75
+            ? theme.colorScheme.tertiary
+            : theme.colorScheme.primary;
 
     if (b.isOverall) {
-      final isOver = b.isOverBudget;
-      final progressColor = isOver
-          ? Colors.red
-          : b.progress >= 0.75
-              ? Colors.amber
-              : Colors.green;
-
+      final daysLeft = _daysRemaining(b.budget);
       return Card(
         margin: const EdgeInsets.all(16),
         child: ListTile(
@@ -102,6 +122,13 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
                 '${CurrencyFormatter.format(b.spent)} / ${CurrencyFormatter.format(b.amount)}',
                 style: theme.textTheme.bodyMedium,
               ),
+              if (b.rolloverAmount > 0)
+                Text(
+                  '+${CurrencyFormatter.format(b.rolloverAmount)} rollover',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
               const SizedBox(height: 4),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
@@ -118,38 +145,43 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
                     ? 'Over budget by ${CurrencyFormatter.format(b.spent - b.amount)}'
                     : '${CurrencyFormatter.format(b.remaining)} left',
                 style: TextStyle(
-                  color: isOver ? Colors.red : theme.colorScheme.outline,
+                  color: isOver
+                      ? theme.colorScheme.error
+                      : theme.colorScheme.outline,
                   fontSize: 13,
                 ),
               ),
             ],
           ),
-          trailing: Text(
-            '${_daysRemaining(b.budget)} days',
-            style: theme.textTheme.bodySmall,
-          ),
+          trailing: _showArchived
+              ? IconButton(
+                  icon: const Icon(Icons.unarchive_outlined),
+                  tooltip: 'Unarchive',
+                  onPressed: () => ref
+                      .read(budgetRepositoryProvider)
+                      .archiveBudget(b.id, archive: false),
+                )
+              : Text(
+                  daysLeft == 1 ? '1 day' : '$daysLeft days',
+                  style: theme.textTheme.bodySmall,
+                ),
           onTap: () => _openDetail(b),
         ),
       );
     } else {
-      final progressColor = b.isOverBudget
-          ? Colors.red
-          : b.progress >= 0.75
-              ? Colors.amber
-              : Colors.green;
+      final categoryColor = _parseColor(
+        b.categoryColorHex,
+        theme.colorScheme.primary,
+      );
 
       return Card(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         child: ListTile(
           leading: CircleAvatar(
-            backgroundColor: b.categoryColorHex != null
-                ? Color(int.parse(b.categoryColorHex!.replaceFirst('#', '0xFF')))
-                : Colors.grey,
+            backgroundColor: categoryColor.withValues(alpha: 0.15),
             child: Icon(
-              _getCategoryIcon(b.categoryIcon),
-              color: b.categoryColorHex != null
-                  ? Color(int.parse(b.categoryColorHex!.replaceFirst('#', '0xFF')))
-                  : Colors.white,
+              CategoryIconHelper.getIcon(b.categoryIcon),
+              color: categoryColor,
             ),
           ),
           title: Text(b.name),
@@ -161,6 +193,13 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
                 '${CurrencyFormatter.format(b.spent)} / ${CurrencyFormatter.format(b.amount)}',
                 style: theme.textTheme.bodyMedium,
               ),
+              if (b.rolloverAmount > 0)
+                Text(
+                  '+${CurrencyFormatter.format(b.rolloverAmount)} rollover',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
               const SizedBox(height: 4),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
@@ -173,22 +212,32 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                b.isOverBudget
+                isOver
                     ? 'Over budget by ${CurrencyFormatter.format(b.spent - b.amount)}'
                     : (b.categoryName ?? ''),
                 style: TextStyle(
-                  color: b.isOverBudget ? Colors.red : theme.colorScheme.outline,
+                  color: isOver
+                      ? theme.colorScheme.error
+                      : theme.colorScheme.outline,
                   fontSize: 13,
                 ),
               ),
             ],
           ),
-          trailing: Chip(
-            label: Text(
-              b.budget.period == 'monthly' ? 'Monthly' : 'Weekly',
-              style: const TextStyle(fontSize: 12),
-            ),
-          ),
+          trailing: _showArchived
+              ? IconButton(
+                  icon: const Icon(Icons.unarchive_outlined),
+                  tooltip: 'Unarchive',
+                  onPressed: () => ref
+                      .read(budgetRepositoryProvider)
+                      .archiveBudget(b.id, archive: false),
+                )
+              : Chip(
+                  label: Text(
+                    _periodLabel(b.budget.period),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
           onTap: () => _openDetail(b),
         ),
       );
@@ -197,60 +246,10 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
 
   int _daysRemaining(Budget budget) {
     final now = DateTime.now();
-    final (start, end) = _getPeriodWindow(budget.period, now);
-    return end.difference(now).inDays;
-  }
-
-  (DateTime, DateTime) _getPeriodWindow(String period, DateTime now) {
-    switch (period) {
-      case 'monthly':
-        final start = DateTime(now.year, now.month, 1);
-        final end = DateTime(now.year, now.month + 1, 1);
-        return (start, end);
-      case 'weekly':
-        final weekday = now.weekday;
-        final start = DateTime(now.year, now.month, now.day - (weekday - 1));
-        final end = start.add(const Duration(days: 7));
-        return (start, end);
-      default:
-        final start = DateTime(now.year, now.month, 1);
-        final end = DateTime(now.year, now.month + 1, 1);
-        return (start, end);
-    }
-  }
-
-  IconData _getCategoryIcon(String? icon) {
-    if (icon == null) return Icons.category;
-    return switch (icon) {
-      'restaurant' => Icons.restaurant,
-      'directions_car' => Icons.directions_car,
-      'shopping_bag' => Icons.shopping_bag,
-      'receipt_long' => Icons.receipt_long,
-      'movie' => Icons.movie,
-      'favorite' => Icons.favorite,
-      'school' => Icons.school,
-      'savings' => Icons.savings,
-      'attach_money' => Icons.attach_money,
-      'more_horiz' => Icons.more_horiz,
-      'swap_horiz' => Icons.swap_horiz,
-      'water_drop' => Icons.water_drop,
-      'bolt' => Icons.bolt,
-      'wifi' => Icons.wifi,
-      'home' => Icons.home,
-      'tv' => Icons.tv,
-      'phone_android' => Icons.phone_android,
-      'security' => Icons.security,
-      'medication' => Icons.medication,
-      'local_hospital' => Icons.local_hospital,
-      'fitness_center' => Icons.fitness_center,
-      'work' => Icons.work,
-      'store' => Icons.store,
-      'trending_up' => Icons.trending_up,
-      'groups' => Icons.groups,
-      'send' => Icons.send,
-      'sync' => Icons.sync,
-      _ => Icons.category,
-    };
+    final today = DateTime(now.year, now.month, now.day);
+    final (_, end) = BudgetRepository.getPeriodWindow(budget, now);
+    final endDay = DateTime(end.year, end.month, end.day);
+    return endDay.difference(today).inDays.clamp(0, 999999);
   }
 
   void _openDetail(BudgetWithProgress b) {
@@ -263,116 +262,256 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
   }
 
   Future<void> _showCreateDialog() async {
-    final nameCtrl = TextEditingController();
-    final amountCtrl = TextEditingController();
-    String period = 'monthly';
-    Category? selectedCategory;
-    bool rollover = false;
-
-    await showDialog(
+    final result = await showDialog<BudgetsCompanion>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Create Budget'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Name *',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: amountCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Amount (KES) *',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  initialValue: period,
-                  decoration: const InputDecoration(
-                    labelText: 'Period',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
-                    DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
-                  ],
-                  onChanged: (v) => setDialogState(() => period = v!),
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  title: const Text('Category'),
-                  subtitle: Text(
-                    selectedCategory == null
-                        ? 'Overall Budget (All Expenses)'
-                        : selectedCategory!.name,
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () async {
-                    final cat = await showCategoryPicker(ctx);
-                    setDialogState(() => selectedCategory = cat);
-                  },
-                ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  title: const Text('Rollover remaining budget'),
-                  value: rollover,
-                  onChanged: (v) => setDialogState(() => rollover = v),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                      if (nameCtrl.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(content: Text('Name is required')),
-                        );
-                        return;
-                      }
-                      final amount = double.tryParse(amountCtrl.text);
-                      if (amount == null || amount <= 0) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(content: Text('Enter a valid amount')),
-                        );
-                        return;
-                      }
+      builder: (_) => const BudgetFormDialog(),
+    );
+    if (result == null) return;
+    await ref.read(budgetRepositoryProvider).insertBudget(result);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Budget created')),
+    );
+  }
+}
 
-                      final repo = ref.read(budgetRepositoryProvider);
-                      final companion = BudgetsCompanion.insert(
-                        name: nameCtrl.text.trim(),
-                        amount: amount,
-                        period: Value(period),
-                        categoryId: Value(selectedCategory?.id),
-                        startDate: DateTime.now(),
-                      );
-                      await repo.insertBudget(companion);
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Budget created')),
-                      );
-                    },
-              child: const Text('Save'),
+/// Shared create/edit budget dialog that owns and disposes its controllers.
+class BudgetFormDialog extends StatefulWidget {
+  final BudgetWithProgress? existing;
+  final Category? initialCategory;
+
+  const BudgetFormDialog({
+    super.key,
+    this.existing,
+    this.initialCategory,
+  });
+
+  @override
+  State<BudgetFormDialog> createState() => _BudgetFormDialogState();
+}
+
+class _BudgetFormDialogState extends State<BudgetFormDialog> {
+  late final TextEditingController _nameCtrl = TextEditingController(
+    text: widget.existing?.name ?? '',
+  );
+  late final TextEditingController _amountCtrl = TextEditingController(
+    text: widget.existing != null
+        ? widget.existing!.baseAmount.toString()
+        : '',
+  );
+
+  late String _period = widget.existing?.period ?? 'monthly';
+  late Category? _selectedCategory = widget.initialCategory;
+  late bool _rollover = widget.existing?.budget.rollover ?? false;
+  late DateTime _customStart =
+      widget.existing?.budget.startDate ?? DateTime.now();
+  late DateTime _customEnd = widget.existing?.budget.endDate ??
+      DateTime.now().add(const Duration(days: 30));
+
+  bool get _isEdit => widget.existing != null;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickStartDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _customStart,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _customStart = picked;
+        if (_customEnd.isBefore(_customStart)) {
+          _customEnd = _customStart;
+        }
+      });
+    }
+  }
+
+  Future<void> _pickEndDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _customEnd.isBefore(_customStart) ? _customStart : _customEnd,
+      firstDate: _customStart,
+      lastDate: DateTime(2100),
+    );
+    if (picked != null && mounted) {
+      setState(() => _customEnd = picked);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = DateFormat('d MMM yyyy');
+    return AlertDialog(
+      title: Text(_isEdit ? 'Edit Budget' : 'Create Budget'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Name *',
+                border: OutlineInputBorder(),
+              ),
             ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _amountCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Amount (KES) *',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: _period,
+              decoration: const InputDecoration(
+                labelText: 'Period',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
+                DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
+                DropdownMenuItem(value: 'custom', child: Text('Custom')),
+              ],
+              onChanged: (v) {
+                if (v != null) setState(() => _period = v);
+              },
+            ),
+            if (_period == 'custom') ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickStartDate,
+                      icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                      label: Text('Start: ${fmt.format(_customStart)}'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickEndDate,
+                      icon: const Icon(Icons.event_outlined, size: 16),
+                      label: Text('End: ${fmt.format(_customEnd)}'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 16),
+            ListTile(
+              title: const Text('Category'),
+              subtitle: Text(
+                _selectedCategory == null
+                    ? 'Overall Budget (All Expenses)'
+                    : _selectedCategory!.name,
+              ),
+              trailing: _selectedCategory != null
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      tooltip: 'Use Overall Budget',
+                      onPressed: () =>
+                          setState(() => _selectedCategory = null),
+                    )
+                  : const Icon(Icons.chevron_right),
+              onTap: () async {
+                final cat = await showCategoryPicker(context);
+                if (cat != null && mounted) {
+                  setState(() => _selectedCategory = cat);
+                }
+              },
+            ),
+            if (_period != 'custom') ...[
+              const SizedBox(height: 8),
+              SwitchListTile(
+                title: const Text('Rollover remaining budget'),
+                subtitle: _isEdit
+                    ? const Text('Carry over unused amount to next period')
+                    : null,
+                value: _rollover,
+                onChanged: (v) => setState(() => _rollover = v),
+              ),
+            ],
           ],
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final name = _nameCtrl.text.trim();
+            final amount =
+                double.tryParse(_amountCtrl.text.replaceAll(',', '').trim());
+            if (name.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Name is required')),
+              );
+              return;
+            }
+            if (amount == null || amount <= 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Enter a valid amount')),
+              );
+              return;
+            }
+            final startDate = _period == 'custom'
+                ? _customStart
+                : (widget.existing?.budget.startDate ?? DateTime.now());
+            final endDate = _period == 'custom' ? _customEnd : null;
+            final rolloverFlag = _period == 'custom' ? false : _rollover;
+
+            if (_isEdit) {
+              Navigator.pop(
+                context,
+                BudgetsCompanion(
+                  id: Value(widget.existing!.id),
+                  name: Value(name),
+                  amount: Value(amount),
+                  period: Value(_period),
+                  categoryId: Value(_selectedCategory?.id),
+                  startDate: Value(startDate),
+                  endDate: Value(endDate),
+                  rollover: Value(rolloverFlag),
+                ),
+              );
+            } else {
+              Navigator.pop(
+                context,
+                BudgetsCompanion.insert(
+                  name: name,
+                  amount: amount,
+                  period: Value(_period),
+                  categoryId: Value(_selectedCategory?.id),
+                  startDate: startDate,
+                  endDate: Value(endDate),
+                  rollover: Value(rolloverFlag),
+                ),
+              );
+            }
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

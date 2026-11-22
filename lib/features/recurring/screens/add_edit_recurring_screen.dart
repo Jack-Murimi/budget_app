@@ -15,10 +15,12 @@ class AddEditRecurringScreen extends ConsumerStatefulWidget {
   const AddEditRecurringScreen({super.key, this.recurringToEdit});
 
   @override
-  ConsumerState<AddEditRecurringScreen> createState() => _AddEditRecurringScreenState();
+  ConsumerState<AddEditRecurringScreen> createState() =>
+      _AddEditRecurringScreenState();
 }
 
-class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen> {
+class _AddEditRecurringScreenState
+    extends ConsumerState<AddEditRecurringScreen> {
   final _formKey = GlobalKey<FormState>();
   final _payeeCtrl = TextEditingController();
   final _amountCtrl = TextEditingController();
@@ -31,6 +33,7 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
   DateTime? _endDate;
   int? _selectedAccountId;
   Category? _selectedCategory;
+  bool _categoryInitialized = false;
   bool _autoRecord = false;
   bool _isSaving = false;
 
@@ -71,7 +74,12 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
       lastDate: DateTime(2100),
     );
     if (picked != null) {
-      setState(() => _nextDueDate = picked);
+      setState(() {
+        _nextDueDate = picked;
+        if (_endDate != null && _endDate!.isBefore(_nextDueDate)) {
+          _endDate = null;
+        }
+      });
     }
   }
 
@@ -90,7 +98,7 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', ''));
+    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '').trim());
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a valid amount')),
@@ -98,7 +106,13 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
       return;
     }
 
-    final interval = int.tryParse(_intervalCtrl.text) ?? 1;
+    final interval = int.tryParse(_intervalCtrl.text.trim()) ?? 0;
+    if (interval < 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Interval must be at least 1')),
+      );
+      return;
+    }
 
     setState(() => _isSaving = true);
 
@@ -115,8 +129,11 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
           intervalCount: interval,
           nextDueDate: _nextDueDate,
           endDate: _endDate,
+          clearEndDate: _endDate == null,
           accountId: _selectedAccountId,
-          categoryId: _selectedCategory?.id ?? current.categoryId,
+          clearAccountId: _selectedAccountId == null,
+          categoryId: _selectedCategory?.id,
+          clearCategoryId: _selectedCategory == null,
           notes: _notesCtrl.text.trim(),
           autoRecord: _autoRecord,
         );
@@ -147,7 +164,9 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isEditing ? 'Subscription updated' : 'Recurring bill saved'),
+            content: Text(
+              _isEditing ? 'Subscription updated' : 'Recurring bill saved',
+            ),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -155,7 +174,10 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Theme.of(context).colorScheme.error),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     } finally {
@@ -169,9 +191,14 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
     final accounts = ref.watch(accountsWithBalanceProvider).asData?.value ?? [];
     final categories = ref.watch(categoriesStreamProvider).asData?.value ?? [];
 
-    // Resolve category if editing and not selected yet
-    if (_selectedCategory == null && widget.recurringToEdit?.categoryId != null) {
-      _selectedCategory = categories.where((c) => c.id == widget.recurringToEdit!.categoryId).firstOrNull;
+    // Hydrate category once on edit load so later clearing stays respected.
+    if (!_categoryInitialized &&
+        widget.recurringToEdit?.categoryId != null &&
+        categories.isNotEmpty) {
+      _selectedCategory = categories
+          .where((c) => c.id == widget.recurringToEdit!.categoryId)
+          .firstOrNull;
+      _categoryInitialized = true;
     }
 
     return Scaffold(
@@ -180,17 +207,34 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             // Type Selector
             SegmentedButton<String>(
               segments: const [
-                ButtonSegment(value: 'expense', label: Text('Expense'), icon: Icon(Icons.arrow_upward_rounded)),
-                ButtonSegment(value: 'income', label: Text('Income'), icon: Icon(Icons.arrow_downward_rounded)),
+                ButtonSegment(
+                  value: 'expense',
+                  label: Text('Expense'),
+                  icon: Icon(Icons.arrow_upward_rounded),
+                ),
+                ButtonSegment(
+                  value: 'income',
+                  label: Text('Income'),
+                  icon: Icon(Icons.arrow_downward_rounded),
+                ),
               ],
               selected: {_type},
-              onSelectionChanged: (set) => setState(() => _type = set.first),
+              onSelectionChanged: (set) => setState(() {
+                final nextType = set.first;
+                _type = nextType;
+                if (_selectedCategory != null &&
+                    _selectedCategory!.transactionType != nextType) {
+                  _selectedCategory = null;
+                }
+              }),
             ),
             const SizedBox(height: 16),
 
@@ -203,14 +247,16 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.label_outline),
               ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter a name' : null,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Please enter a name' : null,
             ),
             const SizedBox(height: 16),
 
             // Amount Field
             TextFormField(
               controller: _amountCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
                 labelText: 'Amount (KES) *',
                 prefixText: 'KES ',
@@ -219,7 +265,8 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Please enter amount';
-                if (double.tryParse(v.replaceAll(',', '')) == null) return 'Invalid number';
+                final parsed = double.tryParse(v.replaceAll(',', '').trim());
+                if (parsed == null || parsed <= 0) return 'Enter a positive amount';
                 return null;
               },
             ),
@@ -236,7 +283,7 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.repeat),
                     ),
-                    value: _frequency,
+                    initialValue: _frequency,
                     items: const [
                       DropdownMenuItem(value: 'daily', child: Text('Daily')),
                       DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
@@ -259,6 +306,14 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
                       hintText: '1',
                       border: OutlineInputBorder(),
                     ),
+                    onChanged: (_) => setState(() {}),
+                    validator: (v) {
+                      final parsed = int.tryParse((v ?? '').trim());
+                      if (parsed == null || parsed < 1) {
+                        return 'Must be >= 1';
+                      }
+                      return null;
+                    },
                   ),
                 ),
               ],
@@ -275,7 +330,9 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.calendar_today_outlined),
                       title: const Text('Next Due Date'),
-                      subtitle: Text(DateFormat('EEE, d MMM yyyy').format(_nextDueDate)),
+                      subtitle: Text(
+                        DateFormat('EEE, d MMM yyyy').format(_nextDueDate),
+                      ),
                       trailing: TextButton(
                         onPressed: _pickDueDate,
                         child: const Text('Change'),
@@ -286,9 +343,11 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.event_busy_outlined),
                       title: const Text('End Date (Optional)'),
-                      subtitle: Text(_endDate != null
-                          ? DateFormat('EEE, d MMM yyyy').format(_endDate!)
-                          : 'Runs indefinitely'),
+                      subtitle: Text(
+                        _endDate != null
+                            ? DateFormat('EEE, d MMM yyyy').format(_endDate!)
+                            : 'Runs indefinitely',
+                      ),
                       trailing: _endDate != null
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 20),
@@ -306,41 +365,76 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
             const SizedBox(height: 16),
 
             // Account and Category Selectors
-            DropdownButtonFormField<int>(
+            DropdownButtonFormField<int?>(
               decoration: const InputDecoration(
                 labelText: 'Account / Wallet',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.account_balance_wallet_outlined),
               ),
-              value: accounts.any((a) => a.id == _selectedAccountId) ? _selectedAccountId : null,
+              initialValue: accounts.any((a) => a.id == _selectedAccountId)
+                  ? _selectedAccountId
+                  : null,
               hint: const Text('Default Account'),
-              items: accounts.map((a) => DropdownMenuItem(
-                value: a.id,
-                child: Text('${a.name} (${a.type.toUpperCase()})'),
-              )).toList(),
+              items: [
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('Default Account'),
+                ),
+                ...accounts.map(
+                  (a) => DropdownMenuItem<int?>(
+                    value: a.id,
+                    child: Text('${a.name} (${a.type.toUpperCase()})'),
+                  ),
+                ),
+              ],
               onChanged: (v) => setState(() => _selectedAccountId = v),
             ),
             const SizedBox(height: 16),
 
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              icon: const Icon(Icons.category_outlined),
-              label: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _selectedCategory != null ? 'Category: ${_selectedCategory!.name}' : 'Select Category',
-                  style: theme.textTheme.bodyMedium,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
+              icon: const Icon(Icons.category_outlined),
+              label: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _selectedCategory != null
+                          ? 'Category: ${_selectedCategory!.name}'
+                          : 'Select Category',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                  if (_selectedCategory != null)
+                    GestureDetector(
+                      onTap: () => setState(() => _selectedCategory = null),
+                      child: const Icon(Icons.clear, size: 18),
+                    ),
+                ],
+              ),
               onPressed: () async {
-                final cat = await showCategoryPicker(context);
+                final cat =
+                    await showCategoryPicker(context, initialType: _type);
                 if (cat != null) setState(() => _selectedCategory = cat);
               },
             ),
             const SizedBox(height: 16),
+
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+              title: const Text('Auto-record when due'),
+              subtitle: const Text(
+                'Automatically log transactions when the app opens on or after the due date',
+              ),
+              value: _autoRecord,
+              onChanged: (v) => setState(() => _autoRecord = v),
+            ),
+            const SizedBox(height: 12),
 
             // Notes field
             TextFormField(
@@ -358,12 +452,17 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, size: 20, color: theme.colorScheme.primary),
+                  Icon(
+                    Icons.info_outline,
+                    size: 20,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -380,15 +479,27 @@ class _AddEditRecurringScreenState extends ConsumerState<AddEditRecurringScreen>
             FilledButton.icon(
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onPressed: _isSaving ? null : _save,
               icon: _isSaving
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Icon(Icons.check),
-              label: Text(_isEditing ? 'Save Changes' : 'Create Recurring Item'),
+              label: Text(
+                _isEditing ? 'Save Changes' : 'Create Recurring Item',
+              ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

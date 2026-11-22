@@ -79,7 +79,13 @@ class TransactionListItem extends ConsumerWidget {
       label: semanticLabel,
       button: true,
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        contentPadding: EdgeInsets.fromLTRB(
+          16,
+          4,
+          onDelete != null ? 4 : 16,
+          4,
+        ),
+        horizontalTitleGap: 12,
         onTap: onTap ??
             () {
               Navigator.of(context).push(
@@ -116,25 +122,33 @@ class TransactionListItem extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              '$sign${CurrencyFormatter.format(totalAmount)}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: amountColor,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 140),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '$sign${CurrencyFormatter.format(totalAmount)}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: amountColor,
+                  ),
+                ),
               ),
             ),
-            if (onDelete != null) ...[
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 18),
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: onDelete,
-              ),
-            ],
           ],
         ),
+        trailing: onDelete != null
+            ? IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20),
+                tooltip: 'Delete transaction',
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  tapTargetSize: MaterialTapTargetSize.padded,
+                ),
+                onPressed: onDelete,
+              )
+            : null,
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 3),
           child: Row(
@@ -168,23 +182,25 @@ class TransactionListItem extends ConsumerWidget {
                       fontSize: 10,
                     ),
                   ),
-                )
-              else if (transaction.fulizaAmount > 0)
+                ),
+              if (transaction.fulizaAmount > 0) ...[
+                const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.15),
+                    color: theme.colorScheme.tertiaryContainer,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     'Fuliza',
                     style: TextStyle(
-                      color: Colors.orange.shade800,
+                      color: theme.colorScheme.onTertiaryContainer,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
+              ],
             ],
           ),
         ),

@@ -47,18 +47,31 @@ class RecurringModel {
     this.categoryIcon,
   });
 
-  bool get isOverdue => isActive && nextDueDate.isBefore(DateTime.now());
+  bool get isOverdue => isOverdueAt(DateTime.now());
 
-  bool isDueSoon({int days = 3}) {
+  bool isOverdueAt(DateTime now) {
     if (!isActive) return false;
-    final diff = nextDueDate.difference(DateTime.now()).inDays;
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(nextDueDate.year, nextDueDate.month, nextDueDate.day);
+    return due.isBefore(today);
+  }
+
+  bool isDueSoon({int days = 3}) => isDueSoonAt(DateTime.now(), days: days);
+
+  bool isDueSoonAt(DateTime now, {int days = 3}) {
+    if (!isActive) return false;
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(nextDueDate.year, nextDueDate.month, nextDueDate.day);
+    final diff = due.difference(today).inDays;
     return diff >= 0 && diff <= days;
   }
 
   RecurringModel copyWith({
     int? id,
     int? accountId,
+    bool clearAccountId = false,
     int? categoryId,
+    bool clearCategoryId = false,
     double? amount,
     String? type,
     String? payee,
@@ -67,6 +80,7 @@ class RecurringModel {
     int? intervalCount,
     DateTime? startDate,
     DateTime? endDate,
+    bool clearEndDate = false,
     DateTime? nextDueDate,
     bool? autoRecord,
     bool? notify,
@@ -80,8 +94,8 @@ class RecurringModel {
   }) {
     return RecurringModel(
       id: id ?? this.id,
-      accountId: accountId ?? this.accountId,
-      categoryId: categoryId ?? this.categoryId,
+      accountId: clearAccountId ? null : (accountId ?? this.accountId),
+      categoryId: clearCategoryId ? null : (categoryId ?? this.categoryId),
       amount: amount ?? this.amount,
       type: type ?? this.type,
       payee: payee ?? this.payee,
@@ -89,17 +103,18 @@ class RecurringModel {
       frequency: frequency ?? this.frequency,
       intervalCount: intervalCount ?? this.intervalCount,
       startDate: startDate ?? this.startDate,
-      endDate: endDate ?? this.endDate,
+      endDate: clearEndDate ? null : (endDate ?? this.endDate),
       nextDueDate: nextDueDate ?? this.nextDueDate,
       autoRecord: autoRecord ?? this.autoRecord,
       notify: notify ?? this.notify,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      accountName: accountName ?? this.accountName,
-      categoryName: categoryName ?? this.categoryName,
-      categoryColorHex: categoryColorHex ?? this.categoryColorHex,
-      categoryIcon: categoryIcon ?? this.categoryIcon,
+      accountName: clearAccountId ? null : (accountName ?? this.accountName),
+      categoryName: clearCategoryId ? null : (categoryName ?? this.categoryName),
+      categoryColorHex:
+          clearCategoryId ? null : (categoryColorHex ?? this.categoryColorHex),
+      categoryIcon: clearCategoryId ? null : (categoryIcon ?? this.categoryIcon),
     );
   }
 }

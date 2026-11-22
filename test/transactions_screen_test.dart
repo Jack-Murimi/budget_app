@@ -1,8 +1,9 @@
-import 'dart:ffi';
+import 'dart:ffi' hide Size;
 import 'package:budget_app/core/database/app_database.dart';
+import 'package:budget_app/features/transactions/providers/transaction_providers.dart';
 import 'package:budget_app/features/transactions/screens/transactions_screen.dart';
 import 'package:budget_app/main.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -166,5 +167,64 @@ void main() {
     expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
     expect(find.byIcon(Icons.arrow_downward_rounded), findsOneWidget);
     expect(find.byIcon(Icons.swap_horiz_rounded), findsOneWidget);
+  });
+
+  testWidgets('This Week active chip label, parent category filter matching subcategories, and narrow summary bar',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final parentId = await db.into(db.categories).insert(
+      CategoriesCompanion.insert(name: 'TransportParent'),
+    );
+    final subId = await db.into(db.categories).insert(
+      CategoriesCompanion.insert(
+        name: 'UberSub',
+        parentId: Value(parentId),
+      ),
+    );
+    await db.into(db.transactions).insert(
+      TransactionsCompanion.insert(
+        header: 'Ride Share',
+        amount: 450.0,
+        transactionDate: DateTime.now(),
+        type: const Value('expense'),
+        categoryId: Value(subId),
+      ),
+    );
+
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    container.read(transactionDateRangeFilterProvider.notifier).state = 'this_week';
+    container.read(transactionCategoryFilterProvider.notifier).state = parentId;
+
+    final errors = <FlutterErrorDetails>[];
+    final prevOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      errors.add(details);
+    };
+    try {
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: TransactionsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+    } finally {
+      FlutterError.onError = prevOnError;
+    }
+
+    expect(find.text('This Week'), findsOneWidget);
+    expect(find.text('Ride Share'), findsOneWidget);
+    expect(find.text('Grocery'), findsNothing);
+    expect(
+      errors,
+      isEmpty,
+      reason: errors.map((e) => e.toString()).join('\n---\n'),
+    );
   });
 }

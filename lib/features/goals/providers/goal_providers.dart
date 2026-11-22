@@ -11,3 +11,8 @@ final goalRepositoryProvider = Provider<GoalRepository>(
 final savingsGoalsProvider = StreamProvider<List<SavingsGoal>>(
   (ref) => ref.watch(goalRepositoryProvider).watchAll(),
 );
+
+final goalContributionsProvider =
+    StreamProvider.family<List<GoalContribution>, int>(
+  (ref, goalId) => ref.watch(goalRepositoryProvider).watchContributions(goalId),
+);

@@ -88,4 +88,42 @@ void main() {
     expect(find.text('KES 33.68'), findsWidgets);
     expect(find.text('Settled'), findsOneWidget);
   });
+
+  testWidgets('partially repaid active Bridge loan shows Last payment instead of Settled',
+      (tester) async {
+    final accountId = await db
+        .into(db.accounts)
+        .insert(AccountsCompanion.insert(name: 'M-Pesa'));
+
+    final debtId = await repo.create(
+      direction: 'borrowed',
+      counterparty: 'Bridge',
+      principal: 1000,
+      interest: 0,
+      product: 'bridge',
+      disbursementShortfall: 50,
+      accountId: accountId,
+    );
+    final debt = await (db.select(db.debts)
+          ..where((row) => row.id.equals(debtId)))
+        .getSingle();
+
+    await repo.repay(
+      debt: debt,
+      amount: 400,
+      accountId: accountId,
+      paymentDate: DateTime.now(),
+    );
+
+    final container =
+        ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(buildTestApp(container));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Active'), findsOneWidget);
+    expect(find.textContaining('Last payment:'), findsOneWidget);
+    expect(find.textContaining('Settled:'), findsNothing);
+  });
 }

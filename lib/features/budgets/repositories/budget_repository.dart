@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/converters/cents_converter.dart';
@@ -26,37 +28,40 @@ class BudgetRepository {
       final results = <BudgetWithProgress>[];
 
       for (final budget in budgets) {
-        final (start, end) = _getPeriodWindow(budget.period, now);
-        
+        final (start, end) = getPeriodWindow(budget, now);
+
         // Get all category IDs to match (parent + subcategories)
-        final categoryIds = budget.categoryId == null 
+        final categoryIds = budget.categoryId == null
             ? <int>[]
             : await _getCategoryAndSubcategories(budget.categoryId!);
 
         // Query transactions for this period
-        final query = _db.select(_db.transactions).join([])
-          ..where(_db.transactions.type.equals('expense'))
-          ..where(_db.transactions.excludeFromBudget.equals(false))
-          ..where(_db.transactions.transactionDate.isBiggerOrEqualValue(start))
-          ..where(_db.transactions.transactionDate.isSmallerThanValue(end));
-
-        if (categoryIds.isNotEmpty) {
-          query.where(_db.transactions.categoryId.isIn(categoryIds));
-        }
-
-        final txns = await query
-            .map((row) => row.readTable(_db.transactions))
-            .get();
-
-        final spentCents = txns.fold<int>(
-          0,
-          (sum, t) =>
-              sum +
-              CentsConverter.toCents(t.amount) +
-              CentsConverter.toCents(t.transactionCost) +
-              CentsConverter.toCents(t.fulizaFee),
+        final spentCents = await _sumExpensesInWindow(
+          start: start,
+          end: end,
+          categoryIds: categoryIds,
         );
         final spent = CentsConverter.fromCents(spentCents);
+
+        double rolloverAmount = 0.0;
+        final prevWindow = getPreviousPeriodWindow(budget, now);
+        final budgetStartDay = DateTime(
+          budget.startDate.year,
+          budget.startDate.month,
+          budget.startDate.day,
+        );
+        if (budget.rollover &&
+            prevWindow != null &&
+            budgetStartDay.isBefore(start)) {
+          final prevSpentCents = await _sumExpensesInWindow(
+            start: prevWindow.$1,
+            end: prevWindow.$2,
+            categoryIds: categoryIds,
+          );
+          final carryCents =
+              math.max(0, CentsConverter.toCents(budget.amount) - prevSpentCents);
+          rolloverAmount = CentsConverter.fromCents(carryCents);
+        }
 
         // Get category info if needed
         String? categoryName;
@@ -77,6 +82,7 @@ class BudgetRepository {
         results.add(BudgetWithProgress(
           budget: budget,
           spent: spent,
+          rolloverAmount: rolloverAmount,
           categoryName: categoryName,
           categoryColorHex: categoryColorHex,
           categoryIcon: categoryIcon,
@@ -94,12 +100,38 @@ class BudgetRepository {
     });
   }
 
+  Future<int> _sumExpensesInWindow({
+    required DateTime start,
+    required DateTime end,
+    required List<int> categoryIds,
+  }) async {
+    final query = _db.select(_db.transactions).join([])
+      ..where(_db.transactions.type.equals('expense'))
+      ..where(_db.transactions.excludeFromBudget.equals(false))
+      ..where(_db.transactions.transactionDate.isBiggerOrEqualValue(start))
+      ..where(_db.transactions.transactionDate.isSmallerThanValue(end));
+
+    if (categoryIds.isNotEmpty) {
+      query.where(_db.transactions.categoryId.isIn(categoryIds));
+    }
+
+    final txns = await query.map((row) => row.readTable(_db.transactions)).get();
+    return txns.fold<int>(
+      0,
+      (sum, t) =>
+          sum +
+          CentsConverter.toCents(t.amount) +
+          CentsConverter.toCents(t.transactionCost) +
+          CentsConverter.toCents(t.fulizaFee),
+    );
+  }
+
   Stream<List<Transaction>> watchBudgetTransactions(
     Budget budget, {
     DateTime? asOf,
   }) {
     final now = asOf ?? DateTime.now();
-    final (start, end) = _getPeriodWindow(budget.period, now);
+    final (start, end) = getPeriodWindow(budget, now);
 
     return _db
         .customSelect('SELECT 1', readsFrom: {_db.transactions})
@@ -144,8 +176,8 @@ class BudgetRepository {
         .write(BudgetsCompanion(isArchived: Value(archive)));
   }
 
-  (DateTime, DateTime) _getPeriodWindow(String period, DateTime now) {
-    switch (period) {
+  static (DateTime, DateTime) getPeriodWindow(Budget budget, DateTime now) {
+    switch (budget.period) {
       case 'monthly':
         final start = DateTime(now.year, now.month, 1);
         final end = DateTime(now.year, now.month + 1, 1);
@@ -156,11 +188,41 @@ class BudgetRepository {
         final end = start.add(const Duration(days: 7));
         return (start, end);
       default:
-        // For custom periods, use the budget's startDate and endDate
-        // This is a simplified fallback
-        final start = DateTime(now.year, now.month, 1);
-        final end = DateTime(now.year, now.month + 1, 1);
+        final start = DateTime(
+          budget.startDate.year,
+          budget.startDate.month,
+          budget.startDate.day,
+        );
+        if (budget.endDate != null) {
+          final exclusiveEnd = DateTime(
+            budget.endDate!.year,
+            budget.endDate!.month,
+            budget.endDate!.day + 1,
+          );
+          final minEnd = start.add(const Duration(days: 1));
+          return (start, exclusiveEnd.isBefore(minEnd) ? minEnd : exclusiveEnd);
+        }
+        return (start, start.add(const Duration(days: 30)));
+    }
+  }
+
+  static (DateTime, DateTime)? getPreviousPeriodWindow(
+    Budget budget,
+    DateTime now,
+  ) {
+    switch (budget.period) {
+      case 'monthly':
+        final start = DateTime(now.year, now.month - 1, 1);
+        final end = DateTime(now.year, now.month, 1);
         return (start, end);
+      case 'weekly':
+        final weekday = now.weekday;
+        final currentStart =
+            DateTime(now.year, now.month, now.day - (weekday - 1));
+        final prevStart = currentStart.subtract(const Duration(days: 7));
+        return (prevStart, currentStart);
+      default:
+        return null;
     }
   }
 

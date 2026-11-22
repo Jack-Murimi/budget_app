@@ -161,7 +161,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                   setState(() {});
                 },
               )
-            : const Text('Transactions'),
+            : const Text('Transactions', overflow: TextOverflow.ellipsis),
         actions: [
           // Search toggle
           IconButton(
@@ -232,7 +232,11 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     ),
                   if (selectedDateRange != 'all')
                     _ActiveChip(
-                      label: selectedDateRange == 'today' ? 'Today' : 'This Month',
+                      label: switch (selectedDateRange) {
+                        'today' => 'Today',
+                        'this_week' => 'This Week',
+                        _ => 'This Month',
+                      },
                       onRemove: () => ref.read(transactionDateRangeFilterProvider.notifier).state = 'all',
                     ),
                   if (selectedAccountId != null)
@@ -283,23 +287,36 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                      child: Row(
-                        children: [
-                          Text('${txns.length} transaction${txns.length == 1 ? '' : 's'}',
-                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
-                          const Spacer(),
-                          _SummaryPill(label: '▲', amount: expense, color: theme.colorScheme.error),
-                          const SizedBox(width: 8),
-                          _SummaryPill(label: '▼', amount: income, color: theme.colorScheme.primary),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${net >= 0 ? '+' : ''}${CurrencyFormatter.format(net)}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: net >= 0 ? theme.colorScheme.primary : theme.colorScheme.error,
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 10,
+                          runSpacing: 6,
+                          children: [
+                            Text(
+                              '${txns.length} transaction${txns.length == 1 ? '' : 's'}',
+                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
                             ),
-                          ),
-                        ],
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                _SummaryPill(label: '▲', amount: expense, color: theme.colorScheme.error),
+                                _SummaryPill(label: '▼', amount: income, color: theme.colorScheme.primary),
+                                Text(
+                                  '${net >= 0 ? '+' : ''}${CurrencyFormatter.format(net)}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: net >= 0 ? theme.colorScheme.primary : theme.colorScheme.error,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 

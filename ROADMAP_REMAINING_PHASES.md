@@ -127,40 +127,40 @@ Related: [[Budget KE/context|context]] · [[Budget KE/decisions|decisions]] · [
 ## Phase 4 — Unfinished Features, Broken UI Controls & Dark Mode Polish
 
 ### Archived Views & Budget Logic
-- [ ] Add `includeArchived: true` providers in `budget_providers.dart` and `account_providers.dart` so `BudgetsScreen` (`budgets_screen.dart:38-40`) and `AccountsScreen` (`accounts_screen.dart:194`) can actually view and unarchive archived items.
-- [ ] Fix invisible category icons on Budget cards (`lib/features/budgets/screens/budgets_screen.dart:144-154`) by using `color.withValues(alpha: 0.15)` background and contrasting foreground icon color.
-- [ ] Make `BudgetDetailScreen` (`lib/features/budgets/screens/budget_detail_screen.dart`) reactive: watch the budget by ID from `budgetsWithProgressProvider` and switch `budgetTransactionsAsyncProvider` from `.first` `FutureProvider` to a `StreamProvider`.
-- [ ] Fix `BudgetDetailScreen._getPeriodInfo` (`budget_detail_screen.dart:164-168`) `'Period ended'` bug on the final day of a period (use calendar day/hour remainder with `>= 1` day left), and fix the red text on filled primary Delete button (`budget_detail_screen.dart:333`).
-- [ ] Support `custom` budget periods (`startDate`–`endDate`) in `BudgetRepository._getPeriodWindow` (`lib/features/budgets/repositories/budget_repository.dart:158-163`), and either implement `rollover` carry-over math or remove the placebo `rollover` switch from the budget dialogs (`budgets_screen.dart:326-363`).
+- [x] Add `includeArchived: true` providers in `budget_providers.dart` and `account_providers.dart` so `BudgetsScreen` (`budgets_screen.dart:38-40`) and `AccountsScreen` (`accounts_screen.dart:194`) can actually view and unarchive archived items.
+- [x] Fix invisible category icons on Budget cards (`lib/features/budgets/screens/budgets_screen.dart:144-154`) by using `color.withValues(alpha: 0.15)` background and contrasting foreground icon color.
+- [x] Make `BudgetDetailScreen` (`lib/features/budgets/screens/budget_detail_screen.dart`) reactive: watch the budget by ID from `budgetsWithProgressProvider` and switch `budgetTransactionsAsyncProvider` from `.first` `FutureProvider` to a `StreamProvider`.
+- [x] Fix `BudgetDetailScreen._getPeriodInfo` (`budget_detail_screen.dart:164-168`) `'Period ended'` bug on the final day of a period (use calendar day/hour remainder with `>= 1` day left), and fix the red text on filled primary Delete button (`budget_detail_screen.dart:333`).
+- [x] Support `custom` budget periods (`startDate`–`endDate`) in `BudgetRepository._getPeriodWindow` (`lib/features/budgets/repositories/budget_repository.dart:158-163`), and either implement `rollover` carry-over math or remove the placebo `rollover` switch from the budget dialogs (`budgets_screen.dart:326-363`).
 
 ### Recurring Transactions
-- [ ] Fix `RecurringModel.copyWith` (`lib/features/recurring/models/recurring_model.dart:92`) using a sentinel/clear flag so `endDate` can be cleared back to `null`.
-- [ ] Fix `RecurrenceEngine` (`lib/features/recurring/services/recurrence_engine.dart`) month-end drift (`Jan 31 -> Feb 28 -> Mar 28`, `Feb 29 + 1yr -> Mar 1`) by anchoring day-of-month to `startDate.day`.
-- [ ] Fix `RecurringModel.isOverdue` (`recurring_model.dart:50`) to compare calendar dates instead of `DateTime.now()` (avoiding false overdue badges on bills due today).
-- [ ] In `AddEditRecurringScreen` (`lib/features/recurring/screens/add_edit_recurring_screen.dart`): pass `initialType: _type` to `showCategoryPicker`, clear `_selectedCategory` if type changes to a mismatched type, and validate `intervalCount >= 1`.
-- [ ] Validate `actualAmount > 0` in `RecurringScreen._confirmMarkPaid`, filter the `Upcoming & Due` tab by the upcoming horizon (e.g., 30 days) or due/overdue status, and either implement `autoRecord` startup execution + `notify` local notifications (`flutter_local_notifications`) or hide the unimplemented toggles.
+- [x] Fix `RecurringModel.copyWith` (`lib/features/recurring/models/recurring_model.dart:92`) using a sentinel/clear flag so `endDate` can be cleared back to `null`.
+- [x] Fix `RecurrenceEngine` (`lib/features/recurring/services/recurrence_engine.dart`) month-end drift (`Jan 31 -> Feb 28 -> Mar 28`, `Feb 29 + 1yr -> Mar 1`) by anchoring day-of-month to `startDate.day`.
+- [x] Fix `RecurringModel.isOverdue` (`recurring_model.dart:50`) to compare calendar dates instead of `DateTime.now()` (avoiding false overdue badges on bills due today).
+- [x] In `AddEditRecurringScreen` (`lib/features/recurring/screens/add_edit_recurring_screen.dart`): pass `initialType: _type` to `showCategoryPicker`, clear `_selectedCategory` if type changes to a mismatched type, and validate `intervalCount >= 1`.
+- [x] Validate `actualAmount > 0` in `RecurringScreen._confirmMarkPaid`, filter the `Upcoming & Due` tab by the upcoming horizon (e.g., 30 days) or due/overdue status, and either implement `autoRecord` startup execution + `notify` local notifications (`flutter_local_notifications`) or hide the unimplemented toggles.
 
 ### Debts, Loans & Goals UX
-- [ ] Add edit and delete actions for Debts, Debt Repayments, and Savings Goals (with linked transaction cleanup options).
-- [ ] Add an account picker dropdown to Debt creation, Repayment, and Goal contribution dialogs instead of silently defaulting to `getDefaultAccount()`.
-- [ ] Allow tapping Borrowed debts on `DebtsScreen` to open `LoanDetailScreen` (`lib/features/debts/screens/loan_detail_screen.dart`), generalize hardcoded `'Total lent'` / sign strings for both `lent` and `borrowed`, and fix `_DebtCard._repay` button wording for borrowed vs lent items.
-- [ ] Fix `BridgeChargesScreen` (`lib/features/debts/screens/bridge_charges_screen.dart:360-362`) labeling partial repayments on active loans as `'Settled: <date>'`.
-- [ ] Add validation snackbars/errors, `targetAmount > 0` guard (`goals_screen.dart:110`), `NULLS LAST` sorting (`goal_repository.dart:9-11`), and contribution history view to `GoalsScreen`.
+- [x] Add edit and delete actions for Debts, Debt Repayments, and Savings Goals (with linked transaction cleanup options).
+- [x] Add an account picker dropdown to Debt creation, Repayment, and Goal contribution dialogs instead of silently defaulting to `getDefaultAccount()`.
+- [x] Allow tapping Borrowed debts on `DebtsScreen` to open `LoanDetailScreen` (`lib/features/debts/screens/loan_detail_screen.dart`), generalize hardcoded `'Total lent'` / sign strings for both `lent` and `borrowed`, and fix `_DebtCard._repay` button wording for borrowed vs lent items.
+- [x] Fix `BridgeChargesScreen` (`lib/features/debts/screens/bridge_charges_screen.dart:360-362`) labeling partial repayments on active loans as `'Settled: <date>'`.
+- [x] Add validation snackbars/errors, `targetAmount > 0` guard (`goals_screen.dart:110`), `NULLS LAST` sorting (`goal_repository.dart:9-11`), and contribution history view to `GoalsScreen`.
 
 ### Home, Navigation, Transactions, Accounts & Insights UI
-- [ ] Show `HomeFloatingActionButtons` (`lib/features/home/screens/main_navigation_screen.dart:56`) only on Home (`0`) and Transactions (`1`) tabs so it stops overlapping `BudgetsScreen`'s FAB and floating over `MoreScreen`.
-- [ ] Feed `CategoryPieChartSection` on `HomeScreen` (`lib/features/home/screens/home_screen.dart:300-301`) from current-month transactions instead of `recentTransactionsProvider` (last 50 all-time).
-- [ ] Tap Home account chips (`home_screen.dart:236-241`) directly into `AccountDetailScreen` for that account; switch Home app bar logo to `assets/logo_dark.svg` when `Theme.of(context).brightness == Brightness.dark`.
-- [ ] Fix `TransactionsScreen` (`lib/features/transactions/screens/transactions_screen.dart`): show `'This Week'` in the active date filter chip (`transactions_screen.dart:234`), include subcategories when filtering by a parent category (`transaction_providers.dart:91`), and make the summary bar responsive (`Wrap` / `FittedBox`) so it never overflows on narrow devices.
-- [ ] Fix `TransactionListItem` (`lib/features/home/widgets/transaction_list_item.dart:128-134, 161-187`) so the `Fuliza` badge renders alongside `fee > 0`, and restore a 48×48dp tap target on the delete `IconButton`.
-- [ ] Fix `AccountDetailScreen` (`lib/features/accounts/screens/account_detail_screen.dart:252-254, 366-371`) so incoming transfers (`txn.toAccountId == _account.id`) render with `+` and primary color, and edit/default state reads reactively from `accountsWithBalanceProvider`; add validation (`fromId != toId`, `amount > 0`, `fee >= 0`, error feedback) to `AccountsScreen._showTransferDialog`.
-- [ ] Improve `InsightsScreen` (`lib/features/insights/screens/insights_screen.dart`): aggregate `_CashflowChart` weekly/monthly when the selected range exceeds 31 days (instead of cramming 365 daily bars), roll categories #6+ into `"Other"` with KES values in `_CategoryChart`, and display average daily burn rate on `_SummaryCard`.
-- [ ] Replace hardcoded light-only pastel colors (`Colors.amber.shade100`, `Colors.orange.shade50`, `Colors.green.shade50`, `Colors.grey.shade200`, etc.) with theme `ColorScheme` tokens across `HomeScreen`, `FulizaScreen`, `RecurringScreen`, `DebtsScreen`, and `BridgeChargesScreen`.
-- [ ] Fix `CurrencyFormatter.formatCompact` (`lib/shared/utils/currency_formatter.dart:7-11`) for negative values and `DateFormatter.formatRelative` (`lib/shared/utils/date_formatter.dart:7-14`) for calendar-day boundaries and future dates.
+- [x] Show `HomeFloatingActionButtons` (`lib/features/home/screens/main_navigation_screen.dart:56`) only on Home (`0`) and Transactions (`1`) tabs so it stops overlapping `BudgetsScreen`'s FAB and floating over `MoreScreen`.
+- [x] Feed `CategoryPieChartSection` on `HomeScreen` (`lib/features/home/screens/home_screen.dart:300-301`) from current-month transactions instead of `recentTransactionsProvider` (last 50 all-time).
+- [x] Tap Home account chips (`home_screen.dart:236-241`) directly into `AccountDetailScreen` for that account; switch Home app bar logo to `assets/logo_dark.svg` when `Theme.of(context).brightness == Brightness.dark`.
+- [x] Fix `TransactionsScreen` (`lib/features/transactions/screens/transactions_screen.dart`): show `'This Week'` in the active date filter chip (`transactions_screen.dart:234`), include subcategories when filtering by a parent category (`transaction_providers.dart:91`), and make the summary bar responsive (`Wrap` / `FittedBox`) so it never overflows on narrow devices.
+- [x] Fix `TransactionListItem` (`lib/features/home/widgets/transaction_list_item.dart:128-134, 161-187`) so the `Fuliza` badge renders alongside `fee > 0`, and restore a 48×48dp tap target on the delete `IconButton`.
+- [x] Fix `AccountDetailScreen` (`lib/features/accounts/screens/account_detail_screen.dart:252-254, 366-371`) so incoming transfers (`txn.toAccountId == _account.id`) render with `+` and primary color, and edit/default state reads reactively from `accountsWithBalanceProvider`; add validation (`fromId != toId`, `amount > 0`, `fee >= 0`, error feedback) to `AccountsScreen._showTransferDialog`.
+- [x] Improve `InsightsScreen` (`lib/features/insights/screens/insights_screen.dart`): aggregate `_CashflowChart` weekly/monthly when the selected range exceeds 31 days (instead of cramming 365 daily bars), roll categories #6+ into `"Other"` with KES values in `_CategoryChart`, and display average daily burn rate on `_SummaryCard`.
+- [x] Replace hardcoded light-only pastel colors (`Colors.amber.shade100`, `Colors.orange.shade50`, `Colors.green.shade50`, `Colors.grey.shade200`, etc.) with theme `ColorScheme` tokens across `HomeScreen`, `FulizaScreen`, `RecurringScreen`, `DebtsScreen`, and `BridgeChargesScreen`.
+- [x] Fix `CurrencyFormatter.formatCompact` (`lib/shared/utils/currency_formatter.dart:7-11`) for negative values and `DateFormatter.formatRelative` (`lib/shared/utils/date_formatter.dart:7-14`) for calendar-day boundaries and future dates.
 
 ### Phase 4 Verification
-- [ ] Add/update widget tests for `BudgetsScreen` (archived toggle, icon contrast), `BudgetDetailScreen`, `RecurringScreen` (`endDate` clear, `isOverdue`), `DebtsScreen`, `GoalsScreen`, `TransactionsScreen` (`this_week` chip, subcategory filter), `AccountDetailScreen`, and Dark/OLED rendering.
-- [ ] Run `flutter analyze && flutter test`.
+- [x] Add/update widget tests for `BudgetsScreen` (archived toggle, icon contrast), `BudgetDetailScreen`, `RecurringScreen` (`endDate` clear, `isOverdue`), `DebtsScreen`, `GoalsScreen`, `TransactionsScreen` (`this_week` chip, subcategory filter), `AccountDetailScreen`, and Dark/OLED rendering.
+- [x] Run `flutter analyze && flutter test`.
 
 ---
 

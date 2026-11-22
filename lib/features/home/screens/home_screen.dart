@@ -4,9 +4,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/services/widget_update_service.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../accounts/providers/account_providers.dart';
+import '../../accounts/screens/account_detail_screen.dart';
 import '../../budgets/providers/budget_providers.dart';
 import '../../budgets/screens/budgets_screen.dart';
-import '../../accounts/screens/accounts_screen.dart';
 import '../../recurring/providers/recurring_providers.dart';
 import '../../recurring/screens/recurring_screen.dart';
 import '../../transactions/providers/transaction_providers.dart';
@@ -20,7 +20,10 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final transactionsAsync = ref.watch(recentTransactionsProvider);
+    final monthTxnsAsync = ref.watch(currentMonthTransactionsProvider);
     final summaryAsync = ref.watch(monthSummaryProvider);
 
     return Scaffold(
@@ -28,7 +31,7 @@ class HomeScreen extends ConsumerWidget {
         title: Row(
           children: [
             SvgPicture.asset(
-              'assets/logo.svg',
+              isDark ? 'assets/logo_dark.svg' : 'assets/logo.svg',
               height: 32,
               width: 32,
             ),
@@ -38,7 +41,11 @@ class HomeScreen extends ConsumerWidget {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: () async => ref.invalidate(recentTransactionsProvider),
+        onRefresh: () async {
+          ref.invalidate(recentTransactionsProvider);
+          ref.invalidate(currentMonthTransactionsProvider);
+          ref.invalidate(monthSummaryProvider);
+        },
         child: ListView(
           padding: const EdgeInsets.only(bottom: 120),
           children: [
@@ -90,12 +97,12 @@ class HomeScreen extends ConsumerWidget {
                             color: isAlert
                                 ? theme.colorScheme.errorContainer
                                     .withValues(alpha: 0.6)
-                                : Colors.amber.shade100,
+                                : theme.colorScheme.tertiaryContainer,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: isAlert
                                   ? theme.colorScheme.error
-                                  : Colors.amber.shade700,
+                                  : theme.colorScheme.tertiary,
                               width: 1,
                             ),
                           ),
@@ -107,7 +114,7 @@ class HomeScreen extends ConsumerWidget {
                                     : Icons.schedule,
                                 color: isAlert
                                     ? theme.colorScheme.error
-                                    : Colors.amber.shade900,
+                                    : theme.colorScheme.onTertiaryContainer,
                                 size: 20,
                               ),
                               const SizedBox(width: 10),
@@ -120,7 +127,7 @@ class HomeScreen extends ConsumerWidget {
                                     fontWeight: FontWeight.bold,
                                     color: isAlert
                                         ? theme.colorScheme.onErrorContainer
-                                        : Colors.amber.shade900,
+                                        : theme.colorScheme.onTertiaryContainer,
                                   ),
                                 ),
                               ),
@@ -129,7 +136,7 @@ class HomeScreen extends ConsumerWidget {
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: isAlert
                                       ? theme.colorScheme.error
-                                      : Colors.amber.shade900,
+                                      : theme.colorScheme.onTertiaryContainer,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -139,7 +146,7 @@ class HomeScreen extends ConsumerWidget {
                                 size: 16,
                                 color: isAlert
                                     ? theme.colorScheme.error
-                                    : Colors.amber.shade900,
+                                    : theme.colorScheme.onTertiaryContainer,
                               ),
                             ],
                           ),
@@ -196,10 +203,10 @@ class HomeScreen extends ConsumerWidget {
                                         valueColor:
                                             AlwaysStoppedAnimation<Color>(
                                           budget.isOverBudget
-                                              ? Colors.red
+                                              ? theme.colorScheme.error
                                               : budget.progress >= 0.75
-                                                  ? Colors.amber
-                                                  : Colors.green,
+                                                  ? theme.colorScheme.tertiary
+                                                  : theme.colorScheme.primary,
                                         ),
                                         minHeight: 8,
                                       ),
@@ -235,10 +242,12 @@ class HomeScreen extends ConsumerWidget {
                                 );
                                 return GestureDetector(
                                   onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) =>
-                                              const AccountsScreen())),
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          AccountDetailScreen(account: a),
+                                    ),
+                                  ),
                                   child: Container(
                                     margin: const EdgeInsets.only(right: 8),
                                     padding: const EdgeInsets.symmetric(
@@ -297,7 +306,7 @@ class HomeScreen extends ConsumerWidget {
                 );
               },
             ),
-            transactionsAsync.when(
+            monthTxnsAsync.when(
               data: (txns) => CategoryPieChartSection(transactions: txns),
               loading: () => const SizedBox.shrink(),
               error: (_, __) => const SizedBox.shrink(),

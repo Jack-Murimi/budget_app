@@ -380,4 +380,44 @@ void main() {
     expect(emitted.length, 2);
     expect(emitted.first.debt.id, debtId1);
   });
+
+  test('updateDebt, deleteRepayment, and deleteDebt maintain consistent state', () async {
+    final accountId = (await db.select(db.accounts).get()).first.id;
+    final debtId = await repo.create(
+      direction: 'borrowed',
+      counterparty: 'SACCO',
+      principal: 10000,
+      interest: 500,
+      product: 'personal',
+      accountId: accountId,
+    );
+    var debt = await (db.select(db.debts)..where((d) => d.id.equals(debtId))).getSingle();
+    await repo.repay(debt: debt, amount: 2500, accountId: accountId);
+
+    // Update principal & interest -> outstanding = 12000 + 1000 - 2500 = 10500
+    await repo.updateDebt(
+      id: debtId,
+      counterparty: 'Kenya SACCO',
+      product: 'personal',
+      principal: 12000,
+      interest: 1000,
+      clearDueDate: true,
+    );
+    debt = await (db.select(db.debts)..where((d) => d.id.equals(debtId))).getSingle();
+    expect(debt.counterparty, 'Kenya SACCO');
+    expect(debt.outstanding, 10500);
+
+    // Delete repayment with linked txn cleanup -> outstanding restored to 13000
+    final rep = (await db.select(db.debtRepayments).get()).single;
+    await repo.deleteRepayment(rep.id, deleteLinkedTransaction: true);
+    debt = await (db.select(db.debts)..where((d) => d.id.equals(debtId))).getSingle();
+    expect(debt.outstanding, 13000);
+    expect((await db.select(db.transactions).get()).length, 1);
+
+    // Delete debt preserving remaining disbursement txn -> debt gone, txn unlinked
+    await repo.deleteDebt(debtId, deleteLinkedTransactions: false);
+    expect(await db.select(db.debts).get(), isEmpty);
+    final remainingTxn = (await db.select(db.transactions).get()).single;
+    expect(remainingTxn.debtId, isNull);
+  });
 }

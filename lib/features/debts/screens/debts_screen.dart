@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/utils/currency_formatter.dart';
-import '../../accounts/providers/account_providers.dart';
 import '../models/debt_model.dart';
 import '../providers/debt_providers.dart';
+import '../widgets/debt_dialogs.dart';
 import 'loan_detail_screen.dart';
 
 class DebtsScreen extends ConsumerStatefulWidget {
@@ -26,7 +26,6 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateDialog(
           context,
-          ref,
           direction: isLentTab ? 'lent' : 'borrowed',
         ),
         icon: const Icon(Icons.add),
@@ -57,149 +56,14 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
     );
   }
 
-  Future<void> _showCreateDialog(BuildContext context, WidgetRef ref,
-      {String? direction}) async {
-    final name = TextEditingController();
-    final principal = TextEditingController();
-    final interest = TextEditingController(text: '0');
-    final actualCredited = TextEditingController();
-    var selectedDirection = direction ?? 'borrowed';
-    var product = 'personal';
-    DateTime? dueDate;
-    await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(
-            builder: (dialogContext, setState) => AlertDialog(
-                  title: Text(selectedDirection == 'lent'
-                      ? 'Add loan given'
-                      : 'Add debt'),
-                  content: SingleChildScrollView(
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    TextField(
-                        controller: name,
-                        decoration: InputDecoration(
-                            labelText: selectedDirection == 'lent'
-                                ? 'Person (borrower)'
-                                : 'Person or lender',
-                            border: const OutlineInputBorder())),
-                    const SizedBox(height: 12),
-                    if (direction == null) ...[
-                      DropdownButtonFormField<String>(
-                          initialValue: selectedDirection,
-                          decoration: const InputDecoration(
-                              labelText: 'Direction',
-                              border: OutlineInputBorder()),
-                          items: const [
-                            DropdownMenuItem(
-                                value: 'borrowed', child: Text('I borrowed')),
-                            DropdownMenuItem(
-                                value: 'lent', child: Text('I lent'))
-                          ],
-                          onChanged: (value) =>
-                              setState(() => selectedDirection = value!)),
-                      const SizedBox(height: 12),
-                    ],
-                    DropdownButtonFormField<String>(
-                        initialValue: product,
-                        decoration: const InputDecoration(
-                            labelText: 'Type', border: OutlineInputBorder()),
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'personal', child: Text('Personal')),
-                          DropdownMenuItem(
-                              value: 'mshwari', child: Text('M-Shwari')),
-                          DropdownMenuItem(
-                              value: 'fuliza', child: Text('Fuliza')),
-                          DropdownMenuItem(
-                              value: 'hustler_fund',
-                              child: Text('Hustler Fund')),
-                          DropdownMenuItem(
-                              value: 'bridge', child: Text('Bridge')),
-                        ],
-                        onChanged: (value) =>
-                            setState(() => product = value!)),
-                    const SizedBox(height: 12),
-                    TextField(
-                        controller: principal,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        decoration: const InputDecoration(
-                            labelText: 'Principal (KES)',
-                            border: OutlineInputBorder())),
-                    const SizedBox(height: 12),
-                    if (product == 'bridge') ...[
-                      TextField(
-                          controller: actualCredited,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          decoration: const InputDecoration(
-                              labelText: 'Actual amount credited (KES)',
-                              helperText:
-                                  'e.g. borrow 600 but only 570 hits your M-Pesa',
-                              border: OutlineInputBorder())),
-                      const SizedBox(height: 12),
-                    ],
-                    TextField(
-                        controller: interest,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        decoration: const InputDecoration(
-                            labelText: 'Total interest/repayment extra (KES)',
-                            border: OutlineInputBorder())),
-                    TextButton.icon(
-                        onPressed: () async {
-                          final picked = await showDatePicker(
-                              context: dialogContext,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2100),
-                              initialDate: dueDate ?? DateTime.now());
-                          if (picked != null) setState(() => dueDate = picked);
-                        },
-                        icon: const Icon(Icons.calendar_today_outlined),
-                        label: Text(dueDate == null
-                            ? 'Add due date'
-                            : 'Due ${dueDate!.toLocal().toString().split(' ').first}')),
-                  ])),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(dialogContext),
-                        child: const Text('Cancel')),
-                    FilledButton(
-                        onPressed: () async {
-                          final amount = double.tryParse(principal.text);
-                          final fee = double.tryParse(interest.text) ?? 0;
-                          if (amount == null ||
-                              amount <= 0 ||
-                              fee < 0 ||
-                              name.text.trim().isEmpty) {
-                            return;
-                          }
-                          final credited =
-                              double.tryParse(actualCredited.text);
-                          final shortfall = (product == 'bridge' &&
-                                  credited != null &&
-                                  credited < amount)
-                              ? amount - credited
-                              : 0.0;
-                          final account = await ref
-                              .read(accountRepositoryProvider)
-                              .getDefaultAccount();
-                          await ref.read(debtRepositoryProvider).create(
-                              direction: selectedDirection,
-                              counterparty: name.text,
-                              principal: amount,
-                              interest: fee,
-                              product: product,
-                              disbursementShortfall: shortfall,
-                              accountId: account?.id,
-                              dueDate: dueDate);
-                          if (dialogContext.mounted) {
-                            Navigator.pop(dialogContext);
-                          }
-                        },
-                        child: const Text('Save'))
-                  ],
-                )));
+  Future<void> _showCreateDialog(
+    BuildContext context, {
+    String? direction,
+  }) async {
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => CreateEditDebtDialog(initialDirection: direction),
+    );
   }
 }
 
@@ -252,6 +116,7 @@ class _TabSwitcher extends StatelessWidget {
     required VoidCallback onTap,
     required Color primary,
   }) {
+    final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(24),
@@ -267,7 +132,7 @@ class _TabSwitcher extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : primary,
+            color: isSelected ? theme.colorScheme.onPrimary : primary,
             fontWeight: FontWeight.w600,
             fontSize: 14,
           ),
@@ -283,6 +148,7 @@ class _LentTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final lent = items.where((i) => i.debt.direction == 'lent').toList();
     if (lent.isEmpty) {
       return const _EmptyDebts(
@@ -302,29 +168,31 @@ class _LentTab extends StatelessWidget {
         ...unsettled.map((item) => _LoanPersonCard(item: item)),
         if (settled.isNotEmpty) ...[
           if (unsettled.isNotEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(
                 children: [
-                  Expanded(child: Divider()),
+                  const Expanded(child: Divider()),
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Text(
                       'Settled',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: theme.colorScheme.outline,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
-                  Expanded(child: Divider()),
+                  const Expanded(child: Divider()),
                 ],
               ),
             ),
-          ...settled.map((item) => Opacity(
-                opacity: 0.65,
-                child: _LoanPersonCard(item: item),
-              )),
+          ...settled.map(
+            (item) => Opacity(
+              opacity: 0.65,
+              child: _LoanPersonCard(item: item),
+            ),
+          ),
         ],
       ],
     );
@@ -395,15 +263,18 @@ class _LoanPersonCard extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
-                color: isSettled ? Colors.grey : theme.colorScheme.primary,
+                color: isSettled
+                    ? theme.colorScheme.outline
+                    : theme.colorScheme.primary,
               ),
             ),
             if (isSettled) ...[
               const SizedBox(height: 2),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
+                  color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -411,7 +282,7 @@ class _LoanPersonCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -447,90 +318,81 @@ class _BorrowedTab extends StatelessWidget {
 class _DebtCard extends ConsumerWidget {
   final DebtWithRepayments item;
   const _DebtCard({required this.item});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final debt = item.debt;
-    final overdue = debt.dueDate != null &&
-        debt.dueDate!.isBefore(DateTime.now()) &&
-        !item.isSettled;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = debt.dueDate == null
+        ? null
+        : DateTime(debt.dueDate!.year, debt.dueDate!.month, debt.dueDate!.day);
+    final overdue = dueDay != null && dueDay.isBefore(today) && !item.isSettled;
+    final isBorrowed = debt.direction == 'borrowed';
+
     return Card(
-        child: ListTile(
-      leading: CircleAvatar(
-          child: Icon(debt.direction == 'borrowed'
-              ? Icons.south_west
-              : Icons.north_east)),
-      title: Text(debt.counterparty),
-      subtitle: Text(
-          '${debt.product.replaceAll('_', ' ')} | ${item.isSettled ? 'Settled' : overdue ? 'Overdue' : 'Outstanding'}${debt.dueDate == null ? '' : ' | Due ${debt.dueDate!.toLocal().toString().split(' ').first}'}'),
-      trailing: Column(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => LoanDetailScreen(item: item),
+            ),
+          );
+        },
+        leading: CircleAvatar(
+          backgroundColor: overdue
+              ? theme.colorScheme.errorContainer
+              : theme.colorScheme.secondaryContainer,
+          foregroundColor: overdue
+              ? theme.colorScheme.onErrorContainer
+              : theme.colorScheme.onSecondaryContainer,
+          child: Icon(
+            isBorrowed ? Icons.south_west : Icons.north_east,
+          ),
+        ),
+        title: Text(debt.counterparty),
+        subtitle: Text(
+          '${debt.product.replaceAll('_', ' ')} | ${item.isSettled ? 'Settled' : overdue ? 'Overdue' : 'Outstanding'}${debt.dueDate == null ? '' : ' | Due ${debt.dueDate!.toLocal().toString().split(' ').first}'}',
+        ),
+        trailing: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(CurrencyFormatter.format(debt.outstanding),
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color:
-                        overdue ? Theme.of(context).colorScheme.error : null)),
+            Text(
+              CurrencyFormatter.format(debt.outstanding),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: overdue ? theme.colorScheme.error : null,
+              ),
+            ),
             if (!item.isSettled)
               SizedBox(
                 height: 28,
                 child: TextButton(
-                    style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                    onPressed: () => _repay(context, ref),
-                    child: const Text('Repay')),
-              )
-          ]),
-    ));
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => _repay(context),
+                  child: Text(isBorrowed ? 'Repay' : 'Record payment'),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
-  Future<void> _repay(BuildContext context, WidgetRef ref) async {
-    final amount = TextEditingController();
-    await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-                title: Text('Repay ${item.debt.counterparty}'),
-                content: TextField(
-                    controller: amount,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                        labelText:
-                            'Amount, max ${CurrencyFormatter.format(item.debt.outstanding)}',
-                        border: const OutlineInputBorder())),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: const Text('Cancel')),
-                  FilledButton(
-                      onPressed: () async {
-                        final value = double.tryParse(amount.text);
-                        if (value == null) {
-                          return;
-                        }
-                        final account = await ref
-                            .read(accountRepositoryProvider)
-                            .getDefaultAccount();
-                        try {
-                          await ref.read(debtRepositoryProvider).repay(
-                              debt: item.debt,
-                              amount: value,
-                              accountId: account?.id);
-                          if (dialogContext.mounted) {
-                            Navigator.pop(dialogContext);
-                          }
-                        } on ArgumentError {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                              content: Text(
-                                  'Enter an amount up to the outstanding balance')));
-                        }
-                      },
-                      child: const Text('Record'))
-                ]));
+  Future<void> _repay(BuildContext context) async {
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => RecordRepaymentDialog(debt: item.debt),
+    );
   }
 }
 
@@ -545,15 +407,22 @@ class _EmptyDebts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-      child: Padding(
+        child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.handshake_outlined, size: 56),
-            const SizedBox(height: 12),
-            Text(title,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.handshake_outlined, size: 56),
+              const SizedBox(height: 12),
+              Text(
+                title,
                 style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 4),
-            Text(subtitle, textAlign: TextAlign.center)
-          ])));
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 4),
+              Text(subtitle, textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      );
 }

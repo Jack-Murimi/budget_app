@@ -107,4 +107,45 @@ void main() {
     expect(find.text('⇄ KES 5,000.00'), findsOneWidget);
     expect(find.byIcon(Icons.swap_horiz_rounded), findsOneWidget);
   });
+
+  testWidgets('renders Fuliza badge alongside fee and restores 48x48 delete tap target',
+      (tester) async {
+    final container =
+        ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    final txn = TransactionModel(
+      id: 3,
+      header: 'Quickmart',
+      amount: 800.0,
+      transactionCost: 13.0,
+      fulizaAmount: 300.0,
+      fulizaFee: 5.0,
+      transactionDate: DateTime.now(),
+      createdAt: DateTime.now(),
+      type: 'expense',
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: TransactionListItem(
+              transaction: txn,
+              onDelete: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('+KES 18.00 fee'), findsOneWidget);
+    expect(find.text('Fuliza'), findsOneWidget);
+
+    final deleteSize = tester.getSize(find.byType(IconButton));
+    expect(deleteSize.width, greaterThanOrEqualTo(48));
+    expect(deleteSize.height, greaterThanOrEqualTo(48));
+  });
 }

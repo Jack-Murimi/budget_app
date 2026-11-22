@@ -161,5 +161,66 @@ void main() {
 
     expect(find.text('Bank Loan'), findsOneWidget);
     expect(find.text('Repay'), findsOneWidget);
+
+    // Tapping a borrowed debt opens LoanDetailScreen with Total borrowed
+    await tester.tap(find.text('Bank Loan'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoanDetailScreen), findsOneWidget);
+    expect(find.text('Total borrowed'), findsOneWidget);
+  });
+
+  testWidgets('creating debt with explicit account picker and editing/deleting via LoanDetailScreen',
+      (tester) async {
+    final container =
+        ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(buildTestApp(container));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Lend money'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Person (borrower)'),
+      'Grace',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Principal (KES)'),
+      '2000',
+    );
+    // Account picker is visible and selectable
+    expect(find.text('Account'), findsOneWidget);
+
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Grace'), findsOneWidget);
+
+    // Open LoanDetailScreen and edit
+    await tester.tap(find.text('Grace'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Edit debt'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Person or lender').evaluate().isNotEmpty
+          ? find.widgetWithText(TextFormField, 'Person or lender')
+          : find.widgetWithText(TextFormField, 'Person (borrower)'),
+      'Grace Updated',
+    );
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Grace Updated'), findsOneWidget);
+
+    // Delete debt cleanly
+    await tester.tap(find.byTooltip('Delete debt'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoanDetailScreen), findsNothing);
+    expect(await db.select(db.debts).get(), isEmpty);
   });
 }
