@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/l10n.dart';
 import '../../../main.dart';
+import '../../../shared/widgets/motion.dart';
 import '../../accounts/screens/accounts_screen.dart';
 import '../../categories/screens/categories_screen.dart';
 import '../../debts/screens/bridge_charges_screen.dart';
@@ -134,18 +136,22 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     final l10n = context.l10n;
     final allSections = buildMoreSections(ref, l10n);
 
-    final filteredSections = allSections.map((section) {
-      if (_query.isEmpty) return section;
-      final matchingItems = section.items.where((item) {
-        final titleMatch = item.title.toLowerCase().contains(_query);
-        final subMatch = item.subtitle?.toLowerCase().contains(_query) ?? false;
-        return titleMatch || subMatch;
-      }).toList();
-      return MoreSectionConfig(
-        header: section.header,
-        items: matchingItems,
-      );
-    }).where((section) => section.items.isNotEmpty).toList();
+    final filteredSections = allSections
+        .map((section) {
+          if (_query.isEmpty) return section;
+          final matchingItems = section.items.where((item) {
+            final titleMatch = item.title.toLowerCase().contains(_query);
+            final subMatch =
+                item.subtitle?.toLowerCase().contains(_query) ?? false;
+            return titleMatch || subMatch;
+          }).toList();
+          return MoreSectionConfig(
+            header: section.header,
+            items: matchingItems,
+          );
+        })
+        .where((section) => section.items.isNotEmpty)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -187,51 +193,93 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     itemCount: filteredSections.length,
                     itemBuilder: (context, sectionIndex) {
                       final section = filteredSections[sectionIndex];
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-                            child: Text(
-                              section.header.toUpperCase(),
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.1,
-                              ),
-                            ),
-                          ),
-                          ...section.items.map((item) {
-                            return ListTile(
-                              minVerticalPadding: 12,
-                              leading: Icon(
-                                item.icon,
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                              title: Text(
-                                item.title,
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w500,
+                      return FadeSlideIn(
+                        index: sectionIndex,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 14, 16, 6),
+                              child: Text(
+                                section.header.toUpperCase(),
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.1,
                                 ),
                               ),
-                              subtitle: item.subtitle != null
-                                  ? Text(item.subtitle!)
-                                  : null,
-                              trailing: Icon(
-                                Icons.chevron_right,
-                                color: theme.colorScheme.outline,
+                            ),
+                            Card(
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              child: Column(
+                                children: [
+                                  for (final (idx, item)
+                                      in section.items.indexed) ...[
+                                    if (idx > 0)
+                                      const Divider(
+                                        height: 1,
+                                        indent: 64,
+                                        endIndent: 16,
+                                      ),
+                                    ListTile(
+                                      dense: item.subtitle == null,
+                                      minVerticalPadding: 8,
+                                      leading: Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          color: theme
+                                              .colorScheme.primaryContainer
+                                              .withValues(alpha: 0.55),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        child: Icon(
+                                          item.icon,
+                                          size: 19,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      ),
+                                      title: Text(
+                                        item.title,
+                                        style:
+                                            theme.textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      subtitle: item.subtitle != null
+                                          ? Text(
+                                              item.subtitle!,
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                color: theme.colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                            )
+                                          : null,
+                                      trailing: Icon(
+                                        Icons.chevron_right_rounded,
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                      onTap: () {
+                                        HapticFeedback.selectionClick();
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (ctx) =>
+                                                item.destination(ctx),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ],
                               ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (ctx) => item.destination(ctx),
-                                  ),
-                                );
-                              },
-                            );
-                          }),
-                        ],
+                            ),
+                          ],
+                        ),
                       );
                     },
                   ),

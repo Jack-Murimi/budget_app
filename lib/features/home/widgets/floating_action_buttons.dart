@@ -145,26 +145,35 @@ class _HomeFloatingActionButtonsState
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final cs = Theme.of(context).colorScheme;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         FloatingActionButton.small(
           heroTag: 'fab_parse',
-          onPressed: () => _run(_pasteAndParse),
+          backgroundColor: cs.secondaryContainer,
+          foregroundColor: cs.onSecondaryContainer,
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            _run(_pasteAndParse);
+          },
           tooltip: l10n.pasteMpesaSmsTooltip,
           child: const Icon(Icons.content_paste_rounded),
         ),
         const SizedBox(height: 12),
         FloatingActionButton(
           heroTag: 'fab_add_manual',
-          onPressed: () => _run(
-            () => Navigator.of(context).push<void>(
-              MaterialPageRoute(builder: (_) => const AddTransactionScreen()),
-            ),
-          ),
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            _run(
+              () => Navigator.of(context).push<void>(
+                MaterialPageRoute(builder: (_) => const AddTransactionScreen()),
+              ),
+            );
+          },
           tooltip: l10n.addManuallyTooltip,
-          child: const Icon(Icons.add),
+          child: const Icon(Icons.add_rounded, size: 28),
         ),
       ],
     );
@@ -230,8 +239,7 @@ class _PasteDialogState extends State<_PasteDialog> {
       ),
       actions: [
         TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.cancel)),
+            onPressed: () => Navigator.pop(context), child: Text(l10n.cancel)),
         FilledButton(onPressed: _submit, child: Text(l10n.parse)),
       ],
     );

@@ -1,10 +1,12 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../models/account_model.dart';
 import '../providers/account_providers.dart';
 import 'account_detail_screen.dart';
@@ -98,21 +100,73 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Net worth card
+              // Net worth hero card
               netWorthAsync.when(
-                data: (total) => Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(l10n.totalBalance, style: theme.textTheme.bodyMedium),
-                        Text(
-                          CurrencyFormatter.format(total),
-                          style: theme.textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                data: (total) => FadeSlideIn(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            theme.colorScheme.primaryContainer,
+                            Color.lerp(
+                              theme.colorScheme.primaryContainer,
+                              theme.colorScheme.tertiaryContainer,
+                              0.45,
+                            )!,
+                          ],
                         ),
-                      ],
+                      ),
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            right: -24,
+                            top: -28,
+                            child: Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: theme.colorScheme.onPrimaryContainer
+                                    .withValues(alpha: 0.06),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(22),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.totalBalance,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    color: theme.colorScheme.onPrimaryContainer
+                                        .withValues(alpha: 0.8),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: AnimatedAmount(
+                                    value: total,
+                                    format: CurrencyFormatter.format,
+                                    style:
+                                        theme.textTheme.headlineLarge?.copyWith(
+                                      color:
+                                          theme.colorScheme.onPrimaryContainer,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -129,19 +183,29 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                   ),
                 )
               else
-                ...active.map((a) => _AccountCard(account: a)),
+                for (final (i, a) in active.indexed)
+                  FadeSlideIn(
+                    index: i + 1,
+                    child: _AccountCard(account: a),
+                  ),
 
               if (archived.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text(
-                    l10n.archived,
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(color: theme.colorScheme.outline),
+                    l10n.archived.toUpperCase(),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      letterSpacing: 1.0,
+                    ),
                   ),
                 ),
-                ...archived.map((a) => _AccountCard(account: a, dimmed: true)),
+                for (final (i, a) in archived.indexed)
+                  FadeSlideIn(
+                    index: active.length + i + 1,
+                    child: _AccountCard(account: a, dimmed: true),
+                  ),
               ],
             ],
           );
@@ -471,128 +535,141 @@ class _AccountCard extends ConsumerWidget {
 
     return Opacity(
       opacity: dimmed ? 0.5 : 1.0,
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Pressable(
+          haptic: true,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => AccountDetailScreen(account: account),
             ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      account.name.isNotEmpty
-                          ? account.name[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Center(
+                      child: Text(
+                        account.name.isNotEmpty
+                            ? account.name[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            account.name,
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                account.name,
+                                style: theme.textTheme.titleSmall,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (account.isDefault) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primaryContainer,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  l10n.defaultLabel,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.onPrimaryContainer,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            if (account.isArchived) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color:
+                                      theme.colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  l10n.archived,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          account.type.toUpperCase(),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            letterSpacing: 0.6,
                           ),
-                          if (account.isDefault) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                l10n.defaultLabel,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: theme.colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (account.isArchived) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color:
-                                    theme.colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                l10n.archived,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        account.type.toUpperCase(),
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.outline),
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                if (account.isArchived)
-                  IconButton(
-                    icon: const Icon(Icons.unarchive_outlined),
-                    tooltip: l10n.unarchive,
-                    onPressed: () => ref
-                        .read(accountRepositoryProvider)
-                        .archiveAccount(account.id, archive: false),
-                  )
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        CurrencyFormatter.format(account.balance),
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 2),
-                      Icon(
-                        Icons.chevron_right,
-                        size: 18,
-                        color: theme.colorScheme.outline,
-                      ),
-                    ],
-                  ),
-              ],
+                  if (account.isArchived)
+                    IconButton(
+                      icon: const Icon(Icons.unarchive_outlined),
+                      tooltip: l10n.unarchive,
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        ref
+                            .read(accountRepositoryProvider)
+                            .archiveAccount(account.id, archive: false);
+                      },
+                    )
+                  else
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          CurrencyFormatter.format(account.balance),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
+                ],
+              ),
             ),
           ),
         ),

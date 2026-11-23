@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../../debts/models/debt_model.dart';
 import '../../debts/providers/debt_providers.dart';
 
@@ -42,6 +44,7 @@ class _BridgeChargesScreenState extends ConsumerState<BridgeChargesScreen> {
   static final _fmt = DateFormat('dd MMM yyyy');
 
   void _applyPreset(int index) {
+    HapticFeedback.selectionClick();
     final now = DateTime.now();
     setState(() {
       _presetIndex = index;
@@ -179,59 +182,91 @@ class _BridgeChargesScreenState extends ConsumerState<BridgeChargesScreen> {
                 return ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    Card(
-                      color: theme.colorScheme.primaryContainer,
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.totalBridgeCharges,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: theme.colorScheme.onPrimaryContainer,
+                    FadeSlideIn(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                theme.colorScheme.primaryContainer,
+                                Color.lerp(
+                                  theme.colorScheme.primaryContainer,
+                                  theme.colorScheme.tertiaryContainer,
+                                  0.45,
+                                )!,
+                              ],
+                            ),
+                          ),
+                          padding: const EdgeInsets.all(22),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.totalBridgeCharges,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: theme.colorScheme.onPrimaryContainer
+                                      .withValues(alpha: 0.8),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              CurrencyFormatter.format(totalCharges),
-                              style: theme.textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onPrimaryContainer,
+                              const SizedBox(height: 6),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: AnimatedAmount(
+                                  value: totalCharges,
+                                  format: CurrencyFormatter.format,
+                                  style:
+                                      theme.textTheme.headlineLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: theme.colorScheme.onPrimaryContainer,
+                                  ),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            const Divider(height: 1),
-                            const SizedBox(height: 12),
-                            _SummaryRow(
-                              label: l10n.upfrontDeductionsShortfall,
-                              value: totalShortfall,
-                              tooltip: l10n.upfrontDeductionsTooltip,
-                            ),
-                            const SizedBox(height: 6),
-                            _SummaryRow(
-                              label: l10n.repaymentInterest,
-                              value: totalInterest,
-                              tooltip: l10n.repaymentInterestTooltip,
-                            ),
-                            const SizedBox(height: 6),
-                            _SummaryRow(
-                              label: l10n.totalPrincipalBorrowed,
-                              value: totalPrincipal,
-                            ),
-                            const SizedBox(height: 6),
-                            _SummaryRow(
-                              label: l10n.totalLoans,
-                              count: loans.length,
-                            ),
-                          ],
+                              const SizedBox(height: 14),
+                              Divider(
+                                height: 1,
+                                color: theme.colorScheme.onPrimaryContainer
+                                    .withValues(alpha: 0.14),
+                              ),
+                              const SizedBox(height: 14),
+                              _SummaryRow(
+                                label: l10n.upfrontDeductionsShortfall,
+                                value: totalShortfall,
+                                tooltip: l10n.upfrontDeductionsTooltip,
+                              ),
+                              const SizedBox(height: 6),
+                              _SummaryRow(
+                                label: l10n.repaymentInterest,
+                                value: totalInterest,
+                                tooltip: l10n.repaymentInterestTooltip,
+                              ),
+                              const SizedBox(height: 6),
+                              _SummaryRow(
+                                label: l10n.totalPrincipalBorrowed,
+                                value: totalPrincipal,
+                              ),
+                              const SizedBox(height: 6),
+                              _SummaryRow(
+                                label: l10n.totalLoans,
+                                count: loans.length,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Text(l10n.loansHeader, style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 18),
+                    Text(l10n.loansHeader, style: theme.textTheme.titleMedium),
                     const SizedBox(height: 8),
-                    ...loans.map((loan) => _LoanChargeRow(loan: loan)),
+                    for (final (i, loan) in loans.indexed)
+                      FadeSlideIn(
+                        index: i + 1,
+                        dy: 10,
+                        child: _LoanChargeRow(loan: loan),
+                      ),
                   ],
                 );
               },

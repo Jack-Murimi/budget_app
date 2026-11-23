@@ -4,6 +4,7 @@ import '../../../core/database/app_database.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/utils/date_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../models/debt_model.dart';
 import '../providers/debt_providers.dart';
 import '../widgets/debt_dialogs.dart';
@@ -98,115 +99,121 @@ class LoanDetailScreen extends ConsumerWidget {
               label: Text(l10n.recordRepayment),
             ),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 80),
+        padding: const EdgeInsets.only(bottom: 88),
         children: [
-          Card(
-            margin: const EdgeInsets.all(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isBorrowed ? l10n.totalBorrowed : l10n.totalLent,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: theme.colorScheme.outline,
+          FadeSlideIn(
+            child: Card(
+              margin: const EdgeInsets.all(16),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isBorrowed
+                                    ? l10n.totalBorrowed
+                                    : l10n.totalLent,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              CurrencyFormatter.format(debt.principal),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                              const SizedBox(height: 4),
+                              Text(
+                                CurrencyFormatter.format(debt.principal),
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures()
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.repaid,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: theme.colorScheme.outline,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.repaid,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              CurrencyFormatter.format(currentItem.repaid),
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
+                              const SizedBox(height: 4),
+                              Text(
+                                CurrencyFormatter.format(currentItem.repaid),
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.colorScheme.primary,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures()
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                      ],
+                    ),
+                    if (debt.interest > 0 || debt.dueDate != null) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 4,
+                        children: [
+                          if (debt.interest > 0)
+                            Text(
+                              l10n.interestFeesLabel(
+                                CurrencyFormatter.format(debt.interest),
+                              ),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
+                            ),
+                          if (debt.dueDate != null)
+                            Text(
+                              l10n.dueColonDate(
+                                DateFormatter.formatDate(debt.dueDate!),
+                              ),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
                       ),
                     ],
-                  ),
-                  if (debt.interest > 0 || debt.dueDate != null) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 16,
-                      runSpacing: 4,
+                    const Divider(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        if (debt.interest > 0)
-                          Text(
-                            l10n.interestFeesLabel(
-                              CurrencyFormatter.format(debt.interest),
-                            ),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
+                        Text(
+                          l10n.outstanding,
+                          style: theme.textTheme.titleSmall,
+                        ),
+                        AnimatedAmount(
+                          value: debt.outstanding,
+                          format: CurrencyFormatter.format,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: isSettled
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.error,
                           ),
-                        if (debt.dueDate != null)
-                          Text(
-                            l10n.dueColonDate(
-                              DateFormatter.formatDate(debt.dueDate!),
-                            ),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
-                          ),
+                        ),
                       ],
                     ),
                   ],
-                  const Divider(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        l10n.outstanding,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        CurrencyFormatter.format(debt.outstanding),
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: isSettled
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.error,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -214,10 +221,7 @@ class LoanDetailScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: Text(
               l10n.timeline,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.outline,
-              ),
+              style: theme.textTheme.titleMedium,
             ),
           ),
           if (entries.isEmpty)
@@ -226,18 +230,21 @@ class LoanDetailScreen extends ConsumerWidget {
               child: Center(child: Text(l10n.noTransactionHistory)),
             )
           else
-            ...entries.map(
-              (entry) => _TimelineCard(
-                entry: entry,
-                onDeleteRepayment: entry.repayment == null
-                    ? null
-                    : () => _deleteRepayment(
-                          context,
-                          ref,
-                          entry.repayment!,
-                        ),
+            for (final (i, entry) in entries.indexed)
+              FadeSlideIn(
+                index: i + 1,
+                dy: 10,
+                child: _TimelineCard(
+                  entry: entry,
+                  onDeleteRepayment: entry.repayment == null
+                      ? null
+                      : () => _deleteRepayment(
+                            context,
+                            ref,
+                            entry.repayment!,
+                          ),
+                ),
               ),
-            ),
         ],
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import 'calculator_amount_field.dart';
 
 /// Transaction type selector (`expense` / `income` / `transfer`).
@@ -99,14 +100,24 @@ class TransactionAmountHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final amountStyle = theme.textTheme.headlineMedium
-        ?.copyWith(fontWeight: FontWeight.w700, color: accent);
+    final reduced = Motion.reduced(context);
+    final amountStyle = theme.textTheme.headlineMedium?.copyWith(
+      fontWeight: FontWeight.w700,
+      color: accent,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+    return AnimatedContainer(
+      duration: reduced ? Duration.zero : Motion.medium,
+      curve: Motion.emphasized,
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
       decoration: BoxDecoration(
         color: accent.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.22),
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -133,19 +144,29 @@ class TransactionAmountHero extends StatelessWidget {
               validator: validateAmount,
             ),
           ),
-          if (type != 'income') _buildFee(theme),
+          AnimatedSize(
+            duration: reduced ? Duration.zero : Motion.fast,
+            curve: Motion.emphasized,
+            alignment: Alignment.topCenter,
+            child: type != 'income'
+                ? _buildFee(context, theme)
+                : const SizedBox.shrink(),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildFee(ThemeData theme) {
+  Widget _buildFee(BuildContext context, ThemeData theme) {
     if (!showFee) {
       return Align(
         alignment: Alignment.centerLeft,
         child: TextButton.icon(
-          onPressed: onShowFee,
-          icon: const Icon(Icons.add, size: 18),
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            onShowFee();
+          },
+          icon: const Icon(Icons.add_rounded, size: 18),
           label: Text(addFeeLabel),
         ),
       );
@@ -154,7 +175,7 @@ class TransactionAmountHero extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         TextFormField(
           controller: costCtrl,
           decoration: decorationBuilder(feeLabel, null, helper: feeHelper)
@@ -173,7 +194,9 @@ class TransactionAmountHero extends StatelessWidget {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 amountPlusFeeBuilder(CurrencyFormatter.format(amount + fee)),
-                style: theme.textTheme.labelLarge,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
                 textAlign: TextAlign.end,
               ),
             );

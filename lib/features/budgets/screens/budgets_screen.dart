@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
@@ -7,6 +8,7 @@ import '../../../l10n/l10n.dart';
 import '../../../shared/utils/category_icon_helper.dart';
 import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../../categories/widgets/category_picker.dart';
 import '../models/budget_model.dart';
 import '../providers/budget_providers.dart';
@@ -33,8 +35,15 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
         title: Text(l10n.budgetsTitle),
         actions: [
           IconButton(
-            icon: Icon(_showArchived ? Icons.unarchive : Icons.archive_outlined),
-            onPressed: () => setState(() => _showArchived = !_showArchived),
+            icon: Icon(
+              _showArchived
+                  ? Icons.unarchive_rounded
+                  : Icons.archive_outlined,
+            ),
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              setState(() => _showArchived = !_showArchived);
+            },
             tooltip: _showArchived ? l10n.showActive : l10n.showArchived,
           ),
         ],
@@ -50,11 +59,17 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
           }
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(allBudgetsWithProgressProvider),
+            onRefresh: () async =>
+                ref.invalidate(allBudgetsWithProgressProvider),
             child: ListView(
-              padding: const EdgeInsets.only(bottom: 96),
+              padding: const EdgeInsets.only(bottom: 96, top: 4),
               children: [
-                ...filteredBudgets.map((b) => _buildBudgetCard(b)),
+                for (final (i, b) in filteredBudgets.indexed)
+                  FadeSlideIn(
+                    key: ValueKey('${b.id}-$_showArchived'),
+                    index: i,
+                    child: _buildBudgetCard(b),
+                  ),
                 if (_showArchived && filteredBudgets.isEmpty)
                   Padding(
                     padding: const EdgeInsets.all(32),
@@ -74,7 +89,10 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
         error: (e, _) => Center(child: Text(l10n.errorLabel('$e'))),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showCreateDialog,
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          _showCreateDialog();
+        },
         child: const Icon(Icons.add),
       ),
     );
@@ -99,70 +117,113 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
     if (b.isOverall) {
       final daysLeft = BudgetPeriodHelper.daysRemaining(b.budget);
       return Card(
-        margin: const EdgeInsets.all(16),
-        child: ListTile(
-          leading: Icon(
-            Icons.account_balance_wallet,
-            size: 48,
-            color: theme.colorScheme.primary,
-          ),
-          title: Text(l10n.overallBudget),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              Text(
-                '${CurrencyFormatter.format(b.spent)} / ${CurrencyFormatter.format(b.amount)}',
-                style: theme.textTheme.bodyMedium,
-              ),
-              if (b.rolloverAmount > 0)
-                Text(
-                  l10n.rolloverPlusBadge(
-                    CurrencyFormatter.format(b.rolloverAmount),
-                  ),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                  ),
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => _openDetail(b),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: progressColor.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        Icons.account_balance_wallet_rounded,
+                        size: 22,
+                        color: progressColor,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.overallBudget,
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${CurrencyFormatter.format(b.spent)} / ${CurrencyFormatter.format(b.amount)}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_showArchived)
+                      IconButton(
+                        icon: const Icon(Icons.unarchive_outlined),
+                        tooltip: l10n.unarchive,
+                        onPressed: () => ref
+                            .read(budgetRepositoryProvider)
+                            .archiveBudget(b.id, archive: false),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          l10n.daysCount(daysLeft),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              const SizedBox(height: 4),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
+                if (b.rolloverAmount > 0) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.rolloverPlusBadge(
+                      CurrencyFormatter.format(b.rolloverAmount),
+                    ),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                AnimatedProgressBar(
                   value: b.progress,
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  valueColor: AlwaysStoppedAnimation(progressColor),
+                  color: progressColor,
                   minHeight: 8,
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                isOver
-                    ? l10n.overBudgetBy(
-                        CurrencyFormatter.format(b.spent - b.amount),
-                      )
-                    : l10n.amountLeft(CurrencyFormatter.format(b.remaining)),
-                style: TextStyle(
-                  color: isOver
-                      ? theme.colorScheme.error
-                      : theme.colorScheme.outline,
-                  fontSize: 13,
+                const SizedBox(height: 8),
+                Text(
+                  isOver
+                      ? l10n.overBudgetBy(
+                          CurrencyFormatter.format(b.spent - b.amount),
+                        )
+                      : l10n.amountLeft(CurrencyFormatter.format(b.remaining)),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: isOver
+                        ? theme.colorScheme.error
+                        : theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          trailing: _showArchived
-              ? IconButton(
-                  icon: const Icon(Icons.unarchive_outlined),
-                  tooltip: l10n.unarchive,
-                  onPressed: () => ref
-                      .read(budgetRepositoryProvider)
-                      .archiveBudget(b.id, archive: false),
-                )
-              : Text(
-                  l10n.daysCount(daysLeft),
-                  style: theme.textTheme.bodySmall,
-                ),
-          onTap: () => _openDetail(b),
         ),
       );
     } else {
@@ -172,8 +233,10 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
       );
 
       return Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
         child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           leading: CircleAvatar(
             backgroundColor: categoryColor.withValues(alpha: 0.15),
             child: Icon(
@@ -184,14 +247,19 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
               color: categoryColor,
             ),
           ),
-          title: Text(b.name),
+          title: Text(
+            b.name,
+            style: theme.textTheme.titleSmall,
+          ),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 4),
               Text(
                 '${CurrencyFormatter.format(b.spent)} / ${CurrencyFormatter.format(b.amount)}',
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
               if (b.rolloverAmount > 0)
                 Text(
@@ -202,28 +270,25 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
                     color: theme.colorScheme.primary,
                   ),
                 ),
-              const SizedBox(height: 4),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: b.progress,
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  valueColor: AlwaysStoppedAnimation(progressColor),
-                  minHeight: 8,
-                ),
+              const SizedBox(height: 6),
+              AnimatedProgressBar(
+                value: b.progress,
+                color: progressColor,
+                minHeight: 7,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 isOver
                     ? l10n.overBudgetBy(
                         CurrencyFormatter.format(b.spent - b.amount),
                       )
                     : (b.categoryName ?? ''),
-                style: TextStyle(
+                style: theme.textTheme.bodySmall?.copyWith(
                   color: isOver
                       ? theme.colorScheme.error
-                      : theme.colorScheme.outline,
-                  fontSize: 13,
+                      : theme.colorScheme.onSurfaceVariant,
+                  fontWeight: isOver ? FontWeight.w600 : FontWeight.w500,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],
@@ -237,9 +302,10 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
                       .archiveBudget(b.id, archive: false),
                 )
               : Chip(
+                  visualDensity: VisualDensity.compact,
                   label: Text(
                     _periodLabel(b.budget.period, l10n),
-                    style: const TextStyle(fontSize: 12),
+                    style: theme.textTheme.labelSmall,
                   ),
                 ),
           onTap: () => _openDetail(b),
@@ -291,9 +357,7 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
     text: widget.existing?.name ?? '',
   );
   late final TextEditingController _amountCtrl = TextEditingController(
-    text: widget.existing != null
-        ? widget.existing!.baseAmount.toString()
-        : '',
+    text: widget.existing != null ? widget.existing!.baseAmount.toString() : '',
   );
 
   late String _period = widget.existing?.period ?? 'monthly';
@@ -333,7 +397,8 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
   Future<void> _pickEndDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _customEnd.isBefore(_customStart) ? _customStart : _customEnd,
+      initialDate:
+          _customEnd.isBefore(_customStart) ? _customStart : _customEnd,
       firstDate: _customStart,
       lastDate: DateTime(2100),
     );
@@ -424,8 +489,7 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
                   ? IconButton(
                       icon: const Icon(Icons.clear),
                       tooltip: l10n.useOverallBudget,
-                      onPressed: () =>
-                          setState(() => _selectedCategory = null),
+                      onPressed: () => setState(() => _selectedCategory = null),
                     )
                   : const Icon(Icons.chevron_right),
               onTap: () async {
@@ -519,26 +583,42 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.account_balance_wallet_outlined,
-            size: 64,
-            color: Theme.of(context).colorScheme.outline,
+    final theme = Theme.of(context);
+    return FadeSlideIn(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color:
+                      theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.account_balance_wallet_rounded,
+                  size: 38,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                l10n.noBudgetsSetYet,
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: onCreateBudget,
+                icon: const Icon(Icons.add_rounded),
+                label: Text(l10n.createBudget),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            l10n.noBudgetsSetYet,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          FilledButton(
-            onPressed: onCreateBudget,
-            child: Text(l10n.createBudget),
-          ),
-        ],
+        ),
       ),
     );
   }

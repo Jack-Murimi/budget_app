@@ -6,6 +6,7 @@ import '../../../core/database/app_database.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../../add_transaction/screens/add_transaction_screen.dart';
 import '../../transactions/models/transaction_model.dart';
 import '../models/account_model.dart';
@@ -258,103 +259,154 @@ class AccountDetailScreen extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.only(bottom: 32),
             children: [
-              // Header card
-              Container(
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: accountColor,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Colors.white24,
-                          child: Text(
-                            currentAccount.name.isNotEmpty
-                                ? currentAccount.name[0].toUpperCase()
-                                : '?',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              currentAccount.name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
-                            Text(
-                              currentAccount.type.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
+              // Header hero card
+              FadeSlideIn(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            accountColor,
+                            Color.lerp(accountColor, Colors.black, 0.25)!,
                           ],
                         ),
-                        const Spacer(),
-                        if (currentAccount.isDefault)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white24,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              l10n.defaultLabel,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
+                      ),
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            right: -30,
+                            top: -30,
+                            child: Container(
+                              width: 140,
+                              height: 140,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withValues(alpha: 0.08),
                               ),
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      l10n.balanceLabel,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 13,
+                          Padding(
+                            padding: const EdgeInsets.all(22),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundColor: Colors.white24,
+                                      child: Text(
+                                        currentAccount.name.isNotEmpty
+                                            ? currentAccount.name[0]
+                                                .toUpperCase()
+                                            : '?',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          currentAccount.name,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 18,
+                                          ),
+                                        ),
+                                        Text(
+                                          currentAccount.type.toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 11,
+                                            letterSpacing: 0.8,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const Spacer(),
+                                    if (currentAccount.isDefault)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white24,
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                        ),
+                                        child: Text(
+                                          l10n.defaultLabel,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  l10n.balanceLabel.toUpperCase(),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.75),
+                                    fontSize: 11,
+                                    letterSpacing: 1.0,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: AnimatedAmount(
+                                    value: balance,
+                                    format: CurrencyFormatter.format,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.white,
+                                      backgroundColor:
+                                          Colors.white.withValues(alpha: 0.16),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 8),
+                                    ),
+                                    onPressed: () => _adjustBalance(
+                                        context, currentAccount, balance),
+                                    icon:
+                                        const Icon(Icons.tune_rounded, size: 16),
+                                    label: Text(l10n.adjustBalance),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Text(
-                      CurrencyFormatter.format(balance),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white,
-                        ),
-                        onPressed: () =>
-                            _adjustBalance(context, currentAccount, balance),
-                        icon: const Icon(Icons.tune, size: 16),
-                        label: Text(l10n.adjustBalance),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
 
@@ -363,12 +415,13 @@ class AccountDetailScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                 child: Row(
                   children: [
-                    Text(l10n.transactionsTitle, style: theme.textTheme.titleSmall),
+                    Text(l10n.transactionsTitle,
+                        style: theme.textTheme.titleMedium),
                     const Spacer(),
                     Text(
                       l10n.totalCount(txns.length),
                       style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.outline),
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -395,12 +448,12 @@ class AccountDetailScreen extends ConsumerWidget {
               else
                 for (final entry in grouped.entries) ...[
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
                     child: Text(
                       entry.key,
                       style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.outline,
-                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -428,18 +481,21 @@ class AccountDetailScreen extends ConsumerWidget {
                             txn.description.isNotEmpty
                                 ? txn.description
                                 : (txn.mpesaRef ?? ''),
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(color: theme.colorScheme.outline),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           trailing: Text(
                             '${isIncoming ? '+' : '-'}${CurrencyFormatter.format(txn.amount)}',
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w700,
                               color: isIncoming
                                   ? theme.colorScheme.primary
                                   : theme.colorScheme.error,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
                             ),
                           ),
                         );

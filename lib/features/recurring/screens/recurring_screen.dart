@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../models/recurring_model.dart';
 import '../providers/recurring_providers.dart';
 import '../services/recurrence_engine.dart';
@@ -122,12 +124,15 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'fab_add_recurring',
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AddEditRecurringScreen()),
-        ),
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddEditRecurringScreen()),
+          );
+        },
         tooltip: l10n.addRecurringTooltip,
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add_rounded, size: 28),
       ),
       body: allAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -150,90 +155,115 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
-              // Summary card
+              // Summary hero card
               summaryAsync.when(
-                data: (s) => Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              l10n.monthlyCommitments,
-                              style: theme.textTheme.labelMedium
-                                  ?.copyWith(color: theme.colorScheme.outline),
-                            ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
+                data: (s) => FadeSlideIn(
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                l10n.monthlyCommitments.toUpperCase(),
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  letterSpacing: 0.9,
+                                ),
                               ),
-                              decoration: BoxDecoration(
-                                color: s.overdueCount > 0
-                                    ? theme.colorScheme.errorContainer
-                                    : theme.colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                s.overdueCount > 0
-                                    ? l10n.overdueCountBadge(s.overdueCount)
-                                    : l10n.activeCountBadge(s.activeCount),
-                                style: theme.textTheme.labelSmall?.copyWith(
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
                                   color: s.overdueCount > 0
-                                      ? theme.colorScheme.onErrorContainer
-                                      : theme.colorScheme.onPrimaryContainer,
-                                  fontWeight: FontWeight.bold,
+                                      ? theme.colorScheme.errorContainer
+                                      : theme.colorScheme.primaryContainer,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  s.overdueCount > 0
+                                      ? l10n.overdueCountBadge(s.overdueCount)
+                                      : l10n.activeCountBadge(s.activeCount),
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: s.overdueCount > 0
+                                        ? theme.colorScheme.onErrorContainer
+                                        : theme.colorScheme.onPrimaryContainer,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  l10n.expensesLabel,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.outline,
-                                  ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      l10n.expensesLabel,
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: AnimatedAmount(
+                                        value: s.monthlyExpense,
+                                        format: CurrencyFormatter.format,
+                                        style:
+                                            theme.textTheme.titleLarge?.copyWith(
+                                          color: theme.colorScheme.error,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                Text(
-                                  CurrencyFormatter.format(s.monthlyExpense),
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    color: theme.colorScheme.error,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      l10n.income,
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerRight,
+                                      child: AnimatedAmount(
+                                        value: s.monthlyIncome,
+                                        format: CurrencyFormatter.format,
+                                        style:
+                                            theme.textTheme.titleLarge?.copyWith(
+                                          color: theme.colorScheme.primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  l10n.income,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.outline,
-                                  ),
-                                ),
-                                Text(
-                                  CurrencyFormatter.format(s.monthlyIncome),
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    color: theme.colorScheme.primary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -248,17 +278,19 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
                   ButtonSegment(
                     value: 0,
                     label: Text(l10n.upcomingAndDue),
-                    icon: const Icon(Icons.schedule),
+                    icon: const Icon(Icons.schedule_rounded),
                   ),
                   ButtonSegment(
                     value: 1,
                     label: Text(l10n.allSubscriptions),
-                    icon: const Icon(Icons.list_alt),
+                    icon: const Icon(Icons.list_alt_rounded),
                   ),
                 ],
                 selected: {_selectedTab},
-                onSelectionChanged: (set) =>
-                    setState(() => _selectedTab = set.first),
+                onSelectionChanged: (set) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedTab = set.first);
+                },
               ),
               const SizedBox(height: 16),
 
@@ -266,55 +298,63 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
               if (_selectedTab == 0) ...[
                 if (upcomingItems.isEmpty)
                   _buildEmptyState(
-                    icon: Icons.check_circle_outline,
+                    icon: Icons.check_circle_outline_rounded,
                     title: l10n.noUpcomingBillsDue,
                     subtitle: l10n.noUpcomingBillsDueDesc,
                   )
                 else
-                  ...upcomingItems.map(
-                    (item) => _RecurringItemCard(
-                      item: item,
-                      onMarkPaid: () => _confirmMarkPaid(context, item),
-                      onSkip: () => _confirmSkip(context, item),
-                      onEdit: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              AddEditRecurringScreen(recurringToEdit: item),
+                  for (final (i, item) in upcomingItems.indexed)
+                    FadeSlideIn(
+                      key: ValueKey('upcoming-${item.id}'),
+                      index: i + 1,
+                      dy: 10,
+                      child: _RecurringItemCard(
+                        item: item,
+                        onMarkPaid: () => _confirmMarkPaid(context, item),
+                        onSkip: () => _confirmSkip(context, item),
+                        onEdit: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                AddEditRecurringScreen(recurringToEdit: item),
+                          ),
                         ),
+                        onToggleActive: (val) => ref
+                            .read(recurringRepositoryProvider)
+                            .toggleActive(item.id, val),
+                        onDelete: () => _confirmDelete(context, item),
                       ),
-                      onToggleActive: (val) => ref
-                          .read(recurringRepositoryProvider)
-                          .toggleActive(item.id, val),
-                      onDelete: () => _confirmDelete(context, item),
                     ),
-                  ),
               ] else ...[
                 if (allItems.isEmpty)
                   _buildEmptyState(
-                    icon: Icons.repeat,
+                    icon: Icons.repeat_rounded,
                     title: l10n.noRecurringTransactions,
                     subtitle: l10n.noRecurringTransactionsDesc,
                   )
                 else
-                  ...allItems.map(
-                    (item) => _RecurringItemCard(
-                      item: item,
-                      onMarkPaid: () => _confirmMarkPaid(context, item),
-                      onSkip: () => _confirmSkip(context, item),
-                      onEdit: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              AddEditRecurringScreen(recurringToEdit: item),
+                  for (final (i, item) in allItems.indexed)
+                    FadeSlideIn(
+                      key: ValueKey('all-${item.id}'),
+                      index: i + 1,
+                      dy: 10,
+                      child: _RecurringItemCard(
+                        item: item,
+                        onMarkPaid: () => _confirmMarkPaid(context, item),
+                        onSkip: () => _confirmSkip(context, item),
+                        onEdit: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                AddEditRecurringScreen(recurringToEdit: item),
+                          ),
                         ),
+                        onToggleActive: (val) => ref
+                            .read(recurringRepositoryProvider)
+                            .toggleActive(item.id, val),
+                        onDelete: () => _confirmDelete(context, item),
                       ),
-                      onToggleActive: (val) => ref
-                          .read(recurringRepositoryProvider)
-                          .toggleActive(item.id, val),
-                      onDelete: () => _confirmDelete(context, item),
                     ),
-                  ),
               ],
             ],
           );
@@ -328,27 +368,36 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
     required String title,
     required String subtitle,
   }) {
-    return Padding(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        children: [
-          Icon(icon, size: 56, color: Theme.of(context).colorScheme.outline),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: Theme.of(context).colorScheme.outline),
-            textAlign: TextAlign.center,
-          ),
-        ],
+    final theme = Theme.of(context);
+    return FadeSlideIn(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          children: [
+            Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 36, color: theme.colorScheme.primary),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

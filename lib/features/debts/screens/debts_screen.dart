@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../models/debt_model.dart';
 import '../providers/debt_providers.dart';
 import '../widgets/debt_dialogs.dart';
@@ -26,18 +28,24 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.debtsTitle)),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateDialog(
-          context,
-          direction: isLentTab ? 'lent' : 'borrowed',
-        ),
-        icon: const Icon(Icons.add),
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          _showCreateDialog(
+            context,
+            direction: isLentTab ? 'lent' : 'borrowed',
+          );
+        },
+        icon: const Icon(Icons.add_rounded),
         label: Text(isLentTab ? l10n.lendMoney : l10n.addDebt),
       ),
       body: Column(
         children: [
           _TabSwitcher(
             selectedIndex: _selectedTab,
-            onChanged: (index) => setState(() => _selectedTab = index),
+            onChanged: (index) {
+              HapticFeedback.selectionClick();
+              setState(() => _selectedTab = index);
+            },
           ),
           Expanded(
             child: debts.when(
@@ -167,9 +175,14 @@ class _LentTab extends StatelessWidget {
       ..sort((a, b) => b.debt.outstanding.compareTo(a.debt.outstanding));
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
       children: [
-        ...unsettled.map((item) => _LoanPersonCard(item: item)),
+        for (final (i, item) in unsettled.indexed)
+          FadeSlideIn(
+            index: i,
+            dy: 10,
+            child: _LoanPersonCard(item: item),
+          ),
         if (settled.isNotEmpty) ...[
           if (unsettled.isNotEmpty)
             Padding(
@@ -178,12 +191,12 @@ class _LentTab extends StatelessWidget {
                 children: [
                   const Expanded(child: Divider()),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: Text(
-                      l10n.settled,
-                      style: TextStyle(
-                        color: theme.colorScheme.outline,
-                        fontWeight: FontWeight.w500,
+                      l10n.settled.toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        letterSpacing: 0.9,
                       ),
                     ),
                   ),
@@ -191,12 +204,15 @@ class _LentTab extends StatelessWidget {
                 ],
               ),
             ),
-          ...settled.map(
-            (item) => Opacity(
-              opacity: 0.65,
-              child: _LoanPersonCard(item: item),
+          for (final (i, item) in settled.indexed)
+            FadeSlideIn(
+              index: unsettled.length + i,
+              dy: 10,
+              child: Opacity(
+                opacity: 0.65,
+                child: _LoanPersonCard(item: item),
+              ),
             ),
-          ),
         ],
       ],
     );
@@ -427,23 +443,43 @@ class _EmptyDebts extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Center(
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return FadeSlideIn(
+      child: Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(36),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.handshake_outlined, size: 56),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color:
+                      theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.handshake_rounded,
+                  size: 38,
+                  color: theme.colorScheme.primary,
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(subtitle, textAlign: TextAlign.center),
+              const SizedBox(height: 18),
+              Text(title, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
         ),
-      );
+      ),
+    );
+  }
 }

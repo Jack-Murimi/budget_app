@@ -1,10 +1,12 @@
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/category_icon_helper.dart';
 import '../../../shared/utils/color_utils.dart';
+import '../../../shared/widgets/motion.dart';
 import '../providers/category_providers.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
@@ -34,9 +36,12 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
         title: Text(l10n.categoriesTitle),
         actions: [
           TextButton.icon(
-            icon: Icon(_showArchived ? Icons.unarchive : Icons.archive),
+            icon: Icon(_showArchived ? Icons.unarchive_rounded : Icons.archive_outlined),
             label: Text(_showArchived ? l10n.active : l10n.archived),
-            onPressed: () => setState(() => _showArchived = !_showArchived),
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              setState(() => _showArchived = !_showArchived);
+            },
           ),
         ],
       ),
@@ -64,7 +69,10 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                 ),
               ],
               selected: {_selectedType},
-              onSelectionChanged: (s) => setState(() => _selectedType = s.first),
+              onSelectionChanged: (s) {
+                HapticFeedback.selectionClick();
+                setState(() => _selectedType = s.first);
+              },
             ),
           ),
           Expanded(
@@ -411,15 +419,33 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
                 );
                 final selected = _selectedColor == hex;
                 return InkWell(
-                  onTap: () => setState(() => _selectedColor = hex),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: selected ? Border.all(width: 3, color: Colors.white) : null,
-                      boxShadow: selected ? [BoxShadow(color: color, blurRadius: 8)] : null,
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _selectedColor = hex);
+                  },
+                  child: AnimatedScale(
+                    scale: selected ? 1.12 : 1.0,
+                    duration: Motion.reduced(context)
+                        ? Duration.zero
+                        : Motion.fast,
+                    curve: Motion.emphasized,
+                    child: AnimatedContainer(
+                      duration: Motion.reduced(context)
+                          ? Duration.zero
+                          : Motion.fast,
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: selected
+                            ? Border.all(width: 3, color: Colors.white)
+                            : null,
+                        boxShadow: selected
+                            ? [BoxShadow(color: color, blurRadius: 8)]
+                            : null,
+                      ),
                     ),
                   ),
                 );
@@ -442,18 +468,35 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
                   fallback: const Color(0xFFE53935),
                 );
                 return InkWell(
-                  onTap: () => setState(() => _selectedIcon = name),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? color.withValues(alpha: 0.2)
-                          : Colors.grey.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                      border: selected ? Border.all(width: 2, color: color) : null,
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _selectedIcon = name);
+                  },
+                  child: AnimatedScale(
+                    scale: selected ? 1.1 : 1.0,
+                    duration: Motion.reduced(context)
+                        ? Duration.zero
+                        : Motion.fast,
+                    curve: Motion.emphasized,
+                    child: AnimatedContainer(
+                      duration: Motion.reduced(context)
+                          ? Duration.zero
+                          : Motion.fast,
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? color.withValues(alpha: 0.2)
+                            : Colors.grey.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                        border: selected
+                            ? Border.all(width: 2, color: color)
+                            : null,
+                      ),
+                      child: Icon(icon,
+                          size: 20, color: selected ? color : Colors.grey),
                     ),
-                    child: Icon(icon, size: 20, color: selected ? color : Colors.grey),
                   ),
                 );
               }).toList(),

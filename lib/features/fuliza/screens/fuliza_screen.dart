@@ -5,6 +5,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/database/converters/cents_converter.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../providers/fuliza_providers.dart';
 
 class FulizaScreen extends ConsumerWidget {
@@ -24,30 +25,37 @@ class FulizaScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           latestAsync.when(
-            data: (latest) => _OutstandingCard(
-              latest: latest,
-              totalFees: totalFeesAsync.valueOrNull ?? 0.0,
-              onRecordRepayment: (latest?.outstandingTotal ?? 0) > 0
-                  ? () => _showRepayDialog(
-                        context,
-                        ref,
-                        latest!.outstandingTotal,
-                      )
-                  : null,
+            data: (latest) => FadeSlideIn(
+              child: _OutstandingCard(
+                latest: latest,
+                totalFees: totalFeesAsync.valueOrNull ?? 0.0,
+                onRecordRepayment: (latest?.outstandingTotal ?? 0) > 0
+                    ? () => _showRepayDialog(
+                          context,
+                          ref,
+                          latest!.outstandingTotal,
+                        )
+                    : null,
+              ),
             ),
             loading: () => const LinearProgressIndicator(),
             error: (_, __) => const SizedBox.shrink(),
           ),
-          const SizedBox(height: 16),
-          Text(l10n.fulizaUsageHistory, style: theme.textTheme.titleSmall),
+          const SizedBox(height: 18),
+          Text(l10n.fulizaUsageHistory, style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           recordsAsync.when(
             data: (records) => records.isEmpty
                 ? const _EmptyFuliza()
                 : Column(
-                    children: records
-                        .map((r) => _FulizaListItem(record: r))
-                        .toList(),
+                    children: [
+                      for (final (i, r) in records.indexed)
+                        FadeSlideIn(
+                          index: i + 1,
+                          dy: 10,
+                          child: _FulizaListItem(record: r),
+                        ),
+                    ],
                   ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Text(l10n.errorLabel('$e')),
@@ -194,72 +202,112 @@ class _OutstandingCard extends StatelessWidget {
             : theme.colorScheme.onTertiaryContainer)
         : theme.colorScheme.onPrimaryContainer;
 
-    return Card(
-      color: cardColor,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              cardColor,
+              Color.lerp(cardColor, theme.colorScheme.surface, 0.14)!,
+            ],
+          ),
+        ),
+        child: Stack(
           children: [
-            Row(
-              children: [
-                Icon(
-                  outstanding > 0
-                      ? Icons.warning_amber_rounded
-                      : Icons.check_circle,
-                  color: fgColor,
+            Positioned(
+              right: -24,
+              top: -28,
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: fgColor.withValues(alpha: 0.06),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  outstanding > 0
-                      ? l10n.fulizaOutstanding
-                      : l10n.noFulizaBalance,
-                  style: theme.textTheme.titleSmall?.copyWith(color: fgColor),
-                ),
-              ],
+              ),
             ),
-            if (outstanding > 0) ...[
-              const SizedBox(height: 12),
-              Text(
-                CurrencyFormatter.format(outstanding),
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: fgColor,
-                ),
-              ),
-              if (dueDate != null)
-                Text(
-                  overdue
-                      ? l10n.dueDateOverdue(
-                          DateFormat('dd MMM yyyy').format(dueDate),
-                        )
-                      : l10n.dueDateLabel(
-                          DateFormat('dd MMM yyyy').format(dueDate),
+            Padding(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        outstanding > 0
+                            ? Icons.warning_amber_rounded
+                            : Icons.check_circle_rounded,
+                        color: fgColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        outstanding > 0
+                            ? l10n.fulizaOutstanding
+                            : l10n.noFulizaBalance,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: fgColor,
+                          fontWeight: FontWeight.w700,
                         ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: fgColor,
-                    fontWeight: overdue ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ],
                   ),
-                ),
-              if (onRecordRepayment != null) ...[
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: onRecordRepayment,
-                  icon: const Icon(Icons.payments_outlined),
-                  label: Text(l10n.recordRepaymentButton),
-                ),
-              ],
-            ],
-            if (totalFees > 0) ...[
-              const SizedBox(height: 12),
-              Text(
-                l10n.totalFeesPaid(CurrencyFormatter.format(totalFees)),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: fgColor,
-                  fontWeight: FontWeight.w500,
-                ),
+                  if (outstanding > 0) ...[
+                    const SizedBox(height: 12),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: AnimatedAmount(
+                        value: outstanding,
+                        format: CurrencyFormatter.format,
+                        style: theme.textTheme.headlineLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: fgColor,
+                        ),
+                      ),
+                    ),
+                    if (dueDate != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        overdue
+                            ? l10n.dueDateOverdue(
+                                DateFormat('dd MMM yyyy').format(dueDate),
+                              )
+                            : l10n.dueDateLabel(
+                                DateFormat('dd MMM yyyy').format(dueDate),
+                              ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: fgColor,
+                          fontWeight:
+                              overdue ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    if (onRecordRepayment != null) ...[
+                      const SizedBox(height: 14),
+                      FilledButton.icon(
+                        onPressed: onRecordRepayment,
+                        icon: const Icon(Icons.payments_outlined),
+                        label: Text(l10n.recordRepaymentButton),
+                      ),
+                    ],
+                  ],
+                  if (totalFees > 0) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      l10n.totalFeesPaid(CurrencyFormatter.format(totalFees)),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: fgColor.withValues(alpha: 0.85),
+                        fontWeight: FontWeight.w600,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            ],
+            ),
           ],
         ),
       ),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../../add_transaction/screens/add_transaction_screen.dart';
 import '../../transactions/models/mpesa_parse_result.dart';
 import '../../transactions/services/mpesa_result_handler.dart';
@@ -321,11 +322,21 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
               ],
             ),
           ),
-          ...good.map((i) => _itemTile(theme, l10n, i)),
+          for (final (idx, i) in good.indexed)
+            FadeSlideIn(
+              index: idx > 8 ? 8 : idx,
+              dy: 10,
+              child: _itemTile(theme, l10n, i),
+            ),
         ],
         if (review.isNotEmpty) ...[
           _sectionHeader(theme, l10n.needsReviewCount(review.length)),
-          ...review.map((i) => _itemTile(theme, l10n, i, isReview: true)),
+          for (final (idx, i) in review.indexed)
+            FadeSlideIn(
+              index: idx > 8 ? 8 : idx,
+              dy: 10,
+              child: _itemTile(theme, l10n, i, isReview: true),
+            ),
         ],
       ],
     );
@@ -334,7 +345,7 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
   Widget _sectionHeader(ThemeData theme, String label) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
         child: Text(label,
-            style: theme.textTheme.labelSmall
+            style: theme.textTheme.labelMedium
                 ?.copyWith(color: theme.colorScheme.primary)),
       );
 
@@ -365,7 +376,10 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
           r.isValid
               ? '${r.type.defaultDescription} • ${CurrencyFormatter.format(r.amount)}'
               : l10n.unrecognised,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
         ),
         subtitle: Text(
           r.isValid

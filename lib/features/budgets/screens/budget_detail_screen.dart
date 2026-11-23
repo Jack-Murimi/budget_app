@@ -4,6 +4,7 @@ import '../../../core/database/app_database.dart';
 import '../../../l10n/app_localizations_en.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../../categories/providers/category_providers.dart';
 import '../models/budget_model.dart';
 import '../providers/budget_providers.dart';
@@ -106,66 +107,101 @@ class BudgetDetailScreen extends ConsumerWidget {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.only(bottom: 24),
         children: [
-          Card(
-            margin: const EdgeInsets.all(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${CurrencyFormatter.format(liveBudget.spent)} / ${CurrencyFormatter.format(liveBudget.amount)}',
-                    style: theme.textTheme.headlineSmall,
-                  ),
-                  if (liveBudget.rolloverAmount > 0) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      l10n.rolloverIncludes(
-                        CurrencyFormatter.format(liveBudget.rolloverAmount),
+          FadeSlideIn(
+            child: Card(
+              margin: const EdgeInsets.all(16),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '${CurrencyFormatter.format(liveBudget.spent)} / ${CurrencyFormatter.format(liveBudget.amount)}',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: progressColor.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '${liveBudget.percentage.toStringAsFixed(0)}%',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: progressColor,
+                              fontWeight: FontWeight.w700,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (liveBudget.rolloverAmount > 0) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        l10n.rolloverIncludes(
+                          CurrencyFormatter.format(liveBudget.rolloverAmount),
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
+                    ],
+                    const SizedBox(height: 14),
+                    AnimatedProgressBar(
+                      value: liveBudget.progress,
+                      color: progressColor,
+                      minHeight: 10,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      liveBudget.isOverBudget
+                          ? l10n.overBudgetBy(
+                              CurrencyFormatter.format(
+                                liveBudget.spent - liveBudget.amount,
+                              ),
+                            )
+                          : l10n.amountRemaining(
+                              CurrencyFormatter.format(liveBudget.remaining),
+                            ),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: liveBudget.isOverBudget
+                            ? theme.colorScheme.error
+                            : theme.colorScheme.onSurface,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      formatPeriodInfo(liveBudget, l10n: l10n),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: liveBudget.progress,
-                      backgroundColor:
-                          theme.colorScheme.surfaceContainerHighest,
-                      valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-                      minHeight: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    liveBudget.isOverBudget
-                        ? l10n.overBudgetBy(
-                            CurrencyFormatter.format(
-                              liveBudget.spent - liveBudget.amount,
-                            ),
-                          )
-                        : l10n.amountRemaining(
-                            CurrencyFormatter.format(liveBudget.remaining),
-                          ),
-                    style: TextStyle(
-                      color: liveBudget.isOverBudget
-                          ? theme.colorScheme.error
-                          : null,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    formatPeriodInfo(liveBudget, l10n: l10n),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -173,19 +209,19 @@ class BudgetDetailScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
               l10n.contributingTransactions,
-              style: theme.textTheme.titleSmall,
+              style: theme.textTheme.titleMedium,
             ),
           ),
           transactionsAsync.when(
             data: (transactions) {
               if (transactions.isEmpty) {
                 return Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(24),
                   child: Center(
                     child: Text(
                       l10n.noExpensesInPeriodYet,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.outline,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -193,38 +229,58 @@ class BudgetDetailScreen extends ConsumerWidget {
               }
 
               return Column(
-                children: transactions
-                    .map(
-                      (t) => ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: theme.colorScheme.primaryContainer,
+                children: [
+                  for (final (i, t) in transactions.indexed)
+                    FadeSlideIn(
+                      index: i > 8 ? 8 : i,
+                      dy: 10,
+                      child: ListTile(
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: (t.type == 'income'
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.error)
+                                .withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           child: Icon(
                             t.type == 'income'
-                                ? Icons.arrow_downward
-                                : Icons.arrow_upward,
-                            size: 16,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                        title: Text(t.header),
-                        subtitle: Text(
-                          '${t.transactionDate.day}/${t.transactionDate.month}/${t.transactionDate.year}',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        trailing: Text(
-                          CurrencyFormatter.format(
-                            t.amount + t.transactionCost + t.fulizaFee,
-                          ),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
+                                ? Icons.arrow_downward_rounded
+                                : Icons.arrow_upward_rounded,
+                            size: 18,
                             color: t.type == 'income'
                                 ? theme.colorScheme.primary
                                 : theme.colorScheme.error,
                           ),
                         ),
+                        title: Text(
+                          t.header,
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          '${t.transactionDate.day}/${t.transactionDate.month}/${t.transactionDate.year}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        trailing: Text(
+                          CurrencyFormatter.format(
+                            t.amount + t.transactionCost + t.fulizaFee,
+                          ),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: t.type == 'income'
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.error,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
                       ),
-                    )
-                    .toList(),
+                    ),
+                ],
               );
             },
             loading: () => const Padding(

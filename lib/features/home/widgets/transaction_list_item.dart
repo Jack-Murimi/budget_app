@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/category_icon_helper.dart';
@@ -38,7 +39,9 @@ class TransactionListItem extends ConsumerWidget {
       category?.colorHex,
       fallback: isIncome
           ? theme.colorScheme.primary
-          : (isTransfer ? theme.colorScheme.tertiary : theme.colorScheme.secondary),
+          : (isTransfer
+              ? theme.colorScheme.tertiary
+              : theme.colorScheme.secondary),
     );
 
     final IconData icon = CategoryIconHelper.resolveCategoryIcon(
@@ -48,7 +51,8 @@ class TransactionListItem extends ConsumerWidget {
     );
 
     final fee = transaction.transactionCost + transaction.fulizaFee;
-    final totalAmount = isIncome ? transaction.amount : transaction.amount + fee;
+    final totalAmount =
+        isIncome ? transaction.amount : transaction.amount + fee;
 
     final sign = isIncome ? '+' : (isTransfer ? '⇄ ' : '-');
     final amountColor = isIncome
@@ -59,13 +63,16 @@ class TransactionListItem extends ConsumerWidget {
     if (category != null) {
       if (category.parentId != null) {
         final parent = categoriesById[category.parentId!];
-        categoryLabel = parent != null ? '${parent.name} > ${category.name}' : category.name;
+        categoryLabel = parent != null
+            ? '${parent.name} > ${category.name}'
+            : category.name;
       } else {
         categoryLabel = category.name;
       }
     }
 
-    final relativeDate = DateFormatter.formatRelative(transaction.transactionDate);
+    final relativeDate =
+        DateFormatter.formatRelative(transaction.transactionDate);
 
     final semanticLabel = l10n.transactionSemantics(
       isIncome ? l10n.income : (isTransfer ? l10n.transfer : l10n.expense),
@@ -88,6 +95,7 @@ class TransactionListItem extends ConsumerWidget {
         horizontalTitleGap: 12,
         onTap: onTap ??
             () {
+              HapticFeedback.selectionClick();
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => AddTransactionScreen(
@@ -100,13 +108,17 @@ class TransactionListItem extends ConsumerWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: categoryColor.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(12),
+            color: categoryColor.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: categoryColor.withValues(alpha: 0.22),
+              width: 1,
+            ),
           ),
           child: Icon(
             icon,
             color: categoryColor,
-            size: 22,
+            size: 21,
           ),
         ),
         title: Row(
@@ -130,8 +142,9 @@ class TransactionListItem extends ConsumerWidget {
                 child: Text(
                   '$sign${CurrencyFormatter.format(totalAmount)}',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w700,
                     color: amountColor,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ),
@@ -161,7 +174,8 @@ class TransactionListItem extends ConsumerWidget {
                       transaction.description
                     else if (categoryLabel != null)
                       categoryLabel
-                    else if (transaction.mpesaRef != null && transaction.mpesaRef!.isNotEmpty)
+                    else if (transaction.mpesaRef != null &&
+                        transaction.mpesaRef!.isNotEmpty)
                       transaction.mpesaRef!,
                     relativeDate,
                   ].join(' • '),
@@ -178,25 +192,29 @@ class TransactionListItem extends ConsumerWidget {
                   child: Text(
                     l10n.feeBadge(CurrencyFormatter.format(fee)),
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.outline,
+                      color: theme.colorScheme.onSurfaceVariant
+                          .withValues(alpha: 0.8),
                       fontSize: 10,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                 ),
               if (transaction.fulizaAmount > 0) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.tertiaryContainer,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     l10n.fulizaBadge,
                     style: TextStyle(
                       color: theme.colorScheme.onTertiaryContainer,
                       fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ),

@@ -5,6 +5,7 @@ import '../../../core/services/widget_update_service.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../../accounts/screens/account_detail_screen.dart';
 import '../../budgets/providers/budget_providers.dart';
@@ -88,10 +89,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           padding: const EdgeInsets.only(bottom: 120),
           children: [
             summaryAsync.when(
-              data: (summary) => SpendingSummaryCard(
-                totalSpent: summary.totalExpenses,
-                totalIncome: summary.totalIncome,
-                month: summary.month,
+              data: (summary) => FadeSlideIn(
+                child: SpendingSummaryCard(
+                  totalSpent: summary.totalExpenses,
+                  totalIncome: summary.totalIncome,
+                  month: summary.month,
+                ),
               ),
               loading: () => const Padding(
                 padding: EdgeInsets.all(16),
@@ -109,74 +112,92 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     final overdueCount = items.where((i) => i.isOverdue).length;
                     final isAlert = overdueCount > 0;
 
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: InkWell(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const RecurringScreen()),
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isAlert
-                                ? theme.colorScheme.errorContainer
-                                    .withValues(alpha: 0.6)
-                                : theme.colorScheme.tertiaryContainer,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isAlert
-                                  ? theme.colorScheme.error
-                                  : theme.colorScheme.tertiary,
-                              width: 1,
-                            ),
+                    return FadeSlideIn(
+                      index: 1,
+                      dy: 12,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: Pressable(
+                          haptic: true,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const RecurringScreen()),
                           ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                isAlert
-                                    ? Icons.warning_amber_rounded
-                                    : Icons.schedule,
-                                color: isAlert
-                                    ? theme.colorScheme.error
-                                    : theme.colorScheme.onTertiaryContainer,
-                                size: 20,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isAlert
+                                  ? theme.colorScheme.errorContainer
+                                      .withValues(alpha: 0.7)
+                                  : theme.colorScheme.tertiaryContainer
+                                      .withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: (isAlert
+                                        ? theme.colorScheme.error
+                                        : theme.colorScheme.tertiary)
+                                    .withValues(alpha: 0.35),
+                                width: 1,
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  isAlert
-                                      ? l10n.billsOverdueCount(overdueCount)
-                                      : l10n.billsDueSoonCount(items.length),
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    color: (isAlert
+                                            ? theme.colorScheme.error
+                                            : theme.colorScheme.tertiary)
+                                        .withValues(alpha: 0.16),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    isAlert
+                                        ? Icons.warning_amber_rounded
+                                        : Icons.schedule_rounded,
                                     color: isAlert
-                                        ? theme.colorScheme.onErrorContainer
+                                        ? theme.colorScheme.error
                                         : theme.colorScheme.onTertiaryContainer,
+                                    size: 18,
                                   ),
                                 ),
-                              ),
-                              Text(
-                                l10n.view,
-                                style: theme.textTheme.labelSmall?.copyWith(
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    isAlert
+                                        ? l10n.billsOverdueCount(overdueCount)
+                                        : l10n.billsDueSoonCount(items.length),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: isAlert
+                                          ? theme.colorScheme.onErrorContainer
+                                          : theme.colorScheme
+                                              .onTertiaryContainer,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  l10n.view,
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    color: isAlert
+                                        ? theme.colorScheme.error
+                                        : theme.colorScheme.onTertiaryContainer,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 18,
                                   color: isAlert
                                       ? theme.colorScheme.error
                                       : theme.colorScheme.onTertiaryContainer,
-                                  fontWeight: FontWeight.bold,
                                 ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.chevron_right,
-                                size: 16,
-                                color: isAlert
-                                    ? theme.colorScheme.error
-                                    : theme.colorScheme.onTertiaryContainer,
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -192,63 +213,90 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 final theme = Theme.of(context);
                 final budgetAsync = ref.watch(overallBudgetProvider);
                 return budgetAsync.when(
-                  data: (budget) => budget == null
-                      ? const SizedBox.shrink()
-                      : Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  data: (budget) {
+                    if (budget == null) return const SizedBox.shrink();
+                    final statusColor = budget.isOverBudget
+                        ? theme.colorScheme.error
+                        : budget.progress >= 0.75
+                            ? theme.colorScheme.tertiary
+                            : theme.colorScheme.primary;
+                    return FadeSlideIn(
+                      index: 2,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                        child: Pressable(
+                          haptic: true,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const BudgetsScreen()),
+                          ),
                           child: Card(
-                            child: InkWell(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const BudgetsScreen()),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.account_balance_wallet,
-                                            size: 20),
-                                        const SizedBox(width: 8),
-                                        Text(l10n.overallBudget),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withValues(
+                                              alpha: 0.14),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        child: Icon(
+                                          Icons.account_balance_wallet_rounded,
+                                          size: 17,
+                                          color: statusColor,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          l10n.overallBudget,
+                                          style: theme.textTheme.titleSmall,
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.chevron_right_rounded,
+                                        size: 20,
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    l10n.budgetProgressSummary(
+                                      budget.spent.toStringAsFixed(0),
+                                      budget.amount.toStringAsFixed(0),
+                                      budget.percentage.toStringAsFixed(0),
+                                    ),
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures()
                                       ],
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      l10n.budgetProgressSummary(
-                                        budget.spent.toStringAsFixed(0),
-                                        budget.amount.toStringAsFixed(0),
-                                        budget.percentage.toStringAsFixed(0),
-                                      ),
-                                      style: theme.textTheme.bodyMedium,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(4),
-                                      child: LinearProgressIndicator(
-                                        value: budget.progress,
-                                        backgroundColor: theme.colorScheme
-                                            .surfaceContainerHighest,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                          budget.isOverBudget
-                                              ? theme.colorScheme.error
-                                              : budget.progress >= 0.75
-                                                  ? theme.colorScheme.tertiary
-                                                  : theme.colorScheme.primary,
-                                        ),
-                                        minHeight: 8,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  AnimatedProgressBar(
+                                    value: budget.progress,
+                                    color: statusColor,
+                                    minHeight: 8,
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ),
+                      ),
+                    );
+                  },
                   loading: () => const SizedBox.shrink(),
                   error: (_, __) => const SizedBox.shrink(),
                 );
@@ -261,75 +309,106 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 return accountsAsync.when(
                   data: (accounts) => accounts.isEmpty
                       ? const SizedBox.shrink()
-                      : Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: accounts.map((a) {
-                                final isDefault = a.isDefault;
-                                final accountColor = parseHexColor(
-                                  a.colorHex,
-                                  fallback: theme.colorScheme.primary,
-                                );
-                                return GestureDetector(
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          AccountDetailScreen(account: a),
-                                    ),
-                                  ),
-                                  child: Container(
-                                    margin: const EdgeInsets.only(right: 8),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: accountColor.withValues(
-                                          alpha: isDefault ? 0.24 : 0.14),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: accountColor.withValues(
-                                            alpha: isDefault ? 0.9 : 0.5),
+                      : FadeSlideIn(
+                          index: 2,
+                          dy: 10,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                            child: SingleChildScrollView(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: accounts.map((a) {
+                                  final isDefault = a.isDefault;
+                                  final accountColor = parseHexColor(
+                                    a.colorHex,
+                                    fallback: theme.colorScheme.primary,
+                                  );
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 10),
+                                    child: Pressable(
+                                      haptic: true,
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              AccountDetailScreen(account: a),
+                                        ),
                                       ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 8,
-                                          height: 8,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: accountColor,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 14, vertical: 11),
+                                        decoration: BoxDecoration(
+                                          color: isDefault
+                                              ? accountColor.withValues(
+                                                  alpha: 0.16)
+                                              : theme.colorScheme
+                                                  .surfaceContainerLow,
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: isDefault
+                                                ? accountColor.withValues(
+                                                    alpha: 0.65)
+                                                : theme
+                                                    .colorScheme.outlineVariant
+                                                    .withValues(alpha: 0.7),
+                                            width: isDefault ? 1.25 : 1,
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          mainAxisSize: MainAxisSize.min,
+                                        child: Row(
                                           children: [
-                                            Text(
-                                              a.name,
-                                              style: theme.textTheme.labelMedium
-                                                  ?.copyWith(
-                                                fontWeight: FontWeight.w600,
+                                            Container(
+                                              width: 10,
+                                              height: 10,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: accountColor,
                                               ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                            Text(
-                                              CurrencyFormatter.format(
-                                                  a.balance),
-                                              style: theme.textTheme.bodySmall,
+                                            const SizedBox(width: 10),
+                                            Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  a.name,
+                                                  style: theme
+                                                      .textTheme.labelMedium
+                                                      ?.copyWith(
+                                                    fontWeight: FontWeight.w600,
+                                                    color: theme.colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 1),
+                                                Text(
+                                                  CurrencyFormatter.format(
+                                                      a.balance),
+                                                  style: theme
+                                                      .textTheme.titleSmall
+                                                      ?.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontFeatures: const [
+                                                      FontFeature
+                                                          .tabularFigures()
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                );
-                              }).toList(),
+                                  );
+                                }).toList(),
+                              ),
                             ),
                           ),
                         ),
@@ -339,23 +418,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               },
             ),
             monthTxnsAsync.when(
-              data: (txns) => CategoryPieChartSection(transactions: txns),
+              data: (txns) => FadeSlideIn(
+                index: 3,
+                child: CategoryPieChartSection(transactions: txns),
+              ),
               loading: () => const SizedBox.shrink(),
               error: (_, __) => const SizedBox.shrink(),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
               child: Row(
                 children: [
                   Text(
                     l10n.recentTransactions,
-                    style: Theme.of(context).textTheme.titleSmall,
+                    style: theme.textTheme.titleMedium,
                   ),
                   const Spacer(),
                   TextButton(
                     onPressed: () =>
                         ref.read(selectedTabProvider.notifier).state = 1,
-                    child: Text(l10n.seeAll),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(l10n.seeAll),
+                        const SizedBox(width: 2),
+                        const Icon(Icons.arrow_forward_rounded, size: 16),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -364,9 +453,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               data: (txns) => txns.isEmpty
                   ? const _EmptyState()
                   : Column(
-                      children: txns
-                          .map((t) => TransactionListItem(transaction: t))
-                          .toList(),
+                      children: [
+                        for (final (i, t) in txns.indexed)
+                          FadeSlideIn(
+                            key: ValueKey(t.id),
+                            index: 4 + (i > 6 ? 6 : i),
+                            dy: 12,
+                            child: TransactionListItem(transaction: t),
+                          ),
+                      ],
                     ),
               loading: () => const Center(
                 child: Padding(
@@ -416,26 +511,41 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Padding(
-      padding: const EdgeInsets.all(48),
-      child: Column(
-        children: [
-          Icon(Icons.receipt_long_outlined,
-              size: 64, color: Theme.of(context).colorScheme.outline),
-          const SizedBox(height: 16),
-          Text(
-            l10n.noTransactionsYet,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            l10n.pasteOrAddHint,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+    final theme = Theme.of(context);
+    return FadeSlideIn(
+      index: 3,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 44),
+        child: Column(
+          children: [
+            Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.receipt_long_rounded,
+                size: 36,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              l10n.noTransactionsYet,
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              l10n.pasteOrAddHint,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

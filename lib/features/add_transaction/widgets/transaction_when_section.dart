@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/date_formatter.dart';
 
@@ -73,12 +74,18 @@ class TransactionWhenSection extends StatelessWidget {
               ChoiceChip(
                 label: Text(l10n.today),
                 selected: _isDaysAgo(0),
-                onSelected: (_) => onSelectDaysAgo(0),
+                onSelected: (_) {
+                  HapticFeedback.selectionClick();
+                  onSelectDaysAgo(0);
+                },
               ),
               ChoiceChip(
                 label: Text(l10n.yesterday),
                 selected: _isDaysAgo(1),
-                onSelected: (_) => onSelectDaysAgo(1),
+                onSelected: (_) {
+                  HapticFeedback.selectionClick();
+                  onSelectDaysAgo(1);
+                },
               ),
             ],
           ),

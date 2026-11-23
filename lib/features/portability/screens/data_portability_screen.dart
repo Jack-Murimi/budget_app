@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../core/database/app_database.dart';
 import '../../../l10n/l10n.dart';
+import '../../../shared/widgets/motion.dart';
 import '../services/csv_portability_service.dart';
 import '../services/database_backup_service.dart';
 import '../services/encrypted_backup_service.dart';
@@ -41,6 +42,7 @@ class _DataPortabilityScreenState extends State<DataPortabilityScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.portabilityTitle)),
       body: ListView(
@@ -52,40 +54,126 @@ class _DataPortabilityScreenState extends State<DataPortabilityScreen> {
               const SizedBox(height: 8),
               Text(
                 _statusMessage!,
-                style: Theme.of(context).textTheme.bodySmall,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
             const SizedBox(height: 16),
           ],
-          Text(l10n.csvHeading, style: Theme.of(context).textTheme.titleLarge),
-          Text(l10n.csvDescription),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _busy ? null : _exportCsv,
-            icon: const Icon(Icons.download_outlined),
-            label: Text(l10n.exportCsvFiles),
+          FadeSlideIn(
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer
+                                .withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.table_chart_outlined,
+                            color: theme.colorScheme.primary,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            l10n.csvHeading,
+                            style: theme.textTheme.titleLarge,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      l10n.csvDescription,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: _busy ? null : _exportCsv,
+                      icon: const Icon(Icons.download_outlined),
+                      label: Text(l10n.exportCsvFiles),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _importCsv,
+                      icon: const Icon(Icons.upload_file_outlined),
+                      label: Text(l10n.importTransactionsCsv),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-          OutlinedButton.icon(
-            onPressed: _busy ? null : _importCsv,
-            icon: const Icon(Icons.upload_file_outlined),
-            label: Text(l10n.importTransactionsCsv),
-          ),
-          const Divider(height: 40),
-          Text(
-            l10n.encryptedBackupHeading,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          Text(l10n.encryptedBackupDesc),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _busy ? null : _backup,
-            icon: const Icon(Icons.lock_outline),
-            label: Text(l10n.createEncryptedBackup),
-          ),
-          OutlinedButton.icon(
-            onPressed: _busy ? null : _restore,
-            icon: const Icon(Icons.restore_outlined),
-            label: Text(l10n.restoreEncryptedBackup),
+          const SizedBox(height: 16),
+          FadeSlideIn(
+            index: 1,
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.tertiaryContainer
+                                .withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.shield_outlined,
+                            color: theme.colorScheme.tertiary,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            l10n.encryptedBackupHeading,
+                            style: theme.textTheme.titleLarge,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      l10n.encryptedBackupDesc,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: _busy ? null : _backup,
+                      icon: const Icon(Icons.lock_outline),
+                      label: Text(l10n.createEncryptedBackup),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _restore,
+                      icon: const Icon(Icons.restore_outlined),
+                      label: Text(l10n.restoreEncryptedBackup),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),

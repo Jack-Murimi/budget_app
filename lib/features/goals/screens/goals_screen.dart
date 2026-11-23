@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/utils/date_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../../debts/widgets/debt_dialogs.dart';
 import '../providers/goal_providers.dart';
@@ -19,8 +21,11 @@ class GoalsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.goalsTitle)),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateDialog(context),
-        icon: const Icon(Icons.add),
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          _showCreateDialog(context);
+        },
+        icon: const Icon(Icons.add_rounded),
         label: Text(l10n.addGoal),
       ),
       body: goals.when(
@@ -32,8 +37,13 @@ class GoalsScreen extends ConsumerWidget {
             : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
                 itemCount: items.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                itemBuilder: (_, index) => _GoalCard(goal: items[index]),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 10),
+                itemBuilder: (_, index) => FadeSlideIn(
+                  key: ValueKey(items[index].id),
+                  index: index,
+                  child: _GoalCard(goal: items[index]),
+                ),
               ),
       ),
     );
@@ -352,10 +362,10 @@ class _GoalCard extends ConsumerWidget {
 
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         onTap: () => _showHistory(context),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -364,7 +374,22 @@ class _GoalCard extends ConsumerWidget {
                   Expanded(
                     child: Text(goal.name, style: theme.textTheme.titleMedium),
                   ),
-                  Text('${(progress * 100).round()}%'),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '${(progress * 100).round()}%',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
                   PopupMenuButton<String>(
                     onSelected: (value) {
                       switch (value) {
@@ -393,22 +418,31 @@ class _GoalCard extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              LinearProgressIndicator(value: progress),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
+              AnimatedProgressBar(value: progress, minHeight: 8),
+              const SizedBox(height: 10),
               Text(
                 l10n.goalAmountProgress(
                   CurrencyFormatter.format(goal.currentAmount),
                   CurrencyFormatter.format(goal.targetAmount),
                 ),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
+              const SizedBox(height: 2),
               Text(
                 l10n.remainingTarget(
                   CurrencyFormatter.format(remaining),
                   targetPart,
                 ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -416,7 +450,8 @@ class _GoalCard extends ConsumerWidget {
                     onPressed: () => _showHistory(context),
                     child: Text(l10n.history),
                   ),
-                  TextButton(
+                  const SizedBox(width: 4),
+                  FilledButton.tonal(
                     onPressed: () => _contribute(context),
                     child: Text(l10n.addMoney),
                   ),
@@ -597,21 +632,43 @@ class _EmptyGoals extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.savings_outlined, size: 56),
-            const SizedBox(height: 12),
-            Text(l10n.noSavingsGoals),
-            const SizedBox(height: 4),
-            Text(
-              l10n.noSavingsGoalsDesc,
-              textAlign: TextAlign.center,
-            ),
-          ],
+    final theme = Theme.of(context);
+    return FadeSlideIn(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(36),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color:
+                      theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.savings_rounded,
+                  size: 38,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                l10n.noSavingsGoals,
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                l10n.noSavingsGoalsDesc,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -10,6 +10,7 @@ import '../../../core/database/converters/cents_converter.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/cashflow_calculator.dart';
 import '../../../shared/utils/color_utils.dart';
+import '../../../shared/widgets/motion.dart';
 import '../../categories/providers/category_providers.dart';
 import '../../transactions/models/transaction_model.dart';
 
@@ -95,8 +96,8 @@ class _CategoryPieChartSectionState
     final restCents =
         entries.skip(_maxSlices).fold<int>(0, (s, e) => s + e.value);
     if (restCents > 0) {
-      slices.add(
-          _Slice(l10n.otherLabel, CentsConverter.fromCents(restCents), _otherColor));
+      slices.add(_Slice(
+          l10n.otherLabel, CentsConverter.fromCents(restCents), _otherColor));
     }
     return slices;
   }
@@ -135,7 +136,7 @@ class _CategoryPieChartSectionState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.spendingBreakdown, style: theme.textTheme.titleSmall),
+            Text(l10n.spendingBreakdown, style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
             SegmentedButton<bool>(
               showSelectedIcon: false,
@@ -145,10 +146,13 @@ class _CategoryPieChartSectionState
                 ButtonSegment(value: true, label: Text(l10n.subcategory)),
               ],
               selected: {_showSubcategories},
-              onSelectionChanged: (s) => setState(() {
-                _showSubcategories = s.first;
-                _touchedIndex = null;
-              }),
+              onSelectionChanged: (s) {
+                HapticFeedback.selectionClick();
+                setState(() {
+                  _showSubcategories = s.first;
+                  _touchedIndex = null;
+                });
+              },
             ),
             const SizedBox(height: 16),
             if (total <= 0)
@@ -166,12 +170,12 @@ class _CategoryPieChartSectionState
               LayoutBuilder(
                 builder: (context, constraints) {
                   final chartSize =
-                      math.min(160.0, constraints.maxWidth * 0.46);
+                      math.min(164.0, constraints.maxWidth * 0.46);
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       _buildChart(theme, slices, total, selected, chartSize),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 14),
                       Expanded(
                           child: _buildLegend(theme, slices, total, selected)),
                     ],
@@ -187,13 +191,16 @@ class _CategoryPieChartSectionState
   Widget _buildChart(ThemeData theme, List<_Slice> slices, double total,
       int? selected, double size) {
     final l10n = context.l10n;
+    final reduced = Motion.reduced(context);
     final scale = size / 160;
     final centerLabel = selected != null ? slices[selected].label : l10n.total;
     final centerValue = selected != null ? slices[selected].value : total;
 
     return Semantics(
       label: l10n.spendingBreakdownSemantic(
-        slices.map((s) => '${s.label} Ksh ${_money.format(s.value)}').join(', '),
+        slices
+            .map((s) => '${s.label} Ksh ${_money.format(s.value)}')
+            .join(', '),
       ),
       excludeSemantics: true,
       child: SizedBox(
@@ -204,7 +211,7 @@ class _CategoryPieChartSectionState
           children: [
             PieChart(
               PieChartData(
-                sectionsSpace: 2,
+                sectionsSpace: 2.5,
                 centerSpaceRadius: 38 * scale,
                 pieTouchData: PieTouchData(
                   touchCallback: (event, response) {
@@ -225,7 +232,7 @@ class _CategoryPieChartSectionState
                   final isSelected = i == selected;
                   final dimmed = selected != null && !isSelected;
                   final color =
-                      dimmed ? s.color.withValues(alpha: 0.45) : s.color;
+                      dimmed ? s.color.withValues(alpha: 0.35) : s.color;
                   final onColor =
                       ThemeData.estimateBrightnessForColor(s.color) ==
                               Brightness.dark
@@ -235,39 +242,59 @@ class _CategoryPieChartSectionState
                   return PieChartSectionData(
                     value: s.value,
                     color: color,
-                    radius: (isSelected ? 40 : 34) * scale,
+                    radius: (isSelected ? 41 : 34) * scale,
                     // tiny slices can't fit a label
                     title: pct >= 8 ? '${pct.toStringAsFixed(0)}%' : '',
                     titleStyle: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: onColor),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: onColor,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   );
                 }),
               ),
+              swapAnimationDuration: reduced ? Duration.zero : Motion.medium,
+              swapAnimationCurve: Motion.emphasized,
             ),
             IgnorePointer(
               child: SizedBox(
-                width: 66 * scale,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      centerLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                width: 68 * scale,
+                child: AnimatedSwitcher(
+                  duration: reduced ? Duration.zero : Motion.fast,
+                  switchInCurve: Motion.emphasizedDecelerate,
+                  switchOutCurve: Motion.emphasized,
+                  transitionBuilder: (child, anim) => FadeTransition(
+                    opacity: anim,
+                    child: ScaleTransition(
+                      scale: Tween(begin: 0.9, end: 1.0).animate(anim),
+                      child: child,
                     ),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        _money.format(centerValue),
-                        style: theme.textTheme.labelLarge
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  child: Column(
+                    key: ValueKey('$centerLabel-${centerValue.round()}'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        centerLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                  ],
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          _money.format(centerValue),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -279,44 +306,68 @@ class _CategoryPieChartSectionState
 
   Widget _buildLegend(
       ThemeData theme, List<_Slice> slices, double total, int? selected) {
+    final reduced = Motion.reduced(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(slices.length, (i) {
         final s = slices[i];
         final pct = s.value / total * 100;
-        final dimmed = selected != null && selected != i;
+        final isSelected = selected == i;
+        final dimmed = selected != null && !isSelected;
 
         return InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           onTap: () => _select(i),
-          child: Opacity(
-            opacity: dimmed ? 0.5 : 1,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
+          child: AnimatedOpacity(
+            duration: reduced ? Duration.zero : Motion.fast,
+            opacity: dimmed ? 0.45 : 1,
+            child: AnimatedContainer(
+              duration: reduced ? Duration.zero : Motion.fast,
+              curve: Motion.emphasized,
+              padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 6),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? s.color.withValues(alpha: 0.14)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Row(
                 children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration:
-                        BoxDecoration(color: s.color, shape: BoxShape.circle),
+                  AnimatedContainer(
+                    duration: reduced ? Duration.zero : Motion.fast,
+                    width: isSelected ? 12 : 10,
+                    height: isSelected ? 12 : 10,
+                    decoration: BoxDecoration(
+                      color: s.color,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(s.label,
-                            style: theme.textTheme.bodySmall,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
+                        Text(
+                          s.label,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
                           child: Text(
                             'Ksh ${_money.format(s.value)} (${pct.toStringAsFixed(1)}%)',
-                            style: theme.textTheme.labelSmall,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
+                            ),
                           ),
                         ),
                       ],

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/l10n.dart';
+import '../../shared/widgets/motion.dart';
 import 'auth_service.dart';
 
 /// Wraps the app body. When [appLockedProvider] is true, shows lock screen.
@@ -81,19 +83,54 @@ class _AuthGateState extends ConsumerState<AuthGate> with WidgetsBindingObserver
     final l10n = context.l10n;
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.lock_outline, size: 64, color: theme.colorScheme.primary),
-            const SizedBox(height: 24),
-            Text(l10n.biometricLockedTitle, style: theme.textTheme.headlineSmall),
-            const SizedBox(height: 32),
-            FilledButton.icon(
-              onPressed: _unlock,
-              icon: const Icon(Icons.fingerprint),
-              label: Text(l10n.biometricUnlock),
+        child: FadeSlideIn(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer
+                        .withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.lock_rounded,
+                        size: 34,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  l10n.biometricLockedTitle,
+                  style: theme.textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 28),
+                FilledButton.icon(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _unlock();
+                  },
+                  icon: const Icon(Icons.fingerprint_rounded),
+                  label: Text(l10n.biometricUnlock),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

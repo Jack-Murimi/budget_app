@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/cashflow_calculator.dart';
 import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
+import '../../../shared/widgets/motion.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../../categories/providers/category_providers.dart';
 import '../../categories/widgets/category_picker.dart';
@@ -158,31 +160,64 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           _ => l10n.all,
         };
 
+    final reduced = Motion.reduced(context);
+
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: !widget.isEmbedded,
-        title: _searchExpanded
-            ? TextField(
-                controller: _searchCtrl,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: l10n.searchTransactionsHint,
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+        title: AnimatedSwitcher(
+          duration: reduced ? Duration.zero : Motion.fast,
+          switchInCurve: Motion.emphasizedDecelerate,
+          switchOutCurve: Motion.emphasized,
+          layoutBuilder: (currentChild, previousChildren) => Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              ...previousChildren,
+              if (currentChild != null) currentChild,
+            ],
+          ),
+          child: _searchExpanded
+              ? TextField(
+                  key: const ValueKey('search'),
+                  controller: _searchCtrl,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: l10n.searchTransactionsHint,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                    contentPadding: EdgeInsets.zero,
+                    hintStyle: TextStyle(
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.5)),
+                  ),
+                  style: theme.textTheme.bodyLarge,
+                  onChanged: (val) {
+                    ref.read(transactionSearchQueryProvider.notifier).state =
+                        val;
+                    setState(() {});
+                  },
+                )
+              : Text(
+                  l10n.transactionsTitle,
+                  key: const ValueKey('title'),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                style: theme.textTheme.bodyLarge,
-                onChanged: (val) {
-                  ref.read(transactionSearchQueryProvider.notifier).state = val;
-                  setState(() {});
-                },
-              )
-            : Text(l10n.transactionsTitle, overflow: TextOverflow.ellipsis),
+        ),
         actions: [
           // Search toggle
           IconButton(
-            icon: Icon(_searchExpanded ? Icons.close : Icons.search),
+            icon: AnimatedSwitcher(
+              duration: reduced ? Duration.zero : Motion.fast,
+              child: Icon(
+                _searchExpanded ? Icons.close : Icons.search,
+                key: ValueKey(_searchExpanded),
+              ),
+            ),
             tooltip: _searchExpanded ? l10n.closeSearch : l10n.search,
             onPressed: () {
+              HapticFeedback.selectionClick();
               setState(() => _searchExpanded = !_searchExpanded);
               if (!_searchExpanded) {
                 _searchCtrl.clear();
@@ -197,7 +232,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               IconButton(
                 icon: const Icon(Icons.tune),
                 tooltip: l10n.filters,
-                onPressed: () => _showFilterSheet(context),
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  _showFilterSheet(context);
+                },
               ),
               if (activeFilterCount > 0)
                 Positioned(
@@ -227,41 +265,57 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
       body: Column(
         children: [
-          // Active filter chips — compact horizontal scroll, only shown when active
-          if (activeFilterCount > 0)
-            SizedBox(
-              height: 44,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                children: [
-                  if (selectedType != 'all')
-                    _ActiveChip(
-                      label: typeLabel(selectedType),
-                      onRemove: () => ref.read(transactionTypeFilterProvider.notifier).state = 'all',
+          // Active filter chips — smooth animated reveal
+          AnimatedSize(
+            duration: reduced ? Duration.zero : Motion.fast,
+            curve: Motion.emphasized,
+            child: activeFilterCount > 0
+                ? SizedBox(
+                    height: 44,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      children: [
+                        if (selectedType != 'all')
+                          _ActiveChip(
+                            label: typeLabel(selectedType),
+                            onRemove: () => ref
+                                .read(transactionTypeFilterProvider.notifier)
+                                .state = 'all',
+                          ),
+                        if (selectedCategoryId != null)
+                          _ActiveChip(
+                            label: categoryName,
+                            onRemove: () => ref
+                                .read(
+                                    transactionCategoryFilterProvider.notifier)
+                                .state = null,
+                          ),
+                        if (selectedDateRange != 'all')
+                          _ActiveChip(
+                            label: switch (selectedDateRange) {
+                              'today' => l10n.today,
+                              'this_week' => l10n.thisWeekTitle,
+                              _ => l10n.thisMonth,
+                            },
+                            onRemove: () => ref
+                                .read(
+                                    transactionDateRangeFilterProvider.notifier)
+                                .state = 'all',
+                          ),
+                        if (selectedAccountId != null)
+                          _ActiveChip(
+                            label: accountName,
+                            onRemove: () => ref
+                                .read(transactionAccountFilterProvider.notifier)
+                                .state = null,
+                          ),
+                      ],
                     ),
-                  if (selectedCategoryId != null)
-                    _ActiveChip(
-                      label: categoryName,
-                      onRemove: () => ref.read(transactionCategoryFilterProvider.notifier).state = null,
-                    ),
-                  if (selectedDateRange != 'all')
-                    _ActiveChip(
-                      label: switch (selectedDateRange) {
-                        'today' => l10n.today,
-                        'this_week' => l10n.thisWeekTitle,
-                        _ => l10n.thisMonth,
-                      },
-                      onRemove: () => ref.read(transactionDateRangeFilterProvider.notifier).state = 'all',
-                    ),
-                  if (selectedAccountId != null)
-                    _ActiveChip(
-                      label: accountName,
-                      onRemove: () => ref.read(transactionAccountFilterProvider.notifier).state = null,
-                    ),
-                ],
-              ),
-            ),
+                  )
+                : const SizedBox.shrink(),
+          ),
 
           Expanded(
             child: filteredAsync.when(
@@ -269,18 +323,42 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               error: (e, _) => Center(child: Text(l10n.errorLabel('$e'))),
               data: (txns) {
                 if (txns.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.search_off, size: 48, color: theme.colorScheme.outline),
-                        const SizedBox(height: 8),
-                        Text(l10n.noTransactionsFound, style: theme.textTheme.bodyMedium),
-                        if (activeFilterCount > 0) ...[
-                          const SizedBox(height: 8),
-                          TextButton(onPressed: _clearAllFilters, child: Text(l10n.clearFilters)),
-                        ],
-                      ],
+                  return FadeSlideIn(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.7),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.search_off_rounded,
+                                size: 34,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              l10n.noTransactionsFound,
+                              style: theme.textTheme.titleMedium,
+                            ),
+                            if (activeFilterCount > 0) ...[
+                              const SizedBox(height: 12),
+                              FilledButton.tonal(
+                                onPressed: _clearAllFilters,
+                                child: Text(l10n.clearFilters),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
                   );
                 }
@@ -317,8 +395,17 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                   itemBuilder: (context, index) => switch (listItems[index]) {
                     _SummaryBarItem(:final count, :final income, :final expense, :final net) =>
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                        margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.colorScheme.outlineVariant
+                                .withValues(alpha: 0.6),
+                          ),
+                        ),
                         child: SizedBox(
                           width: double.infinity,
                           child: Wrap(
@@ -329,20 +416,26 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                             children: [
                               Text(
                                 l10n.transactionCount(count),
-                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
                               ),
                               Wrap(
-                                spacing: 8,
+                                spacing: 10,
                                 runSpacing: 4,
                                 crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   _SummaryPill(label: '▲', amount: expense, color: theme.colorScheme.error),
                                   _SummaryPill(label: '▼', amount: income, color: theme.colorScheme.primary),
-                                  Text(
-                                    '${net >= 0 ? '+' : ''}${CurrencyFormatter.format(net)}',
+                                  AnimatedAmount(
+                                    value: net,
+                                    format: (v) =>
+                                        '${v >= 0 ? '+' : ''}${CurrencyFormatter.format(v)}',
                                     style: theme.textTheme.bodySmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: net >= 0 ? theme.colorScheme.primary : theme.colorScheme.error,
+                                      fontWeight: FontWeight.w700,
+                                      color: net >= 0
+                                          ? theme.colorScheme.primary
+                                          : theme.colorScheme.error,
                                     ),
                                   ),
                                 ],
@@ -362,23 +455,35 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                           final netFormatted = '$netSign${CurrencyFormatter.format(net.abs())}';
 
                           return Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                            padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
                             child: Row(
                               children: [
                                 Expanded(
                                   child: Text(
                                     title,
                                     style: theme.textTheme.labelMedium?.copyWith(
-                                      color: theme.colorScheme.outline,
-                                      fontWeight: FontWeight.w600,
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.2,
                                     ),
                                   ),
                                 ),
-                                Text(
-                                  netFormatted,
-                                  style: theme.textTheme.labelMedium?.copyWith(
-                                    color: netColor,
-                                    fontWeight: FontWeight.bold,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: netColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    netFormatted,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: netColor,
+                                      fontWeight: FontWeight.w700,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures()
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
@@ -581,9 +686,13 @@ class _SummaryPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      '$label ${CurrencyFormatter.format(amount)}',
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w600),
+    return AnimatedAmount(
+      value: amount,
+      format: (v) => '$label ${CurrencyFormatter.format(v)}',
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
     );
   }
 }
