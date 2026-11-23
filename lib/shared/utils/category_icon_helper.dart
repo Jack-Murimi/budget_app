@@ -82,6 +82,21 @@ class CategoryIconHelper {
     };
   }
 
+  /// Resolves a category's display [IconData], substituting a name-based default
+  /// when the stored icon is the generic `'category'` sentinel.
+  static IconData resolveCategoryIcon({
+    String? iconName,
+    String? categoryName,
+    String? type,
+  }) {
+    final resolvedName = (iconName == 'category' &&
+            categoryName != null &&
+            categoryName.isNotEmpty)
+        ? defaultIconForName(categoryName)
+        : iconName;
+    return getIcon(resolvedName, type: type);
+  }
+
   /// Maps category name to its intended default icon when icon is 'category'
   static String defaultIconForName(String name) {
     final lower = name.toLowerCase();

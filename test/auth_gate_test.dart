@@ -32,7 +32,7 @@ class _FakeAuthService extends AuthService {
   Future<bool> biometricAvailable() async => nextAvailable;
 
   @override
-  Future<bool> authenticate() async {
+  Future<bool> authenticate({String? localizedReason}) async {
     authenticateCalls++;
     return nextAuthenticate;
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
+import '../../../l10n/l10n.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../../categories/providers/category_providers.dart';
 import '../../categories/widgets/category_picker.dart';
@@ -97,11 +98,12 @@ class _AddEditRecurringScreenState
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    final l10n = context.l10n;
 
     final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '').trim());
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid amount')),
+        SnackBar(content: Text(l10n.errorValidAmount)),
       );
       return;
     }
@@ -109,7 +111,7 @@ class _AddEditRecurringScreenState
     final interval = int.tryParse(_intervalCtrl.text.trim()) ?? 0;
     if (interval < 1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Interval must be at least 1')),
+        SnackBar(content: Text(l10n.intervalAtLeastOne)),
       );
       return;
     }
@@ -165,7 +167,7 @@ class _AddEditRecurringScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              _isEditing ? 'Subscription updated' : 'Recurring bill saved',
+              _isEditing ? l10n.subscriptionUpdated : l10n.recurringBillSaved,
             ),
             duration: const Duration(seconds: 2),
           ),
@@ -175,7 +177,7 @@ class _AddEditRecurringScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(l10n.errorLabel('$e')),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -188,6 +190,7 @@ class _AddEditRecurringScreenState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final accounts = ref.watch(accountsWithBalanceProvider).asData?.value ?? [];
     final categories = ref.watch(categoriesStreamProvider).asData?.value ?? [];
 
@@ -203,7 +206,7 @@ class _AddEditRecurringScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Edit Recurring' : 'New Recurring & Bill'),
+        title: Text(_isEditing ? l10n.editRecurring : l10n.newRecurringAndBill),
       ),
       body: Form(
         key: _formKey,
@@ -214,16 +217,16 @@ class _AddEditRecurringScreenState
             children: [
             // Type Selector
             SegmentedButton<String>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: 'expense',
-                  label: Text('Expense'),
-                  icon: Icon(Icons.arrow_upward_rounded),
+                  label: Text(l10n.expense),
+                  icon: const Icon(Icons.arrow_upward_rounded),
                 ),
                 ButtonSegment(
                   value: 'income',
-                  label: Text('Income'),
-                  icon: Icon(Icons.arrow_downward_rounded),
+                  label: Text(l10n.income),
+                  icon: const Icon(Icons.arrow_downward_rounded),
                 ),
               ],
               selected: {_type},
@@ -241,14 +244,15 @@ class _AddEditRecurringScreenState
             // Payee / Name Field
             TextFormField(
               controller: _payeeCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Payee / Subscription Name *',
-                hintText: 'e.g., Netflix, Home Internet, Rent, Salary',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.label_outline),
+              decoration: InputDecoration(
+                labelText: l10n.payeeSubscriptionRequired,
+                hintText: l10n.payeeSubscriptionHint,
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.label_outline),
               ),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Please enter a name' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? l10n.pleaseEnterName
+                  : null,
             ),
             const SizedBox(height: 16),
 
@@ -257,16 +261,20 @@ class _AddEditRecurringScreenState
               controller: _amountCtrl,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Amount (KES) *',
+              decoration: InputDecoration(
+                labelText: l10n.budgetAmountRequired,
                 prefixText: 'KES ',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.payments_outlined),
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.payments_outlined),
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Please enter amount';
+                if (v == null || v.trim().isEmpty) {
+                  return l10n.pleaseEnterAmount;
+                }
                 final parsed = double.tryParse(v.replaceAll(',', '').trim());
-                if (parsed == null || parsed <= 0) return 'Enter a positive amount';
+                if (parsed == null || parsed <= 0) {
+                  return l10n.errorPositiveAmount;
+                }
                 return null;
               },
             ),
@@ -278,17 +286,26 @@ class _AddEditRecurringScreenState
                 Expanded(
                   flex: 3,
                   child: DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: 'Frequency',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.repeat),
+                    decoration: InputDecoration(
+                      labelText: l10n.frequency,
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.repeat),
                     ),
                     initialValue: _frequency,
-                    items: const [
-                      DropdownMenuItem(value: 'daily', child: Text('Daily')),
-                      DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
-                      DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
-                      DropdownMenuItem(value: 'yearly', child: Text('Yearly')),
+                    items: [
+                      DropdownMenuItem(value: 'daily', child: Text(l10n.daily)),
+                      DropdownMenuItem(
+                        value: 'weekly',
+                        child: Text(l10n.weekly),
+                      ),
+                      DropdownMenuItem(
+                        value: 'monthly',
+                        child: Text(l10n.monthly),
+                      ),
+                      DropdownMenuItem(
+                        value: 'yearly',
+                        child: Text(l10n.yearly),
+                      ),
                     ],
                     onChanged: (v) {
                       if (v != null) setState(() => _frequency = v);
@@ -301,16 +318,16 @@ class _AddEditRecurringScreenState
                   child: TextFormField(
                     controller: _intervalCtrl,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Interval',
+                    decoration: InputDecoration(
+                      labelText: l10n.interval,
                       hintText: '1',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                     onChanged: (_) => setState(() {}),
                     validator: (v) {
                       final parsed = int.tryParse((v ?? '').trim());
                       if (parsed == null || parsed < 1) {
-                        return 'Must be >= 1';
+                        return l10n.mustBeAtLeastOne;
                       }
                       return null;
                     },
@@ -329,24 +346,24 @@ class _AddEditRecurringScreenState
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.calendar_today_outlined),
-                      title: const Text('Next Due Date'),
+                      title: Text(l10n.nextDueDate),
                       subtitle: Text(
                         DateFormat('EEE, d MMM yyyy').format(_nextDueDate),
                       ),
                       trailing: TextButton(
                         onPressed: _pickDueDate,
-                        child: const Text('Change'),
+                        child: Text(l10n.change),
                       ),
                     ),
                     const Divider(height: 1),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.event_busy_outlined),
-                      title: const Text('End Date (Optional)'),
+                      title: Text(l10n.endDateOptional),
                       subtitle: Text(
                         _endDate != null
                             ? DateFormat('EEE, d MMM yyyy').format(_endDate!)
-                            : 'Runs indefinitely',
+                            : l10n.runsIndefinitely,
                       ),
                       trailing: _endDate != null
                           ? IconButton(
@@ -355,7 +372,7 @@ class _AddEditRecurringScreenState
                             )
                           : TextButton(
                               onPressed: _pickEndDate,
-                              child: const Text('Set End'),
+                              child: Text(l10n.setEnd),
                             ),
                     ),
                   ],
@@ -366,19 +383,19 @@ class _AddEditRecurringScreenState
 
             // Account and Category Selectors
             DropdownButtonFormField<int?>(
-              decoration: const InputDecoration(
-                labelText: 'Account / Wallet',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+              decoration: InputDecoration(
+                labelText: l10n.accountWallet,
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
               ),
               initialValue: accounts.any((a) => a.id == _selectedAccountId)
                   ? _selectedAccountId
                   : null,
-              hint: const Text('Default Account'),
+              hint: Text(l10n.defaultAccount),
               items: [
-                const DropdownMenuItem<int?>(
+                DropdownMenuItem<int?>(
                   value: null,
-                  child: Text('Default Account'),
+                  child: Text(l10n.defaultAccount),
                 ),
                 ...accounts.map(
                   (a) => DropdownMenuItem<int?>(
@@ -405,8 +422,8 @@ class _AddEditRecurringScreenState
                   Expanded(
                     child: Text(
                       _selectedCategory != null
-                          ? 'Category: ${_selectedCategory!.name}'
-                          : 'Select Category',
+                          ? l10n.categoryWithName(_selectedCategory!.name)
+                          : l10n.selectCategory,
                       style: theme.textTheme.bodyMedium,
                     ),
                   ),
@@ -420,17 +437,17 @@ class _AddEditRecurringScreenState
               onPressed: () async {
                 final cat =
                     await showCategoryPicker(context, initialType: _type);
-                if (cat != null) setState(() => _selectedCategory = cat);
+                if (cat != null && mounted) {
+                  setState(() => _selectedCategory = cat);
+                }
               },
             ),
             const SizedBox(height: 16),
 
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-              title: const Text('Auto-record when due'),
-              subtitle: const Text(
-                'Automatically log transactions when the app opens on or after the due date',
-              ),
+              title: Text(l10n.autoRecordWhenDue),
+              subtitle: Text(l10n.autoRecordWhenDueDesc),
               value: _autoRecord,
               onChanged: (v) => setState(() => _autoRecord = v),
             ),
@@ -440,10 +457,10 @@ class _AddEditRecurringScreenState
             TextFormField(
               controller: _notesCtrl,
               maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Notes (optional)',
-                hintText: 'Account number, billing notes, etc.',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.notesOptional,
+                hintText: l10n.notesBillingHint,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 16),
@@ -466,7 +483,14 @@ class _AddEditRecurringScreenState
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Repeats ${RecurrenceEngine.frequencyLabel(_frequency, int.tryParse(_intervalCtrl.text) ?? 1).toLowerCase()}, starting ${DateFormat('d MMM yyyy').format(_nextDueDate)}.',
+                      l10n.repeatsSummary(
+                        RecurrenceEngine.localizedFrequencyLabel(
+                          l10n,
+                          _frequency,
+                          int.tryParse(_intervalCtrl.text) ?? 1,
+                        ).toLowerCase(),
+                        DateFormat('d MMM yyyy').format(_nextDueDate),
+                      ),
                       style: theme.textTheme.bodySmall,
                     ),
                   ),
@@ -495,7 +519,7 @@ class _AddEditRecurringScreenState
                     )
                   : const Icon(Icons.check),
               label: Text(
-                _isEditing ? 'Save Changes' : 'Create Recurring Item',
+                _isEditing ? l10n.saveChanges : l10n.createRecurringItem,
               ),
             ),
             ],

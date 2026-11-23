@@ -13,6 +13,6 @@ final savingsGoalsProvider = StreamProvider<List<SavingsGoal>>(
 );
 
 final goalContributionsProvider =
-    StreamProvider.family<List<GoalContribution>, int>(
+    StreamProvider.autoDispose.family<List<GoalContribution>, int>(
   (ref, goalId) => ref.watch(goalRepositoryProvider).watchContributions(goalId),
 );

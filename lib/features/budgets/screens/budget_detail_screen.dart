@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
+import '../../../l10n/app_localizations_en.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../categories/providers/category_providers.dart';
 import '../models/budget_model.dart';
 import '../providers/budget_providers.dart';
-import '../repositories/budget_repository.dart';
+import '../utils/budget_period_helper.dart';
 import 'budgets_screen.dart';
 
 class BudgetDetailScreen extends ConsumerWidget {
@@ -16,31 +18,38 @@ class BudgetDetailScreen extends ConsumerWidget {
     required this.budgetWithProgress,
   });
 
-  static String formatPeriodInfo(BudgetWithProgress bp, {DateTime? now}) {
+  static final AppLocalizations _fallbackL10n = AppLocalizationsEn();
+
+  static String formatPeriodInfo(
+    BudgetWithProgress bp, {
+    DateTime? now,
+    AppLocalizations? l10n,
+  }) {
+    final strings = l10n ?? _fallbackL10n;
     if (bp.remaining <= 0) {
-      return 'No remaining budget';
+      return strings.noRemainingBudget;
     }
 
     final current = now ?? DateTime.now();
-    final (_, end) = BudgetRepository.getPeriodWindow(bp.budget, current);
+    final (_, end) = BudgetPeriodHelper.getPeriodWindow(bp.budget, current);
     if (!current.isBefore(end)) {
-      return 'Period ended';
+      return strings.periodEnded;
     }
 
-    final today = DateTime(current.year, current.month, current.day);
-    final endDay = DateTime(end.year, end.month, end.day);
-    final daysLeft = endDay.difference(today).inDays;
-    final remainingDays = daysLeft < 1 ? 1 : daysLeft;
+    final remainingDays = BudgetPeriodHelper.daysRemaining(
+      bp.budget,
+      now: current,
+    ).clamp(1, 999999);
     final recommendedDaily = bp.remaining / remainingDays;
     final daily = CurrencyFormatter.formatCompact(recommendedDaily);
 
-    return '$daily / day for the remaining $remainingDays '
-        '${remainingDays == 1 ? 'day' : 'days'}';
+    return strings.recommendedDaily(daily, remainingDays);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final allBudgets = ref.watch(allBudgetsWithProgressProvider).valueOrNull;
     final liveBudget = allBudgets
             ?.where((b) => b.id == budgetWithProgress.id)
@@ -74,23 +83,25 @@ class BudgetDetailScreen extends ConsumerWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      nextArchived ? 'Budget archived' : 'Budget unarchived',
+                      nextArchived ? l10n.budgetArchived : l10n.budgetUnarchived,
                     ),
                   ),
                 );
               }
             },
-            tooltip: liveBudget.isArchived ? 'Unarchive budget' : 'Archive budget',
+            tooltip: liveBudget.isArchived
+                ? l10n.unarchiveBudgetTooltip
+                : l10n.archiveBudgetTooltip,
           ),
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () => _showEditDialog(context, ref, liveBudget),
-            tooltip: 'Edit budget',
+            tooltip: l10n.editBudgetTooltip,
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
             onPressed: () => _showDeleteDialog(context, ref, liveBudget),
-            tooltip: 'Delete budget',
+            tooltip: l10n.deleteBudgetTooltip,
           ),
         ],
       ),
@@ -111,7 +122,9 @@ class BudgetDetailScreen extends ConsumerWidget {
                   if (liveBudget.rolloverAmount > 0) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'Includes ${CurrencyFormatter.format(liveBudget.rolloverAmount)} rollover from previous period',
+                      l10n.rolloverIncludes(
+                        CurrencyFormatter.format(liveBudget.rolloverAmount),
+                      ),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.primary,
                       ),
@@ -131,8 +144,14 @@ class BudgetDetailScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   Text(
                     liveBudget.isOverBudget
-                        ? 'Over budget by ${CurrencyFormatter.format(liveBudget.spent - liveBudget.amount)}'
-                        : '${CurrencyFormatter.format(liveBudget.remaining)} remaining',
+                        ? l10n.overBudgetBy(
+                            CurrencyFormatter.format(
+                              liveBudget.spent - liveBudget.amount,
+                            ),
+                          )
+                        : l10n.amountRemaining(
+                            CurrencyFormatter.format(liveBudget.remaining),
+                          ),
                     style: TextStyle(
                       color: liveBudget.isOverBudget
                           ? theme.colorScheme.error
@@ -143,7 +162,7 @@ class BudgetDetailScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    formatPeriodInfo(liveBudget),
+                    formatPeriodInfo(liveBudget, l10n: l10n),
                     style: theme.textTheme.bodyMedium,
                   ),
                 ],
@@ -153,7 +172,7 @@ class BudgetDetailScreen extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
-              'Contributing Transactions',
+              l10n.contributingTransactions,
               style: theme.textTheme.titleSmall,
             ),
           ),
@@ -164,7 +183,7 @@ class BudgetDetailScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(16),
                   child: Center(
                     child: Text(
-                      'No expenses in this period yet',
+                      l10n.noExpensesInPeriodYet,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.outline,
                       ),
@@ -214,7 +233,7 @@ class BudgetDetailScreen extends ConsumerWidget {
             ),
             error: (e, _) => Padding(
               padding: const EdgeInsets.all(16),
-              child: Center(child: Text('Error: $e')),
+              child: Center(child: Text(l10n.errorLabel('$e'))),
             ),
           ),
         ],
@@ -247,7 +266,7 @@ class BudgetDetailScreen extends ConsumerWidget {
     await ref.read(budgetRepositoryProvider).updateBudget(result);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Budget updated')),
+      SnackBar(content: Text(context.l10n.budgetUpdated)),
     );
   }
 
@@ -256,15 +275,16 @@ class BudgetDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     BudgetWithProgress current,
   ) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Budget'),
-        content: Text('Are you sure you want to delete "${current.name}"?'),
+        title: Text(l10n.deleteBudgetTitle),
+        content: Text(l10n.deleteBudgetConfirm(current.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -272,7 +292,7 @@ class BudgetDetailScreen extends ConsumerWidget {
               foregroundColor: Theme.of(ctx).colorScheme.onError,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -283,7 +303,7 @@ class BudgetDetailScreen extends ConsumerWidget {
       if (!context.mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Budget deleted')),
+        SnackBar(content: Text(l10n.budgetDeleted)),
       );
     }
   }

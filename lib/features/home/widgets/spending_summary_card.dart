@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 
 class SpendingSummaryCard extends StatelessWidget {
@@ -16,6 +17,7 @@ class SpendingSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final net = totalIncome - totalSpent;
     final isPositive = net >= 0;
 
@@ -59,7 +61,7 @@ class SpendingSummaryCard extends StatelessWidget {
               ),
             ),
             Text(
-              'spent this month',
+              l10n.spentThisMonth,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.outline,
               ),
@@ -70,7 +72,7 @@ class SpendingSummaryCard extends StatelessWidget {
                 Expanded(
                   child: _SummaryPill(
                     icon: Icons.arrow_downward_rounded,
-                    label: 'Income',
+                    label: l10n.income,
                     amount: totalIncome,
                     color: theme.colorScheme.primary,
                   ),
@@ -79,7 +81,7 @@ class SpendingSummaryCard extends StatelessWidget {
                 Expanded(
                   child: _SummaryPill(
                     icon: Icons.arrow_upward_rounded,
-                    label: 'Expenses',
+                    label: l10n.expensesLabel,
                     amount: totalSpent,
                     color: theme.colorScheme.error,
                   ),

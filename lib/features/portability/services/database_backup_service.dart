@@ -94,6 +94,7 @@ class DatabaseBackupService {
           );
         }
       }
+      await _db.backfillCategorySystemKeys();
     });
     _db.markTablesUpdated(_db.allTables);
   }

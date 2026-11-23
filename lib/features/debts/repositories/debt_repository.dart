@@ -17,20 +17,31 @@ class DebtRepository {
       .watch()
       .asyncMap((_) async {
         final debts = await _db.select(_db.debts).get();
-        final result = <DebtWithRepayments>[];
-        for (final debt in debts) {
-          final repayments = await (_db.select(_db.debtRepayments)
-                ..where((row) => row.debtId.equals(debt.id)))
-              .get();
-          final disbursements = await (_db.select(_db.transactions)
-                ..where((row) => row.debtId.equals(debt.id))
-                ..orderBy([(row) => OrderingTerm.desc(row.transactionDate)]))
-              .get();
-          result.add(DebtWithRepayments(
-              debt: debt,
-              repayments: repayments,
-              disbursements: disbursements));
+        if (debts.isEmpty) return const <DebtWithRepayments>[];
+
+        final allRepayments = await _db.select(_db.debtRepayments).get();
+        final repaymentsByDebt = <int, List<DebtRepayment>>{};
+        for (final r in allRepayments) {
+          repaymentsByDebt.putIfAbsent(r.debtId, () => []).add(r);
         }
+
+        final allDisbursements = await (_db.select(_db.transactions)
+              ..where((row) => row.debtId.isNotNull())
+              ..orderBy([(row) => OrderingTerm.desc(row.transactionDate)]))
+            .get();
+        final disbursementsByDebt = <int, List<Transaction>>{};
+        for (final t in allDisbursements) {
+          disbursementsByDebt.putIfAbsent(t.debtId!, () => []).add(t);
+        }
+
+        final result = [
+          for (final debt in debts)
+            DebtWithRepayments(
+              debt: debt,
+              repayments: repaymentsByDebt[debt.id] ?? const [],
+              disbursements: disbursementsByDebt[debt.id] ?? const [],
+            ),
+        ];
         result.sort((a, b) {
           final da = a.debt.dueDate;
           final db = b.debt.dueDate;

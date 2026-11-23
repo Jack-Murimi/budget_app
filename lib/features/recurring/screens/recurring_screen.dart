@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../models/recurring_model.dart';
 import '../providers/recurring_providers.dart';
@@ -21,6 +22,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
     BuildContext context,
     RecurringModel item,
   ) async {
+    final l10n = context.l10n;
     final result = await showDialog<({double amount, DateTime paidDate})>(
       context: context,
       builder: (_) => _MarkPaidDialog(item: item),
@@ -36,7 +38,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
     if (mounted) {
       ScaffoldMessenger.of(this.context).showSnackBar(
         SnackBar(
-          content: Text('Recorded "${item.payee}" payment ✓'),
+          content: Text(l10n.recordedPaymentToast(item.payee)),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -44,21 +46,20 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
   }
 
   Future<void> _confirmSkip(BuildContext context, RecurringModel item) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Skip this occurrence?'),
-        content: Text(
-          'Skip payment for "${item.payee}"? Next due date will advance to the following cycle without creating a ledger transaction.',
-        ),
+        title: Text(l10n.skipOccurrenceTitle),
+        content: Text(l10n.skipOccurrenceBody(item.payee)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Skip'),
+            child: Text(l10n.skip),
           ),
         ],
       ),
@@ -68,24 +69,23 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
       await ref.read(recurringRepositoryProvider).skip(item);
       if (mounted) {
         ScaffoldMessenger.of(this.context).showSnackBar(
-          SnackBar(content: Text('Skipped "${item.payee}" occurrence')),
+          SnackBar(content: Text(l10n.skippedOccurrenceToast(item.payee))),
         );
       }
     }
   }
 
   Future<void> _confirmDelete(BuildContext context, RecurringModel item) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Recurring Item?'),
-        content: Text(
-          'Delete "${item.payee}"? Past recorded transactions will remain in your ledger.',
-        ),
+        title: Text(l10n.deleteRecurringTitle),
+        content: Text(l10n.deleteRecurringBody(item.payee)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -93,7 +93,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
               foregroundColor: Theme.of(ctx).colorScheme.onError,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -103,7 +103,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
       await ref.read(recurringRepositoryProvider).delete(item.id);
       if (mounted) {
         ScaffoldMessenger.of(this.context).showSnackBar(
-          SnackBar(content: Text('Deleted "${item.payee}"')),
+          SnackBar(content: Text(l10n.deletedItemToast(item.payee))),
         );
       }
     }
@@ -112,12 +112,13 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final summaryAsync = ref.watch(recurringSummaryProvider);
     final allAsync = ref.watch(allRecurringProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Recurring & Bills'),
+        title: Text(l10n.recurringTitle),
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'fab_add_recurring',
@@ -125,12 +126,12 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
           context,
           MaterialPageRoute(builder: (_) => const AddEditRecurringScreen()),
         ),
-        tooltip: 'Add Recurring Bill',
+        tooltip: l10n.addRecurringTooltip,
         child: const Icon(Icons.add),
       ),
       body: allAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(l10n.errorLabel('$e'))),
         data: (allItems) {
           final now = DateTime.now();
           final today = DateTime(now.year, now.month, now.day);
@@ -160,7 +161,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
                         Row(
                           children: [
                             Text(
-                              'Monthly Commitments',
+                              l10n.monthlyCommitments,
                               style: theme.textTheme.labelMedium
                                   ?.copyWith(color: theme.colorScheme.outline),
                             ),
@@ -178,8 +179,8 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
                               ),
                               child: Text(
                                 s.overdueCount > 0
-                                    ? '${s.overdueCount} Overdue'
-                                    : '${s.activeCount} Active',
+                                    ? l10n.overdueCountBadge(s.overdueCount)
+                                    : l10n.activeCountBadge(s.activeCount),
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: s.overdueCount > 0
                                       ? theme.colorScheme.onErrorContainer
@@ -198,7 +199,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Expenses',
+                                  l10n.expensesLabel,
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.outline,
                                   ),
@@ -216,7 +217,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Text(
-                                  'Income',
+                                  l10n.income,
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.outline,
                                   ),
@@ -243,16 +244,16 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
 
               // Segmented view toggle
               SegmentedButton<int>(
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: 0,
-                    label: Text('Upcoming & Due'),
-                    icon: Icon(Icons.schedule),
+                    label: Text(l10n.upcomingAndDue),
+                    icon: const Icon(Icons.schedule),
                   ),
                   ButtonSegment(
                     value: 1,
-                    label: Text('All Subscriptions'),
-                    icon: Icon(Icons.list_alt),
+                    label: Text(l10n.allSubscriptions),
+                    icon: const Icon(Icons.list_alt),
                   ),
                 ],
                 selected: {_selectedTab},
@@ -266,9 +267,8 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
                 if (upcomingItems.isEmpty)
                   _buildEmptyState(
                     icon: Icons.check_circle_outline,
-                    title: 'No upcoming bills due',
-                    subtitle:
-                        'Bills due or overdue within the next 30 days appear here.',
+                    title: l10n.noUpcomingBillsDue,
+                    subtitle: l10n.noUpcomingBillsDueDesc,
                   )
                 else
                   ...upcomingItems.map(
@@ -293,9 +293,8 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
                 if (allItems.isEmpty)
                   _buildEmptyState(
                     icon: Icons.repeat,
-                    title: 'No recurring transactions',
-                    subtitle:
-                        'Set up recurring bills, salaries, rent, and subscriptions.',
+                    title: l10n.noRecurringTransactions,
+                    subtitle: l10n.noRecurringTransactionsDesc,
                   )
                 else
                   ...allItems.map(
@@ -379,25 +378,24 @@ class _MarkPaidDialogState extends State<_MarkPaidDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AlertDialog(
-      title: Text('Record "${widget.item.payee}" as Paid?'),
+      title: Text(l10n.recordPaidTitle(widget.item.payee)),
       content: Form(
         key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'This will log a transaction in your ledger and advance the due date to the next cycle.',
-            ),
+            Text(l10n.recordPaidBody),
             const SizedBox(height: 16),
             TextFormField(
               controller: _amountCtrl,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Amount Paid (KES)',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.amountPaidKes,
+                border: const OutlineInputBorder(),
                 prefixText: 'KES ',
               ),
               validator: (v) {
@@ -405,7 +403,7 @@ class _MarkPaidDialogState extends State<_MarkPaidDialog> {
                   (v ?? '').replaceAll(',', '').trim(),
                 );
                 if (parsed == null || !parsed.isFinite || parsed <= 0) {
-                  return 'Enter a positive amount';
+                  return l10n.errorPositiveAmount;
                 }
                 return null;
               },
@@ -414,7 +412,7 @@ class _MarkPaidDialogState extends State<_MarkPaidDialog> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.calendar_today_outlined),
-              title: const Text('Payment Date'),
+              title: Text(l10n.paymentDate),
               subtitle: Text(DateFormat('EEE, d MMM yyyy').format(_paidDate)),
               trailing: TextButton(
                 onPressed: () async {
@@ -426,7 +424,7 @@ class _MarkPaidDialogState extends State<_MarkPaidDialog> {
                   );
                   if (d != null && mounted) setState(() => _paidDate = d);
                 },
-                child: const Text('Change'),
+                child: Text(l10n.change),
               ),
             ),
           ],
@@ -435,7 +433,7 @@ class _MarkPaidDialogState extends State<_MarkPaidDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: () {
@@ -445,7 +443,7 @@ class _MarkPaidDialogState extends State<_MarkPaidDialog> {
             );
             Navigator.pop(context, (amount: actual, paidDate: _paidDate));
           },
-          child: const Text('Confirm Paid'),
+          child: Text(l10n.confirmPaid),
         ),
       ],
     );
@@ -472,6 +470,7 @@ class _RecurringItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final isIncome = item.type == 'income';
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -486,22 +485,22 @@ class _RecurringItemCard extends StatelessWidget {
       < 0 => (
           theme.colorScheme.errorContainer,
           theme.colorScheme.onErrorContainer,
-          'Overdue by ${-daysUntil}d'
+          l10n.overdueByDays(-daysUntil),
         ),
       0 => (
           theme.colorScheme.errorContainer,
           theme.colorScheme.onErrorContainer,
-          'Due Today'
+          l10n.dueToday,
         ),
       1 => (
           theme.colorScheme.tertiaryContainer,
           theme.colorScheme.onTertiaryContainer,
-          'Due Tomorrow'
+          l10n.dueTomorrow,
         ),
       <= 3 => (
           theme.colorScheme.tertiaryContainer,
           theme.colorScheme.onTertiaryContainer,
-          'Due in ${daysUntil}d'
+          l10n.dueInDays(daysUntil),
         ),
       _ => (
           theme.colorScheme.surfaceContainerHighest,
@@ -551,7 +550,8 @@ class _RecurringItemCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          RecurrenceEngine.frequencyLabel(
+                          RecurrenceEngine.localizedFrequencyLabel(
+                            l10n,
                             item.frequency,
                             item.intervalCount,
                           ),
@@ -606,15 +606,15 @@ class _RecurringItemCard extends StatelessWidget {
                       }
                     },
                     itemBuilder: (ctx) => [
-                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                      PopupMenuItem(value: 'edit', child: Text(l10n.edit)),
                       PopupMenuItem(
                         value: 'toggle',
-                        child: Text(item.isActive ? 'Pause' : 'Resume'),
+                        child: Text(item.isActive ? l10n.pause : l10n.resume),
                       ),
                       PopupMenuItem(
                         value: 'delete',
                         child: Text(
-                          'Delete',
+                          l10n.delete,
                           style: TextStyle(color: theme.colorScheme.error),
                         ),
                       ),
@@ -662,7 +662,7 @@ class _RecurringItemCard extends StatelessWidget {
                       ),
                       onPressed: onSkip,
                       icon: const Icon(Icons.skip_next, size: 16),
-                      label: const Text('Skip'),
+                      label: Text(l10n.skip),
                     ),
                     const SizedBox(width: 8),
                     FilledButton.tonalIcon(
@@ -671,7 +671,7 @@ class _RecurringItemCard extends StatelessWidget {
                       ),
                       onPressed: onMarkPaid,
                       icon: const Icon(Icons.check, size: 16),
-                      label: const Text('Mark as Paid'),
+                      label: Text(l10n.markAsPaid),
                     ),
                   ],
                 ),

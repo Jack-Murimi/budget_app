@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../add_transaction/screens/add_transaction_screen.dart';
 import '../../transactions/models/mpesa_parse_result.dart';
@@ -33,10 +34,13 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
   @override
   void initState() {
     super.initState();
-    _requestAndScan();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _requestAndScan();
+    });
   }
 
   Future<void> _requestAndScan() async {
+    final l10n = context.l10n;
     setState(() {
       _loading = true;
       _error = null;
@@ -50,7 +54,7 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
       if (!granted) {
         setState(() {
           _loading = false;
-          _error = 'SMS permission denied. Grant it in device Settings.';
+          _error = l10n.smsPermissionDenied;
         });
         return;
       }
@@ -88,13 +92,13 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Could not read SMS inbox: ${e.message ?? e.code}';
+        _error = l10n.couldNotReadSmsInbox(e.message ?? e.code);
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Failed to scan SMS inbox: $e';
+        _error = l10n.failedToScanSmsInbox('$e');
       });
     }
   }
@@ -107,6 +111,7 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
   }
 
   Future<void> _handleAddItem(SmsParseItem item) async {
+    final l10n = context.l10n;
     final r = item.result;
     final handler = ref.read(mpesaResultHandlerProvider);
     final smsRepo = ref.read(smsInboxRepositoryProvider);
@@ -122,14 +127,16 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
       if (!mounted) return;
       setState(() => _items?.remove(item));
       if (outcome.isDuplicate) {
-        _toast('Already recorded — ${r.mpesaRef}');
+        _toast(l10n.alreadyRecordedRef(r.mpesaRef));
       } else if (r.type == MpesaTransactionType.fulizaRepayment) {
-        _toast('Fuliza repayment recorded: ${CurrencyFormatter.format(r.amount)}');
+        _toast(
+          l10n.fulizaRepaymentRecorded(CurrencyFormatter.format(r.amount)),
+        );
       } else {
         _toast(
           outcome.linkedExisting
-              ? 'Fuliza recorded & linked to existing transaction.'
-              : 'Fuliza drawdown recorded.',
+              ? l10n.fulizaRecordedAndLinked
+              : l10n.fulizaDrawdownRecorded,
         );
       }
       return;
@@ -145,7 +152,7 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
       );
       if (!mounted) return;
       setState(() => _items?.remove(item));
-      _toast('Already recorded — ${r.mpesaRef}');
+      _toast(l10n.alreadyRecordedRef(r.mpesaRef));
       return;
     }
 
@@ -177,6 +184,7 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
 
   Future<void> _importAllHighConfidence(List<SmsParseItem> good) async {
     if (_importing || good.isEmpty) return;
+    final l10n = context.l10n;
     setState(() => _importing = true);
     try {
       final handler = ref.read(mpesaResultHandlerProvider);
@@ -194,10 +202,15 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
       setState(() {
         _items?.removeWhere((item) => good.contains(item));
       });
+      final skippedPart = summary.skippedDuplicates > 0
+          ? l10n.bulkImportSkippedPart(summary.skippedDuplicates)
+          : '';
       _toast(
-        'Imported ${summary.importedTransactions} transactions, '
-        '${summary.importedFuliza} Fuliza records'
-        '${summary.skippedDuplicates > 0 ? ' (${summary.skippedDuplicates} duplicates skipped)' : ''}.',
+        l10n.bulkImportSummary(
+          summary.importedTransactions,
+          summary.importedFuliza,
+          skippedPart,
+        ),
       );
     } finally {
       if (mounted) setState(() => _importing = false);
@@ -207,24 +220,25 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan M-Pesa SMS'),
+        title: Text(l10n.scanSmsTitle),
         actions: [
           if (!_loading && !_importing)
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _requestAndScan,
-              tooltip: 'Rescan',
+              tooltip: l10n.rescan,
             ),
         ],
       ),
-      body: _build(theme),
+      body: _build(theme, l10n),
     );
   }
 
-  Widget _build(ThemeData theme) {
+  Widget _build(ThemeData theme, AppLocalizations l10n) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -242,11 +256,11 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: _requestAndScan,
-                child: const Text('Retry'),
+                child: Text(l10n.retry),
               ),
-              const TextButton(
+              TextButton(
                 onPressed: openAppSettings,
-                child: Text('Open Settings'),
+                child: Text(l10n.openSettings),
               ),
             ],
           ),
@@ -258,8 +272,8 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
       return Center(
         child: Text(
           _alreadyProcessedCount > 0
-              ? 'All M-Pesa messages already imported ($_alreadyProcessedCount).'
-              : 'No M-Pesa messages found in inbox.',
+              ? l10n.allMpesaAlreadyImported(_alreadyProcessedCount)
+              : l10n.noMpesaInInbox,
         ),
       );
     }
@@ -274,7 +288,7 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Text(
-              'Skipped $_alreadyProcessedCount already recorded or dismissed messages',
+              l10n.skippedAlreadyRecorded(_alreadyProcessedCount),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.outline,
               ),
@@ -287,7 +301,7 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    'Ready to Add (${good.length})',
+                    l10n.readyToAddCount(good.length),
                     style: theme.textTheme.labelSmall
                         ?.copyWith(color: theme.colorScheme.primary),
                   ),
@@ -302,16 +316,16 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.done_all, size: 18),
-                  label: Text('Import all (${good.length})'),
+                  label: Text(l10n.importAllCount(good.length)),
                 ),
               ],
             ),
           ),
-          ...good.map((i) => _itemTile(theme, i)),
+          ...good.map((i) => _itemTile(theme, l10n, i)),
         ],
         if (review.isNotEmpty) ...[
-          _sectionHeader(theme, 'Needs Review (${review.length})'),
-          ...review.map((i) => _itemTile(theme, i, isReview: true)),
+          _sectionHeader(theme, l10n.needsReviewCount(review.length)),
+          ...review.map((i) => _itemTile(theme, l10n, i, isReview: true)),
         ],
       ],
     );
@@ -324,7 +338,7 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
                 ?.copyWith(color: theme.colorScheme.primary)),
       );
 
-  Widget _itemTile(ThemeData theme, SmsParseItem item,
+  Widget _itemTile(ThemeData theme, AppLocalizations l10n, SmsParseItem item,
       {bool isReview = false}) {
     final r = item.result;
     final color = isReview
@@ -350,7 +364,7 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
         title: Text(
           r.isValid
               ? '${r.type.defaultDescription} • ${CurrencyFormatter.format(r.amount)}'
-              : 'Unrecognised',
+              : l10n.unrecognised,
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
@@ -368,11 +382,11 @@ class _SmsInboxScreenState extends ConsumerState<SmsInboxScreen> {
             if (r.isValid)
               FilledButton.tonal(
                 onPressed: _importing ? null : () => _handleAddItem(item),
-                child: Text(isFuliza ? 'Record' : 'Add'),
+                child: Text(isFuliza ? l10n.record : l10n.add),
               ),
             IconButton(
               icon: const Icon(Icons.close, size: 18),
-              tooltip: 'Dismiss',
+              tooltip: l10n.dismiss,
               onPressed: _importing ? null : () => _dismissItem(item),
             ),
           ],

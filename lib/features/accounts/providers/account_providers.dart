@@ -28,6 +28,6 @@ final totalNetWorthProvider = Provider<AsyncValue<double>>((ref) {
   });
 });
 
-final accountTransactionsProvider = StreamProvider.family<List<Transaction>, int>((ref, accountId) {
+final accountTransactionsProvider = StreamProvider.autoDispose.family<List<Transaction>, int>((ref, accountId) {
   return ref.watch(accountRepositoryProvider).watchTransactionsByAccount(accountId);
 });

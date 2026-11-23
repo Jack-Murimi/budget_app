@@ -113,7 +113,7 @@ void main() {
     expect(txns, hasLength(3));
 
     final versionRow = await db.customSelect('PRAGMA user_version').getSingle();
-    expect(versionRow.read<int>('user_version'), 18);
+    expect(versionRow.read<int>('user_version'), 19);
 
     final fkRow = await db.customSelect('PRAGMA foreign_keys').getSingle();
     expect(fkRow.read<int>('foreign_keys'), 1);
@@ -443,7 +443,61 @@ void main() {
         'idx_transactions_debt_id',
         'idx_debt_repayments_debt_id',
         'idx_goal_contributions_goal_id',
+        'idx_categories_system_key',
       ]),
     );
+  });
+
+  test('migrates v18 -> v19 adding categories.system_key and backfilling loan keys',
+      () async {
+    final tempDir = await Directory.systemTemp.createTemp('budget_v18_to_v19_');
+    final dbFile = File('${tempDir.path}/test_v18_v19.sqlite');
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    final raw = sql.sqlite3.open(dbFile.path);
+    try {
+      raw.execute('PRAGMA user_version = 18;');
+      raw.execute('''
+        CREATE TABLE categories (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          icon TEXT NOT NULL DEFAULT 'category',
+          color_hex TEXT NOT NULL DEFAULT '#6750A4',
+          parent_id INTEGER REFERENCES categories(id),
+          transaction_type TEXT NOT NULL DEFAULT 'expense',
+          is_default INTEGER NOT NULL DEFAULT 0,
+          is_archived INTEGER NOT NULL DEFAULT 0,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', CURRENT_TIMESTAMP))
+        );
+        INSERT INTO categories (name, transaction_type, is_default) VALUES
+          ('Loan Given', 'expense', 1),
+          ('Loan Received', 'income', 1),
+          ('Loan Repayment', 'expense', 1),
+          ('Loan Repayment Received', 'income', 1),
+          ('Food & Groceries', 'expense', 1);
+      ''');
+    } finally {
+      raw.dispose();
+    }
+
+    final db = AppDatabase.forTesting(NativeDatabase(dbFile));
+    addTearDown(db.close);
+
+    final cats = await db.select(db.categories).get();
+    final versionRow = await db.customSelect('PRAGMA user_version').getSingle();
+    expect(versionRow.read<int>('user_version'), 19);
+
+    String? keyFor(String name) =>
+        cats.firstWhere((c) => c.name == name).systemKey;
+    expect(keyFor('Loan Given'), 'loan_given');
+    expect(keyFor('Loan Received'), 'loan_received');
+    expect(keyFor('Loan Repayment'), 'loan_repayment');
+    expect(keyFor('Loan Repayment Received'), 'loan_repayment_received');
+    expect(keyFor('Food & Groceries'), isNull);
   });
 }

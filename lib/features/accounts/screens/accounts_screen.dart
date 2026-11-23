@@ -2,6 +2,8 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
+import '../../../l10n/l10n.dart';
+import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../models/account_model.dart';
 import '../providers/account_providers.dart';
@@ -39,13 +41,14 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
   }
 
   Future<void> _showTransferDialog() async {
+    final l10n = context.l10n;
     final accounts = await ref.read(accountRepositoryProvider).getAll();
     if (!mounted) return;
     final opts = accounts.where((a) => !a.isArchived).toList();
     if (opts.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Need at least 2 active accounts to transfer'),
+        SnackBar(
+          content: Text(l10n.needTwoAccountsToTransfer),
         ),
       );
       return;
@@ -57,7 +60,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
     );
     if (transferred == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Transfer recorded')),
+        SnackBar(content: Text(l10n.transferRecorded)),
       );
     }
   }
@@ -65,28 +68,29 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final netWorthAsync = ref.watch(totalNetWorthProvider);
     final accountsAsync = ref.watch(allAccountsWithBalanceProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accounts & Wallets'),
+        title: Text(l10n.accountsTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.swap_horiz),
             onPressed: _showTransferDialog,
-            tooltip: 'Transfer',
+            tooltip: l10n.transfer,
           ),
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: _showAddDialog,
-            tooltip: 'Add Account',
+            tooltip: l10n.addAccount,
           ),
         ],
       ),
       body: accountsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const Center(child: Text('Error loading accounts')),
+        error: (_, __) => Center(child: Text(l10n.errorLoadingAccounts)),
         data: (accounts) {
           final active = accounts.where((a) => !a.isArchived).toList();
           final archived = accounts.where((a) => a.isArchived).toList();
@@ -102,7 +106,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Total Balance', style: theme.textTheme.bodyMedium),
+                        Text(l10n.totalBalance, style: theme.textTheme.bodyMedium),
                         Text(
                           CurrencyFormatter.format(total),
                           style: theme.textTheme.titleMedium
@@ -118,10 +122,10 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
               const SizedBox(height: 16),
 
               if (active.isEmpty)
-                const Center(
+                Center(
                   child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Text('No accounts yet. Tap + to add one.'),
+                    padding: const EdgeInsets.all(32),
+                    child: Text(l10n.noAccountsYet),
                   ),
                 )
               else
@@ -132,7 +136,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text(
-                    'Archived',
+                    l10n.archived,
                     style: theme.textTheme.labelSmall
                         ?.copyWith(color: theme.colorScheme.outline),
                   ),
@@ -177,8 +181,9 @@ class _AddAccountDialogState extends ConsumerState<_AddAccountDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AlertDialog(
-      title: const Text('Add Account'),
+      title: Text(l10n.addAccount),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -187,19 +192,19 @@ class _AddAccountDialogState extends ConsumerState<_AddAccountDialog> {
             children: [
               TextFormField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Name *',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.nameRequired,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Enter account name'
+                    ? l10n.enterAccountName
                     : null,
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                decoration: const InputDecoration(
-                  labelText: 'Type',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.type,
+                  border: const OutlineInputBorder(),
                 ),
                 initialValue: _selectedType,
                 items: widget.typeOptions
@@ -216,9 +221,9 @@ class _AddAccountDialogState extends ConsumerState<_AddAccountDialog> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                decoration: const InputDecoration(
-                  labelText: 'Color',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.colorLabel,
+                  border: const OutlineInputBorder(),
                 ),
                 initialValue: _selectedColor,
                 items: widget.colorOptions.entries
@@ -232,9 +237,7 @@ class _AddAccountDialogState extends ConsumerState<_AddAccountDialog> {
                               height: 16,
                               margin: const EdgeInsets.only(right: 8),
                               decoration: BoxDecoration(
-                                color: Color(
-                                  int.parse(e.key.replaceFirst('#', '0xFF')),
-                                ),
+                                color: parseHexColor(e.key),
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -253,9 +256,9 @@ class _AddAccountDialogState extends ConsumerState<_AddAccountDialog> {
                 controller: _balanceCtrl,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Opening Balance',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.openingBalance,
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ],
@@ -265,11 +268,11 @@ class _AddAccountDialogState extends ConsumerState<_AddAccountDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _isSaving ? null : _submit,
-          child: const Text('Add'),
+          child: Text(l10n.add),
         ),
       ],
     );
@@ -326,8 +329,9 @@ class _TransferAccountDialogState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AlertDialog(
-      title: const Text('Transfer Between Accounts'),
+      title: Text(l10n.transferBetweenAccounts),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -335,9 +339,9 @@ class _TransferAccountDialogState
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<int>(
-                decoration: const InputDecoration(
-                  labelText: 'From Account',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.fromAccount,
+                  border: const OutlineInputBorder(),
                 ),
                 initialValue: _fromId,
                 items: widget.accounts
@@ -351,9 +355,9 @@ class _TransferAccountDialogState
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
-                decoration: const InputDecoration(
-                  labelText: 'To Account',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.toAccount,
+                  border: const OutlineInputBorder(),
                 ),
                 initialValue: _toId,
                 items: widget.accounts
@@ -362,8 +366,8 @@ class _TransferAccountDialogState
                     )
                     .toList(),
                 validator: (v) {
-                  if (v == null) return 'Select destination account';
-                  if (v == _fromId) return 'Accounts must be different';
+                  if (v == null) return l10n.selectDestAccount;
+                  if (v == _fromId) return l10n.accountsMustDiffer;
                   return null;
                 },
                 onChanged: (v) {
@@ -375,15 +379,15 @@ class _TransferAccountDialogState
                 controller: _amountCtrl,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Amount (KES)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.amountKES,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (v) {
                   final parsed =
                       double.tryParse((v ?? '').replaceAll(',', '').trim());
                   if (parsed == null || parsed <= 0) {
-                    return 'Enter a positive amount';
+                    return l10n.errorPositiveAmount;
                   }
                   return null;
                 },
@@ -393,15 +397,15 @@ class _TransferAccountDialogState
                 controller: _feeCtrl,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Fee (KES)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.feeKes,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return null;
                   final parsed = double.tryParse(v.replaceAll(',', '').trim());
                   if (parsed == null || parsed < 0) {
-                    return 'Fee cannot be negative';
+                    return l10n.feeCannotBeNegative;
                   }
                   return null;
                 },
@@ -409,9 +413,9 @@ class _TransferAccountDialogState
               const SizedBox(height: 12),
               TextFormField(
                 controller: _noteCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Note',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.note,
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ],
@@ -421,11 +425,11 @@ class _TransferAccountDialogState
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _isSaving ? null : _submit,
-          child: const Text('Transfer'),
+          child: Text(l10n.transfer),
         ),
       ],
     );
@@ -459,7 +463,11 @@ class _AccountCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final color = Color(int.parse(account.colorHex.replaceFirst('#', '0xFF')));
+    final l10n = context.l10n;
+    final color = parseHexColor(
+      account.colorHex,
+      fallback: theme.colorScheme.primary,
+    );
 
     return Opacity(
       opacity: dimmed ? 0.5 : 1.0,
@@ -521,7 +529,7 @@ class _AccountCard extends ConsumerWidget {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                'Default',
+                                l10n.defaultLabel,
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: theme.colorScheme.onPrimaryContainer,
                                 ),
@@ -541,7 +549,7 @@ class _AccountCard extends ConsumerWidget {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                'Archived',
+                                l10n.archived,
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
@@ -562,7 +570,7 @@ class _AccountCard extends ConsumerWidget {
                 if (account.isArchived)
                   IconButton(
                     icon: const Icon(Icons.unarchive_outlined),
-                    tooltip: 'Unarchive',
+                    tooltip: l10n.unarchive,
                     onPressed: () => ref
                         .read(accountRepositoryProvider)
                         .archiveAccount(account.id, archive: false),

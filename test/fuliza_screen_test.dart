@@ -68,4 +68,70 @@ void main() {
     expect(find.text('No Fuliza Balance'), findsOneWidget);
     expect(find.textContaining('Repaid'), findsOneWidget);
   });
+
+  testWidgets('FulizaScreen shows empty state when no records exist',
+      (tester) async {
+    final container = ProviderContainer(
+      overrides: [dbProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: FulizaScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('No Fuliza Balance'), findsOneWidget);
+    expect(find.text('No Fuliza usage recorded'), findsOneWidget);
+    expect(find.text('Record Repayment'), findsNothing);
+  });
+
+  testWidgets('FulizaScreen displays overdue banner, validates input, and records partial repayment',
+      (tester) async {
+    await db.into(db.fulizaRecords).insert(
+          FulizaRecordsCompanion.insert(
+            mpesaRef: 'FUL_OVERDUE',
+            fulizaAmount: 250.0,
+            accessFee: const Value(2.50),
+            outstandingTotal: const Value(252.50),
+            dueDate: Value(DateTime.now().subtract(const Duration(days: 2))),
+          ),
+        );
+
+    final container = ProviderContainer(
+      overrides: [dbProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: FulizaScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('— OVERDUE'), findsOneWidget);
+
+    await tester.tap(find.text('Record Repayment'));
+    await tester.pumpAndSettle();
+
+    // Invalid amount rejected
+    await tester.enterText(find.byType(TextFormField), '0');
+    await tester.tap(find.text('Record'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a valid positive amount'), findsOneWidget);
+
+    // Partial repayment of 100 leaves 152.50 outstanding
+    await tester.enterText(find.byType(TextFormField), '100');
+    await tester.tap(find.text('Record'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Fuliza repayment of KES 100.00 recorded.'), findsOneWidget);
+    expect(find.text('Fuliza Outstanding'), findsOneWidget);
+    expect(find.textContaining('152.50'), findsWidgets);
+  });
 }

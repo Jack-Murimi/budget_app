@@ -9,7 +9,7 @@
         android:shortcutLongLabel="@string/shortcut_add_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.budgetapp.budget_app"
+            android:targetPackage="com.budgetke.app"
             android:targetClass="com.budgetapp.budget_app.MainActivity"
             android:data="budgetke://add_transaction" />
         <categories android:name="android.shortcut.conversation" />
@@ -23,7 +23,7 @@
         android:shortcutLongLabel="@string/shortcut_sms_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.budgetapp.budget_app"
+            android:targetPackage="com.budgetke.app"
             android:targetClass="com.budgetapp.budget_app.MainActivity"
             android:data="budgetke://scan_sms" />
         <categories android:name="android.shortcut.conversation" />

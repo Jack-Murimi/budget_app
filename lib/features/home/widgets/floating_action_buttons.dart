@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/utils/date_formatter.dart';
 import '../../add_transaction/screens/add_transaction_screen.dart';
@@ -48,7 +49,7 @@ class _HomeFloatingActionButtonsState
       debugPrint('M-Pesa flow error: $e\n$st');
       if (mounted) {
         _toast(
-          'Something went wrong. Please try again.',
+          context.l10n.somethingWentWrong,
           color: Theme.of(context).colorScheme.error,
         );
       }
@@ -63,9 +64,10 @@ class _HomeFloatingActionButtonsState
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = data?.text?.trim() ?? '';
     if (!mounted) return;
+    final l10n = context.l10n;
 
     if (text.isEmpty) {
-      _toast('Clipboard is empty. Copy an M-Pesa SMS first.');
+      _toast(l10n.clipboardEmpty);
       return;
     }
 
@@ -87,17 +89,18 @@ class _HomeFloatingActionButtonsState
 
   Future<void> _handleParseResult(MpesaParseResult result) async {
     final handler = ref.read(mpesaResultHandlerProvider);
+    final l10n = context.l10n;
 
     if (result.type == MpesaTransactionType.fulizaDrawdown) {
       final outcome = await handler.handleNonFormResult(result);
       if (!mounted) return;
       if (outcome.isDuplicate) {
-        _toast('Already recorded — this Fuliza was saved before.', seconds: 3);
+        _toast(l10n.fulizaAlreadyRecorded, seconds: 3);
       } else {
         _toast(
           outcome.linkedExisting
-              ? 'Fuliza linked ✓  Transaction updated with Fuliza details.'
-              : 'Fuliza recorded ✓  Paste the paired M-Pesa send message next.',
+              ? l10n.fulizaLinkedToast
+              : l10n.fulizaRecordedToast,
         );
       }
       return;
@@ -107,13 +110,10 @@ class _HomeFloatingActionButtonsState
       final outcome = await handler.handleNonFormResult(result);
       if (!mounted) return;
       if (outcome.isDuplicate) {
-        _toast(
-          'Already recorded — this Fuliza repayment was saved before.',
-          seconds: 3,
-        );
+        _toast(l10n.fulizaRepayAlreadyRecorded, seconds: 3);
       } else {
         _toast(
-          'Fuliza repaid: ${CurrencyFormatter.format(result.amount)}  •  Recorded ✓',
+          l10n.fulizaRepaidToast(CurrencyFormatter.format(result.amount)),
           color: Colors.green.shade700,
           seconds: 5,
         );
@@ -125,8 +125,10 @@ class _HomeFloatingActionButtonsState
     if (!mounted) return;
     if (prep.duplicate != null) {
       _toast(
-        'Already recorded — ${result.mpesaRef} was saved on '
-        '${DateFormatter.formatDate(prep.duplicate!.transactionDate)}.',
+        l10n.alreadyRecordedWithDate(
+          result.mpesaRef,
+          DateFormatter.formatDate(prep.duplicate!.transactionDate),
+        ),
       );
       return;
     }
@@ -142,6 +144,7 @@ class _HomeFloatingActionButtonsState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -149,7 +152,7 @@ class _HomeFloatingActionButtonsState
         FloatingActionButton.small(
           heroTag: 'fab_parse',
           onPressed: () => _run(_pasteAndParse),
-          tooltip: 'Paste M-Pesa SMS',
+          tooltip: l10n.pasteMpesaSmsTooltip,
           child: const Icon(Icons.content_paste_rounded),
         ),
         const SizedBox(height: 12),
@@ -160,7 +163,7 @@ class _HomeFloatingActionButtonsState
               MaterialPageRoute(builder: (_) => const AddTransactionScreen()),
             ),
           ),
-          tooltip: 'Add Manually',
+          tooltip: l10n.addManuallyTooltip,
           child: const Icon(Icons.add),
         ),
       ],
@@ -190,14 +193,17 @@ class _PasteDialogState extends State<_PasteDialog> {
   }
 
   void _submit() {
+    final l10n = context.l10n;
     final text = _controller.text.trim();
     if (text.isEmpty) {
-      setState(() => _error = 'Paste an M-Pesa message first.');
+      setState(() => _error = l10n.pasteMpesaFirstError);
       return;
     }
     final result = MpesaParser.parse(text);
     if (!result.isValid) {
-      setState(() => _error = 'Could not parse: ${result.errorMessage}');
+      setState(
+        () => _error = l10n.couldNotParseError(result.errorMessage ?? ''),
+      );
       return;
     }
     Navigator.pop(context, result);
@@ -205,8 +211,9 @@ class _PasteDialogState extends State<_PasteDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AlertDialog(
-      title: const Text('Paste M-Pesa SMS'),
+      title: Text(l10n.pasteMpesaSmsTitle),
       content: TextField(
         controller: _controller,
         maxLines: 6,
@@ -215,7 +222,7 @@ class _PasteDialogState extends State<_PasteDialog> {
           if (_error != null) setState(() => _error = null);
         },
         decoration: InputDecoration(
-          hintText: 'Paste your M-Pesa message here...',
+          hintText: l10n.pasteMpesaHint,
           border: const OutlineInputBorder(),
           errorText: _error,
           errorMaxLines: 3,
@@ -224,8 +231,8 @@ class _PasteDialogState extends State<_PasteDialog> {
       actions: [
         TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel')),
-        FilledButton(onPressed: _submit, child: const Text('Parse')),
+            child: Text(l10n.cancel)),
+        FilledButton(onPressed: _submit, child: Text(l10n.parse)),
       ],
     );
   }

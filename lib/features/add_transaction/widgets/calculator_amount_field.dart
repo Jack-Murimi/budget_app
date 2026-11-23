@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../l10n/l10n.dart';
 
 /// A TextFormField for numeric amounts that also supports inline math expressions.
 /// Typing "50+25" (or tapping the inline operator chips) and tapping ✓ or = evaluates to "75.00".
@@ -225,11 +226,12 @@ class _CalculatorAmountFieldState extends State<CalculatorAmountField> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final decoration = _hasExpr
         ? widget.decoration.copyWith(
             suffixIcon: IconButton(
               icon: const Icon(Icons.check_circle_outline),
-              tooltip: 'Evaluate expression',
+              tooltip: l10n.evaluateExpressionTooltip,
               onPressed: _applyCalc,
             ),
           )
@@ -247,9 +249,9 @@ class _CalculatorAmountFieldState extends State<CalculatorAmountField> {
           validator: (v) {
             if (v != null && CalculatorAmountField.looksLikeExpression(v)) {
               if (CalculatorAmountField.evaluateExpression(v) == null) {
-                return 'Enter a valid expression';
+                return l10n.enterValidExpression;
               }
-              return 'Tap ✓ to evaluate expression first';
+              return l10n.evaluateExpressionFirst;
             }
             if (widget.validator != null) {
               return widget.validator!(v);

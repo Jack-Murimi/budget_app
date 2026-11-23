@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../models/debt_model.dart';
 import '../providers/debt_providers.dart';
@@ -18,18 +19,19 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final debts = ref.watch(debtsProvider);
     final isLentTab = _selectedTab == 0;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Loans & Debts')),
+      appBar: AppBar(title: Text(l10n.debtsTitle)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateDialog(
           context,
           direction: isLentTab ? 'lent' : 'borrowed',
         ),
         icon: const Icon(Icons.add),
-        label: Text(isLentTab ? 'Lend money' : 'Add debt'),
+        label: Text(isLentTab ? l10n.lendMoney : l10n.addDebt),
       ),
       body: Column(
         children: [
@@ -41,7 +43,7 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
             child: debts.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) =>
-                  Center(child: Text('Unable to load debts: $error')),
+                  Center(child: Text(l10n.unableToLoadDebts('$error'))),
               data: (items) => IndexedStack(
                 index: _selectedTab,
                 children: [
@@ -79,6 +81,7 @@ class _TabSwitcher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final primary = theme.colorScheme.primary;
 
     return Padding(
@@ -88,7 +91,7 @@ class _TabSwitcher extends StatelessWidget {
           Expanded(
             child: _buildPill(
               context: context,
-              label: 'They owe me',
+              label: l10n.theyOweMe,
               isSelected: selectedIndex == 0,
               onTap: () => onChanged(0),
               primary: primary,
@@ -98,7 +101,7 @@ class _TabSwitcher extends StatelessWidget {
           Expanded(
             child: _buildPill(
               context: context,
-              label: 'I owe them',
+              label: l10n.iOweThem,
               isSelected: selectedIndex == 1,
               onTap: () => onChanged(1),
               primary: primary,
@@ -149,11 +152,12 @@ class _LentTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final lent = items.where((i) => i.debt.direction == 'lent').toList();
     if (lent.isEmpty) {
-      return const _EmptyDebts(
-        title: 'No loans given',
-        subtitle: 'Track money you have lent to others.',
+      return _EmptyDebts(
+        title: l10n.noLoansGiven,
+        subtitle: l10n.noLoansGivenDesc,
       );
     }
 
@@ -176,7 +180,7 @@ class _LentTab extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Text(
-                      'Settled',
+                      l10n.settled,
                       style: TextStyle(
                         color: theme.colorScheme.outline,
                         fontWeight: FontWeight.w500,
@@ -206,6 +210,7 @@ class _LoanPersonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final debt = item.debt;
     final isSettled = item.isSettled;
     final initial = debt.counterparty.trim().isNotEmpty
@@ -214,8 +219,8 @@ class _LoanPersonCard extends StatelessWidget {
 
     final repaymentCount = item.repayments.length;
     final subtitleText = repaymentCount == 0
-        ? 'No repayments yet'
-        : '$repaymentCount repayment${repaymentCount == 1 ? '' : 's'}';
+        ? l10n.noRepaymentsYet
+        : l10n.repaymentCount(repaymentCount);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -278,7 +283,7 @@ class _LoanPersonCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  'Settled',
+                  l10n.settled,
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -300,12 +305,13 @@ class _BorrowedTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final borrowed =
         items.where((i) => i.debt.direction == 'borrowed').toList();
     if (borrowed.isEmpty) {
-      return const _EmptyDebts(
-        title: 'No debts owed',
-        subtitle: 'Track money you have borrowed from others.',
+      return _EmptyDebts(
+        title: l10n.noDebtsOwed,
+        subtitle: l10n.noDebtsOwedDesc,
       );
     }
     return ListView(
@@ -322,6 +328,7 @@ class _DebtCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final debt = item.debt;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -330,6 +337,22 @@ class _DebtCard extends ConsumerWidget {
         : DateTime(debt.dueDate!.year, debt.dueDate!.month, debt.dueDate!.day);
     final overdue = dueDay != null && dueDay.isBefore(today) && !item.isSettled;
     final isBorrowed = debt.direction == 'borrowed';
+    final productLabel = switch (debt.product) {
+      'personal' => l10n.personal,
+      'mshwari' => l10n.mshwari,
+      'fuliza' => l10n.fulizaBadge,
+      'hustler_fund' => l10n.hustlerFund,
+      'bridge' => l10n.bridge,
+      _ => debt.product.replaceAll('_', ' '),
+    };
+    final statusLabel = item.isSettled
+        ? l10n.settled
+        : overdue
+            ? l10n.overdue
+            : l10n.outstanding;
+    final duePart = debt.dueDate == null
+        ? ''
+        : ' | ${l10n.dueDateLabel(debt.dueDate!.toLocal().toString().split(' ').first)}';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -354,9 +377,7 @@ class _DebtCard extends ConsumerWidget {
           ),
         ),
         title: Text(debt.counterparty),
-        subtitle: Text(
-          '${debt.product.replaceAll('_', ' ')} | ${item.isSettled ? 'Settled' : overdue ? 'Overdue' : 'Outstanding'}${debt.dueDate == null ? '' : ' | Due ${debt.dueDate!.toLocal().toString().split(' ').first}'}',
-        ),
+        subtitle: Text('$productLabel | $statusLabel$duePart'),
         trailing: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -379,7 +400,7 @@ class _DebtCard extends ConsumerWidget {
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   onPressed: () => _repay(context),
-                  child: Text(isBorrowed ? 'Repay' : 'Record payment'),
+                  child: Text(isBorrowed ? l10n.repay : l10n.recordPayment),
                 ),
               ),
           ],
@@ -401,8 +422,8 @@ class _EmptyDebts extends StatelessWidget {
   final String subtitle;
 
   const _EmptyDebts({
-    this.title = 'No loans or debts',
-    this.subtitle = 'Track money borrowed, lent, and repayments.',
+    required this.title,
+    required this.subtitle,
   });
 
   @override

@@ -1,6 +1,7 @@
 // ignore_for_file: experimental_member_use
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import '../../features/categories/models/category_system_keys.dart';
 import 'converters/cents_converter.dart';
 import 'tables/accounts_table.dart';
 import 'tables/budgets_table.dart';
@@ -36,7 +37,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 19;
 
   Future<bool> _columnExists(String table, String column) async {
     final rows = await customSelect('PRAGMA table_info("$table")').get();
@@ -57,6 +58,9 @@ class AppDatabase extends _$AppDatabase {
         onCreate: (m) async {
           await m.createAll();
           await _createPerformanceIndexes();
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_categories_system_key ON categories (system_key)',
+          );
           await _seedDefaultCategories();
           await _seedDefaultAccounts();
         },
@@ -183,6 +187,9 @@ class AppDatabase extends _$AppDatabase {
           if (from < 14) {
             if (!await _columnExists('categories', 'transaction_type')) {
               await m.addColumn(categories, categories.transactionType);
+            }
+            if (!await _columnExists('categories', 'system_key')) {
+              await m.addColumn(categories, categories.systemKey);
             }
             await customStatement(
               'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories (transaction_type)',
@@ -334,8 +341,20 @@ class AppDatabase extends _$AppDatabase {
               'SELECT COUNT(*) AS cnt FROM categories',
             ).getSingle();
             if (catCount.read<int>('cnt') == 0) {
+              if (!await _columnExists('categories', 'system_key')) {
+                await m.addColumn(categories, categories.systemKey);
+              }
               await _seedDefaultCategories();
             }
+          }
+          if (from < 19) {
+            if (!await _columnExists('categories', 'system_key')) {
+              await m.addColumn(categories, categories.systemKey);
+            }
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_categories_system_key ON categories (system_key)',
+            );
+            await backfillCategorySystemKeys();
           }
         },
         beforeOpen: (details) async {
@@ -459,6 +478,33 @@ class AppDatabase extends _$AppDatabase {
     return driftDatabase(name: 'budget_app_db');
   }
 
+  /// Populates [Categories.systemKey] on built-in loan categories when missing
+  /// (e.g. during v19 migration or after restoring an older backup snapshot).
+  Future<void> backfillCategorySystemKeys() async {
+    const entries = <(String key, String name, String type)>[
+      (CategorySystemKeys.loanGiven, 'loan given', 'expense'),
+      (CategorySystemKeys.loanReceived, 'loan received', 'income'),
+      (CategorySystemKeys.loanRepayment, 'loan repayment', 'expense'),
+      (
+        CategorySystemKeys.loanRepaymentReceived,
+        'loan repayment received',
+        'income',
+      ),
+    ];
+    for (final (key, name, type) in entries) {
+      await customUpdate(
+        'UPDATE categories SET system_key = ? '
+        'WHERE system_key IS NULL AND LOWER(name) = ? AND transaction_type = ?',
+        variables: [
+          Variable.withString(key),
+          Variable.withString(name),
+          Variable.withString(type),
+        ],
+        updates: {categories},
+      );
+    }
+  }
+
   Future<void> _seedDefaultCategories() async {
     // Helper to insert and return the new ID
     Future<int> addCat(
@@ -467,6 +513,7 @@ class AppDatabase extends _$AppDatabase {
       String color, {
       int? parentId,
       String type = 'expense',
+      String? systemKey,
     }) async {
       return await into(categories).insert(
         CategoriesCompanion.insert(
@@ -474,6 +521,7 @@ class AppDatabase extends _$AppDatabase {
           icon: Value(icon),
           colorHex: Value(color),
           transactionType: Value(type),
+          systemKey: Value(systemKey),
           isDefault: const Value(true),
           parentId: Value(parentId),
         ),
@@ -554,7 +602,13 @@ class AppDatabase extends _$AppDatabase {
 
     // 10. Debt Repayment
     final debtRepay = await addCat('Debt Repayment', 'credit_card', '#C62828');
-    await addCat('Loan Repayment', 'handshake', '#C62828', parentId: debtRepay);
+    await addCat(
+      'Loan Repayment',
+      'handshake',
+      '#C62828',
+      parentId: debtRepay,
+      systemKey: CategorySystemKeys.loanRepayment,
+    );
     await addCat('Fuliza Repayment', 'sync', '#C62828', parentId: debtRepay);
     await addCat('Mobile Loans (Tala/Branch/M-Shwari)', 'phone_android', '#C62828', parentId: debtRepay);
     await addCat('Credit Card', 'credit_card', '#C62828', parentId: debtRepay);
@@ -569,7 +623,12 @@ class AppDatabase extends _$AppDatabase {
     // 12. Other (Expense)
     final otherExp = await addCat('Other', 'more_horiz', '#757575');
     await addCat('Uncategorized', 'help_outline', '#757575', parentId: otherExp);
-    await addCat('Loan Given', 'handshake', '#00838F');
+    await addCat(
+      'Loan Given',
+      'handshake',
+      '#00838F',
+      systemKey: CategorySystemKeys.loanGiven,
+    );
 
     // ════════════════════════════════════════════════════════════════════════
     // INCOME CATEGORIES & SUBCATEGORIES
@@ -587,8 +646,20 @@ class AppDatabase extends _$AppDatabase {
 
     await addCat('Gifts & Refunds', 'card_giftcard', '#66BB6A', type: 'income');
     await addCat('Other Income', 'add_circle_outline', '#81C784', type: 'income');
-    await addCat('Loan Repayment Received', 'handshake', '#43A047', type: 'income');
-    await addCat('Loan Received', 'handshake', '#00838F', type: 'income');
+    await addCat(
+      'Loan Repayment Received',
+      'handshake',
+      '#43A047',
+      type: 'income',
+      systemKey: CategorySystemKeys.loanRepaymentReceived,
+    );
+    await addCat(
+      'Loan Received',
+      'handshake',
+      '#00838F',
+      type: 'income',
+      systemKey: CategorySystemKeys.loanReceived,
+    );
 
     // ════════════════════════════════════════════════════════════════════════
     // TRANSFER CATEGORIES & SUBCATEGORIES

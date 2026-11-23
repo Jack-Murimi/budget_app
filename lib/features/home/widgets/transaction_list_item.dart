@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/category_icon_helper.dart';
+import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/utils/date_formatter.dart';
 import '../../add_transaction/screens/add_transaction_screen.dart';
@@ -19,37 +21,31 @@ class TransactionListItem extends ConsumerWidget {
     this.onDelete,
   });
 
-  Color _parseColor(String? hex, Color fallback) {
-    if (hex == null || hex.isEmpty) return fallback;
-    try {
-      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
-    } catch (_) {
-      return fallback;
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final categories = ref.watch(categoriesStreamProvider).value ?? [];
+    final l10n = context.l10n;
+    final categoriesById = ref.watch(categoriesByIdProvider);
     final category = transaction.categoryId != null
-        ? categories.where((c) => c.id == transaction.categoryId).firstOrNull
+        ? categoriesById[transaction.categoryId!]
         : null;
 
     final type = transaction.type;
     final isIncome = type == 'income';
     final isTransfer = type == 'transfer';
 
-    final Color categoryColor = _parseColor(
+    final Color categoryColor = parseHexColor(
       category?.colorHex,
-      isIncome
+      fallback: isIncome
           ? theme.colorScheme.primary
           : (isTransfer ? theme.colorScheme.tertiary : theme.colorScheme.secondary),
     );
 
-    final IconData icon = (category != null && category.icon == 'category')
-        ? CategoryIconHelper.getIcon(CategoryIconHelper.defaultIconForName(category.name), type: type)
-        : CategoryIconHelper.getIcon(category?.icon, type: type);
+    final IconData icon = CategoryIconHelper.resolveCategoryIcon(
+      iconName: category?.icon,
+      categoryName: category?.name,
+      type: type,
+    );
 
     final fee = transaction.transactionCost + transaction.fulizaFee;
     final totalAmount = isIncome ? transaction.amount : transaction.amount + fee;
@@ -62,7 +58,7 @@ class TransactionListItem extends ConsumerWidget {
     String? categoryLabel;
     if (category != null) {
       if (category.parentId != null) {
-        final parent = categories.where((c) => c.id == category.parentId).firstOrNull;
+        final parent = categoriesById[category.parentId!];
         categoryLabel = parent != null ? '${parent.name} > ${category.name}' : category.name;
       } else {
         categoryLabel = category.name;
@@ -71,9 +67,13 @@ class TransactionListItem extends ConsumerWidget {
 
     final relativeDate = DateFormatter.formatRelative(transaction.transactionDate);
 
-    final semanticLabel =
-        '${isIncome ? "Income" : (isTransfer ? "Transfer" : "Expense")} of ${CurrencyFormatter.format(totalAmount)}, '
-        '${transaction.header}${categoryLabel != null ? ", $categoryLabel" : ""}, $relativeDate';
+    final semanticLabel = l10n.transactionSemantics(
+      isIncome ? l10n.income : (isTransfer ? l10n.transfer : l10n.expense),
+      CurrencyFormatter.format(totalAmount),
+      transaction.header,
+      categoryLabel != null ? ', $categoryLabel' : '',
+      relativeDate,
+    );
 
     return Semantics(
       label: semanticLabel,
@@ -141,7 +141,7 @@ class TransactionListItem extends ConsumerWidget {
         trailing: onDelete != null
             ? IconButton(
                 icon: const Icon(Icons.delete_outline, size: 20),
-                tooltip: 'Delete transaction',
+                tooltip: l10n.deleteTransactionTooltip,
                 style: IconButton.styleFrom(
                   minimumSize: const Size(48, 48),
                   tapTargetSize: MaterialTapTargetSize.padded,
@@ -176,7 +176,7 @@ class TransactionListItem extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.only(left: 6),
                   child: Text(
-                    '+${CurrencyFormatter.format(fee)} fee',
+                    l10n.feeBadge(CurrencyFormatter.format(fee)),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.outline,
                       fontSize: 10,
@@ -192,7 +192,7 @@ class TransactionListItem extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    'Fuliza',
+                    l10n.fulizaBadge,
                     style: TextStyle(
                       color: theme.colorScheme.onTertiaryContainer,
                       fontSize: 10,

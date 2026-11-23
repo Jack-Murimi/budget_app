@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/utils/date_formatter.dart';
 import '../models/debt_model.dart';
@@ -15,6 +16,7 @@ class LoanDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final debtsAsync = ref.watch(debtsProvider);
     final currentItem = debtsAsync.value?.firstWhere(
           (d) => d.debt.id == item.debt.id,
@@ -24,7 +26,8 @@ class LoanDetailScreen extends ConsumerWidget {
     final debt = currentItem.debt;
     final isSettled = currentItem.isSettled;
     final isBorrowed = debt.direction == 'borrowed';
-    final disbursementLabel = isBorrowed ? 'Loan received' : 'Loan disbursed';
+    final disbursementLabel =
+        isBorrowed ? l10n.loanReceivedLabel : l10n.loanDisbursedLabel;
 
     final entries = <_TimelineEntry>[];
     for (final d in currentItem.disbursements) {
@@ -49,7 +52,7 @@ class LoanDetailScreen extends ConsumerWidget {
       entries.add(
         _TimelineEntry(
           date: r.paymentDate,
-          type: 'Repayment',
+          type: l10n.repaymentLabel,
           amount: r.amount,
           isRepayment: true,
           isBorrowed: isBorrowed,
@@ -77,12 +80,12 @@ class LoanDetailScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Edit debt',
+            tooltip: l10n.editDebtTooltip,
             onPressed: () => _editDebt(context, debt),
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
-            tooltip: 'Delete debt',
+            tooltip: l10n.deleteDebtTooltip,
             onPressed: () => _deleteDebt(context, ref, debt),
           ),
         ],
@@ -92,7 +95,7 @@ class LoanDetailScreen extends ConsumerWidget {
           : FloatingActionButton.extended(
               onPressed: () => _repay(context, debt),
               icon: const Icon(Icons.payment),
-              label: const Text('Record repayment'),
+              label: Text(l10n.recordRepayment),
             ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 80),
@@ -111,7 +114,7 @@ class LoanDetailScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isBorrowed ? 'Total borrowed' : 'Total lent',
+                              isBorrowed ? l10n.totalBorrowed : l10n.totalLent,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: theme.colorScheme.outline,
@@ -133,7 +136,7 @@ class LoanDetailScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Repaid',
+                              l10n.repaid,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: theme.colorScheme.outline,
@@ -161,14 +164,18 @@ class LoanDetailScreen extends ConsumerWidget {
                       children: [
                         if (debt.interest > 0)
                           Text(
-                            'Interest/Fees: ${CurrencyFormatter.format(debt.interest)}',
+                            l10n.interestFeesLabel(
+                              CurrencyFormatter.format(debt.interest),
+                            ),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.outline,
                             ),
                           ),
                         if (debt.dueDate != null)
                           Text(
-                            'Due: ${DateFormatter.formatDate(debt.dueDate!)}',
+                            l10n.dueColonDate(
+                              DateFormatter.formatDate(debt.dueDate!),
+                            ),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.outline,
                             ),
@@ -180,9 +187,9 @@ class LoanDetailScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Outstanding',
-                        style: TextStyle(
+                      Text(
+                        l10n.outstanding,
+                        style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
                         ),
@@ -206,7 +213,7 @@ class LoanDetailScreen extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: Text(
-              'Timeline',
+              l10n.timeline,
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: theme.colorScheme.outline,
@@ -214,9 +221,9 @@ class LoanDetailScreen extends ConsumerWidget {
             ),
           ),
           if (entries.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(child: Text('No transaction history')),
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(child: Text(l10n.noTransactionHistory)),
             )
           else
             ...entries.map(
@@ -250,7 +257,7 @@ class LoanDetailScreen extends ConsumerWidget {
     );
     if (saved == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Debt updated')),
+        SnackBar(content: Text(context.l10n.debtUpdated)),
       );
     }
   }
@@ -260,11 +267,12 @@ class LoanDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     Debt debt,
   ) async {
+    final l10n = context.l10n;
     final res = await showDialog<({bool confirmed, bool deleteLinked})>(
       context: context,
       builder: (_) => ConfirmDeleteWithLinkedTxnsDialog(
-        title: 'Delete debt',
-        message: 'Delete "${debt.counterparty}" and all its repayment records?',
+        title: l10n.deleteDebtTitle,
+        message: l10n.deleteDebtConfirm(debt.counterparty),
       ),
     );
     if (res?.confirmed != true) return;
@@ -275,7 +283,7 @@ class LoanDetailScreen extends ConsumerWidget {
     if (context.mounted) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Deleted "${debt.counterparty}"')),
+        SnackBar(content: Text(l10n.deletedItemToast(debt.counterparty))),
       );
     }
   }
@@ -285,13 +293,15 @@ class LoanDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     DebtRepayment repayment,
   ) async {
+    final l10n = context.l10n;
     final res = await showDialog<({bool confirmed, bool deleteLinked})>(
       context: context,
       builder: (_) => ConfirmDeleteWithLinkedTxnsDialog(
-        title: 'Delete repayment',
-        message:
-            'Remove repayment of ${CurrencyFormatter.format(repayment.amount)} and restore outstanding balance?',
-        checkboxLabel: 'Also delete linked ledger transaction',
+        title: l10n.deleteRepaymentTitle,
+        message: l10n.deleteRepaymentConfirm(
+          CurrencyFormatter.format(repayment.amount),
+        ),
+        checkboxLabel: l10n.alsoDeleteLinkedTxn,
       ),
     );
     if (res?.confirmed != true) return;
@@ -301,7 +311,7 @@ class LoanDetailScreen extends ConsumerWidget {
         );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Repayment deleted')),
+        SnackBar(content: Text(l10n.repaymentDeleted)),
       );
     }
   }
@@ -419,7 +429,7 @@ class _TimelineCard extends StatelessWidget {
                   size: 18,
                   color: theme.colorScheme.outline,
                 ),
-                tooltip: 'Delete repayment',
+                tooltip: context.l10n.deleteRepaymentTooltip,
                 onPressed: onDeleteRepayment,
               ),
           ],

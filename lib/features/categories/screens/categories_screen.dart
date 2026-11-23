@@ -2,7 +2,9 @@ import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/category_icon_helper.dart';
+import '../../../shared/utils/color_utils.dart';
 import '../providers/category_providers.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
@@ -19,6 +21,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final categoriesAsync = ref.watch(
       categoriesByFilterProvider((
         includeArchived: _showArchived,
@@ -28,11 +31,11 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Categories'),
+        title: Text(l10n.categoriesTitle),
         actions: [
           TextButton.icon(
             icon: Icon(_showArchived ? Icons.unarchive : Icons.archive),
-            label: Text(_showArchived ? 'Active' : 'Archived'),
+            label: Text(_showArchived ? l10n.active : l10n.archived),
             onPressed: () => setState(() => _showArchived = !_showArchived),
           ),
         ],
@@ -43,21 +46,21 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: SegmentedButton<String>(
               showSelectedIcon: false,
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: 'expense',
-                  label: Text('Expense'),
-                  icon: Icon(Icons.arrow_upward_rounded, size: 16),
+                  label: Text(l10n.expense),
+                  icon: const Icon(Icons.arrow_upward_rounded, size: 16),
                 ),
                 ButtonSegment(
                   value: 'income',
-                  label: Text('Income'),
-                  icon: Icon(Icons.arrow_downward_rounded, size: 16),
+                  label: Text(l10n.income),
+                  icon: const Icon(Icons.arrow_downward_rounded, size: 16),
                 ),
                 ButtonSegment(
                   value: 'transfer',
-                  label: Text('Transfer'),
-                  icon: Icon(Icons.swap_horiz_rounded, size: 16),
+                  label: Text(l10n.transfer),
+                  icon: const Icon(Icons.swap_horiz_rounded, size: 16),
                 ),
               ],
               selected: {_selectedType},
@@ -67,14 +70,14 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
           Expanded(
             child: categoriesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(child: Text('Error: $error')),
+              error: (error, _) => Center(child: Text(l10n.errorLabel('$error'))),
               data: (all) {
                 _topLevel = all.where((c) => c.parentId == null).toList();
 
                 if (_topLevel.isEmpty) {
                   return Center(
                     child: Text(
-                      _showArchived ? 'No archived categories' : 'No categories',
+                      _showArchived ? l10n.noArchivedCategories : l10n.noCategories,
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                   );
@@ -165,8 +168,13 @@ class _CategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _parseColor(category.colorHex);
-    final icon = _resolveIcon(category);
+    final l10n = context.l10n;
+    final color = parseHexColor(category.colorHex);
+    final icon = CategoryIconHelper.resolveCategoryIcon(
+      iconName: category.icon,
+      categoryName: category.name,
+      type: category.transactionType,
+    );
 
     return ExpansionTile(
       leading: Row(
@@ -190,24 +198,32 @@ class _CategoryTile extends StatelessWidget {
           IconButton(
             icon: Icon(category.isArchived ? Icons.unarchive : Icons.archive, size: 20),
             onPressed: onArchive,
-            tooltip: category.isArchived ? 'Unarchive' : 'Archive',
+            tooltip: category.isArchived ? l10n.unarchive : l10n.archive,
           ),
           IconButton(
             icon: const Icon(Icons.edit, size: 20),
             onPressed: onEdit,
-            tooltip: 'Edit',
+            tooltip: l10n.edit,
           ),
         ],
       ),
       children: [
         ...subcategories.map((sub) {
-          final subColor = _parseColor(sub.colorHex);
+          final subColor = parseHexColor(sub.colorHex);
           return ListTile(
             contentPadding: const EdgeInsets.only(left: 72, right: 16),
             leading: CircleAvatar(
               backgroundColor: subColor.withValues(alpha: 0.15),
               radius: 16,
-              child: Icon(_resolveIcon(sub), color: subColor, size: 16),
+              child: Icon(
+                CategoryIconHelper.resolveCategoryIcon(
+                  iconName: sub.icon,
+                  categoryName: sub.name,
+                  type: sub.transactionType,
+                ),
+                color: subColor,
+                size: 16,
+              ),
             ),
             title: Text(sub.name),
             trailing: IconButton(
@@ -219,26 +235,11 @@ class _CategoryTile extends StatelessWidget {
         ListTile(
           contentPadding: const EdgeInsets.only(left: 72, right: 16),
           leading: const Icon(Icons.add_circle_outline),
-          title: const Text('Add subcategory'),
+          title: Text(l10n.addSubcategory),
           onTap: onAddSub,
         ),
       ],
     );
-  }
-
-  Color _parseColor(String hex) {
-    try {
-      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
-    } catch (_) {
-      return Colors.grey;
-    }
-  }
-
-  IconData _resolveIcon(Category c) {
-    final name = c.icon == 'category'
-        ? CategoryIconHelper.defaultIconForName(c.name)
-        : c.icon;
-    return CategoryIconHelper.getIcon(name, type: c.transactionType);
   }
 }
 
@@ -322,16 +323,9 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
     super.dispose();
   }
 
-  Color _parseColor(String hex) {
-    try {
-      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
-    } catch (_) {
-      return const Color(0xFFE53935);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final repo = ref.watch(categoryRepositoryProvider);
     final colors = _colors.contains(_selectedColor)
         ? _colors
@@ -341,7 +335,7 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
         : [_selectedIcon, ..._icons];
 
     return AlertDialog(
-      title: Text(widget.category == null ? 'New Category' : 'Edit Category'),
+      title: Text(widget.category == null ? l10n.newCategory : l10n.editCategory),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -349,17 +343,17 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
           children: [
             TextField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(labelText: 'Name'),
+              decoration: InputDecoration(labelText: l10n.name),
               autofocus: true,
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               initialValue: _transactionType,
-              decoration: const InputDecoration(labelText: 'Type'),
-              items: const [
-                DropdownMenuItem(value: 'expense', child: Text('Expense')),
-                DropdownMenuItem(value: 'income', child: Text('Income')),
-                DropdownMenuItem(value: 'transfer', child: Text('Transfer')),
+              decoration: InputDecoration(labelText: l10n.type),
+              items: [
+                DropdownMenuItem(value: 'expense', child: Text(l10n.expense)),
+                DropdownMenuItem(value: 'income', child: Text(l10n.income)),
+                DropdownMenuItem(value: 'transfer', child: Text(l10n.transfer)),
               ],
               onChanged: (v) {
                 if (v == null || v == _transactionType) return;
@@ -384,12 +378,12 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
                   key: ValueKey('parent_$_transactionType'),
                   isExpanded: true,
                   initialValue: validParentId,
-                  decoration: const InputDecoration(labelText: 'Parent Category'),
+                  decoration: InputDecoration(labelText: l10n.parentCategory),
                   items: [
-                    const DropdownMenuItem<int?>(
+                    DropdownMenuItem<int?>(
                       value: null,
                       child: Text(
-                        'None (Top-level)',
+                        l10n.noneTopLevel,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -405,13 +399,16 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
               },
             ),
             const SizedBox(height: 16),
-            Text('Color', style: Theme.of(context).textTheme.labelLarge),
+            Text(l10n.colorLabel, style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: colors.map((hex) {
-                final color = _parseColor(hex);
+                final color = parseHexColor(
+                  hex,
+                  fallback: const Color(0xFFE53935),
+                );
                 final selected = _selectedColor == hex;
                 return InkWell(
                   onTap: () => setState(() => _selectedColor = hex),
@@ -429,7 +426,7 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
               }).toList(),
             ),
             const SizedBox(height: 16),
-            Text('Icon', style: Theme.of(context).textTheme.labelLarge),
+            Text(l10n.iconLabel, style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -440,7 +437,10 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
                   type: _transactionType,
                 );
                 final selected = _selectedIcon == name;
-                final color = _parseColor(_selectedColor);
+                final color = parseHexColor(
+                  _selectedColor,
+                  fallback: const Color(0xFFE53935),
+                );
                 return InkWell(
                   onTap: () => setState(() => _selectedIcon = name),
                   child: Container(
@@ -464,11 +464,11 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _save,
-          child: const Text('Save'),
+          child: Text(l10n.save),
         ),
       ],
     );

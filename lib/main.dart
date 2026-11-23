@@ -3,6 +3,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/database/app_database.dart';
 import 'core/services/deep_link_service.dart';
@@ -12,7 +13,8 @@ import 'features/recurring/providers/recurring_providers.dart';
 import 'features/settings/auth_gate.dart';
 import 'features/settings/auth_service.dart';
 import 'features/sms/screens/sms_inbox_screen.dart';
-import 'l10n/app_localizations.dart';
+import 'l10n/l10n.dart';
+import 'shared/providers/locale_provider.dart';
 import 'shared/providers/theme_provider.dart';
 import 'shared/theme/app_theme.dart';
 
@@ -26,6 +28,7 @@ final _navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  GoogleFonts.config.allowRuntimeFetching = false;
   final prefs = await SharedPreferences.getInstance();
   runApp(
     ProviderScope(
@@ -105,6 +108,7 @@ class _BudgetAppState extends ConsumerState<BudgetApp> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
+    final locale = ref.watch(localeProvider);
     final oled = ref.watch(oledDarkProvider);
     final useDynamic = ref.watch(dynamicColorProvider);
 
@@ -125,7 +129,8 @@ class _BudgetAppState extends ConsumerState<BudgetApp> {
 
         return MaterialApp(
           navigatorKey: widget.navigatorKey,
-          title: 'Budget KE',
+          onGenerateTitle: (ctx) => ctx.l10n.appTitle,
+          locale: locale,
           localizationsDelegates: const [
             AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,

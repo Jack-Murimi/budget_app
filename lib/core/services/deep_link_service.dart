@@ -32,7 +32,9 @@ class DeepLinkService {
           onScanSms();
         }
       },
-      onError: (_) {},
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint('DeepLinkService stream error: $error');
+      },
     );
   }
 }

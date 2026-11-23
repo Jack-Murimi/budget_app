@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/converters/cents_converter.dart';
 import '../models/budget_model.dart';
+import '../utils/budget_period_helper.dart';
 
 class BudgetRepository {
   final AppDatabase _db;
@@ -14,78 +15,129 @@ class BudgetRepository {
     DateTime? asOf,
     bool includeArchived = false,
   }) {
-    final now = asOf ?? DateTime.now();
-
     return _db
-        .customSelect('SELECT 1', readsFrom: {_db.budgets, _db.transactions, _db.categories})
+        .customSelect(
+          'SELECT 1',
+          readsFrom: {_db.budgets, _db.transactions, _db.categories},
+        )
         .watch()
         .asyncMap((_) async {
+      final now = asOf ?? DateTime.now();
       final budgetsQuery = _db.select(_db.budgets);
       if (!includeArchived) {
         budgetsQuery.where((b) => b.isArchived.equals(false));
       }
       final budgets = await budgetsQuery.get();
-      final results = <BudgetWithProgress>[];
+      if (budgets.isEmpty) return const <BudgetWithProgress>[];
+
+      final allCategories = await _db.select(_db.categories).get();
+      final categoriesById = <int, Category>{
+        for (final c in allCategories) c.id: c,
+      };
+      final childrenByParentId = <int, List<int>>{};
+      for (final c in allCategories) {
+        if (c.parentId != null) {
+          childrenByParentId.putIfAbsent(c.parentId!, () => []).add(c.id);
+        }
+      }
+
+      final windows = <({
+        Budget budget,
+        (DateTime, DateTime) current,
+        (DateTime, DateTime)? previous,
+        Set<int>? categoryIds,
+      })>[];
+      DateTime? minStart;
+      DateTime? maxEnd;
 
       for (final budget in budgets) {
-        final (start, end) = getPeriodWindow(budget, now);
-
-        // Get all category IDs to match (parent + subcategories)
-        final categoryIds = budget.categoryId == null
-            ? <int>[]
-            : await _getCategoryAndSubcategories(budget.categoryId!);
-
-        // Query transactions for this period
-        final spentCents = await _sumExpensesInWindow(
-          start: start,
-          end: end,
-          categoryIds: categoryIds,
-        );
-        final spent = CentsConverter.fromCents(spentCents);
-
-        double rolloverAmount = 0.0;
-        final prevWindow = getPreviousPeriodWindow(budget, now);
+        final current = BudgetPeriodHelper.getPeriodWindow(budget, now);
+        final prevCandidate =
+            BudgetPeriodHelper.getPreviousPeriodWindow(budget, now);
         final budgetStartDay = DateTime(
           budget.startDate.year,
           budget.startDate.month,
           budget.startDate.day,
         );
-        if (budget.rollover &&
-            prevWindow != null &&
-            budgetStartDay.isBefore(start)) {
-          final prevSpentCents = await _sumExpensesInWindow(
-            start: prevWindow.$1,
-            end: prevWindow.$2,
-            categoryIds: categoryIds,
-          );
-          final carryCents =
-              math.max(0, CentsConverter.toCents(budget.amount) - prevSpentCents);
-          rolloverAmount = CentsConverter.fromCents(carryCents);
+        final previous = (budget.rollover &&
+                prevCandidate != null &&
+                budgetStartDay.isBefore(current.$1))
+            ? prevCandidate
+            : null;
+
+        if (minStart == null || current.$1.isBefore(minStart)) {
+          minStart = current.$1;
+        }
+        if (maxEnd == null || current.$2.isAfter(maxEnd)) {
+          maxEnd = current.$2;
+        }
+        if (previous != null) {
+          if (previous.$1.isBefore(minStart)) minStart = previous.$1;
+          if (previous.$2.isAfter(maxEnd)) maxEnd = previous.$2;
         }
 
-        // Get category info if needed
-        String? categoryName;
-        String? categoryColorHex;
-        String? categoryIcon;
+        final categoryIds = budget.categoryId == null
+            ? null
+            : <int>{
+                budget.categoryId!,
+                ...?childrenByParentId[budget.categoryId!],
+              };
+        windows.add((
+          budget: budget,
+          current: current,
+          previous: previous,
+          categoryIds: categoryIds,
+        ));
+      }
 
-        if (budget.categoryId != null) {
-          final category = await (_db.select(_db.categories)
-                ..where((c) => c.id.equals(budget.categoryId!)))
-              .getSingleOrNull();
-          if (category != null) {
-            categoryName = category.name;
-            categoryColorHex = category.colorHex;
-            categoryIcon = category.icon;
+      final txns = await (_db.select(_db.transactions)
+            ..where((t) => t.type.equals('expense'))
+            ..where((t) => t.excludeFromBudget.equals(false))
+            ..where((t) => t.transactionDate.isBiggerOrEqualValue(minStart!))
+            ..where((t) => t.transactionDate.isSmallerThanValue(maxEnd!)))
+          .get();
+
+      final results = <BudgetWithProgress>[];
+      for (final entry in windows) {
+        final budget = entry.budget;
+        final categoryIds = entry.categoryIds;
+
+        int spentCents = 0;
+        int prevSpentCents = 0;
+        for (final t in txns) {
+          if (categoryIds != null &&
+              (t.categoryId == null || !categoryIds.contains(t.categoryId))) {
+            continue;
+          }
+          final dt = t.transactionDate;
+          final costCents = CentsConverter.toCents(t.amount) +
+              CentsConverter.toCents(t.transactionCost) +
+              CentsConverter.toCents(t.fulizaFee);
+
+          if (!dt.isBefore(entry.current.$1) && dt.isBefore(entry.current.$2)) {
+            spentCents += costCents;
+          }
+          final prev = entry.previous;
+          if (prev != null && !dt.isBefore(prev.$1) && dt.isBefore(prev.$2)) {
+            prevSpentCents += costCents;
           }
         }
 
+        final rolloverCents = entry.previous == null
+            ? 0
+            : math.max(0, CentsConverter.toCents(budget.amount) - prevSpentCents);
+
+        final category = budget.categoryId != null
+            ? categoriesById[budget.categoryId!]
+            : null;
+
         results.add(BudgetWithProgress(
           budget: budget,
-          spent: spent,
-          rolloverAmount: rolloverAmount,
-          categoryName: categoryName,
-          categoryColorHex: categoryColorHex,
-          categoryIcon: categoryIcon,
+          spent: CentsConverter.fromCents(spentCents),
+          rolloverAmount: CentsConverter.fromCents(rolloverCents),
+          categoryName: category?.name,
+          categoryColorHex: category?.colorHex,
+          categoryIcon: category?.icon,
         ));
       }
 
@@ -100,41 +152,15 @@ class BudgetRepository {
     });
   }
 
-  Future<int> _sumExpensesInWindow({
-    required DateTime start,
-    required DateTime end,
-    required List<int> categoryIds,
-  }) async {
-    final query = _db.select(_db.transactions).join([])
-      ..where(_db.transactions.type.equals('expense'))
-      ..where(_db.transactions.excludeFromBudget.equals(false))
-      ..where(_db.transactions.transactionDate.isBiggerOrEqualValue(start))
-      ..where(_db.transactions.transactionDate.isSmallerThanValue(end));
-
-    if (categoryIds.isNotEmpty) {
-      query.where(_db.transactions.categoryId.isIn(categoryIds));
-    }
-
-    final txns = await query.map((row) => row.readTable(_db.transactions)).get();
-    return txns.fold<int>(
-      0,
-      (sum, t) =>
-          sum +
-          CentsConverter.toCents(t.amount) +
-          CentsConverter.toCents(t.transactionCost) +
-          CentsConverter.toCents(t.fulizaFee),
-    );
-  }
-
   Stream<List<Transaction>> watchBudgetTransactions(
     Budget budget, {
     DateTime? asOf,
   }) {
     final now = asOf ?? DateTime.now();
-    final (start, end) = getPeriodWindow(budget, now);
+    final (start, end) = BudgetPeriodHelper.getPeriodWindow(budget, now);
 
     return _db
-        .customSelect('SELECT 1', readsFrom: {_db.transactions})
+        .customSelect('SELECT 1', readsFrom: {_db.transactions, _db.categories})
         .watch()
         .asyncMap((_) async {
       final categoryIds = budget.categoryId == null
@@ -176,55 +202,14 @@ class BudgetRepository {
         .write(BudgetsCompanion(isArchived: Value(archive)));
   }
 
-  static (DateTime, DateTime) getPeriodWindow(Budget budget, DateTime now) {
-    switch (budget.period) {
-      case 'monthly':
-        final start = DateTime(now.year, now.month, 1);
-        final end = DateTime(now.year, now.month + 1, 1);
-        return (start, end);
-      case 'weekly':
-        final weekday = now.weekday;
-        final start = DateTime(now.year, now.month, now.day - (weekday - 1));
-        final end = start.add(const Duration(days: 7));
-        return (start, end);
-      default:
-        final start = DateTime(
-          budget.startDate.year,
-          budget.startDate.month,
-          budget.startDate.day,
-        );
-        if (budget.endDate != null) {
-          final exclusiveEnd = DateTime(
-            budget.endDate!.year,
-            budget.endDate!.month,
-            budget.endDate!.day + 1,
-          );
-          final minEnd = start.add(const Duration(days: 1));
-          return (start, exclusiveEnd.isBefore(minEnd) ? minEnd : exclusiveEnd);
-        }
-        return (start, start.add(const Duration(days: 30)));
-    }
-  }
+  static (DateTime, DateTime) getPeriodWindow(Budget budget, DateTime now) =>
+      BudgetPeriodHelper.getPeriodWindow(budget, now);
 
   static (DateTime, DateTime)? getPreviousPeriodWindow(
     Budget budget,
     DateTime now,
-  ) {
-    switch (budget.period) {
-      case 'monthly':
-        final start = DateTime(now.year, now.month - 1, 1);
-        final end = DateTime(now.year, now.month, 1);
-        return (start, end);
-      case 'weekly':
-        final weekday = now.weekday;
-        final currentStart =
-            DateTime(now.year, now.month, now.day - (weekday - 1));
-        final prevStart = currentStart.subtract(const Duration(days: 7));
-        return (prevStart, currentStart);
-      default:
-        return null;
-    }
-  }
+  ) =>
+      BudgetPeriodHelper.getPreviousPeriodWindow(budget, now);
 
   Future<List<int>> _getCategoryAndSubcategories(int categoryId) async {
     final subcats = await (_db.select(_db.categories)

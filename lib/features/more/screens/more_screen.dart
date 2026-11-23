@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../l10n/l10n.dart';
 import '../../../main.dart';
 import '../../accounts/screens/accounts_screen.dart';
 import '../../categories/screens/categories_screen.dart';
@@ -14,80 +15,83 @@ import '../../settings/settings_screen.dart';
 import '../../sms/screens/sms_inbox_screen.dart';
 import '../models/more_item_config.dart';
 
-List<MoreSectionConfig> buildMoreSections(WidgetRef ref) {
+List<MoreSectionConfig> buildMoreSections(
+  WidgetRef ref,
+  AppLocalizations l10n,
+) {
   return [
     MoreSectionConfig(
-      header: 'Money',
+      header: l10n.sectionMoney,
       items: [
         MoreItemConfig(
-          title: 'Accounts',
+          title: l10n.moreAccounts,
           icon: Icons.account_balance_wallet_outlined,
           destination: (_) => const AccountsScreen(),
         ),
         MoreItemConfig(
-          title: 'Loans & Debts',
+          title: l10n.moreLoansAndDebts,
           icon: Icons.handshake_outlined,
           destination: (_) => const DebtsScreen(),
         ),
         MoreItemConfig(
-          title: 'Bridge Charges',
-          subtitle: 'Track costs from Bridge loans',
+          title: l10n.moreBridgeCharges,
+          subtitle: l10n.moreBridgeChargesSub,
           icon: Icons.account_balance_outlined,
           destination: (_) => const BridgeChargesScreen(),
         ),
         MoreItemConfig(
-          title: 'Fuliza Overdraft',
+          title: l10n.moreFulizaOverdraft,
           icon: Icons.sync_problem_rounded,
           destination: (_) => const FulizaScreen(),
         ),
       ],
     ),
     MoreSectionConfig(
-      header: 'Automation',
+      header: l10n.sectionAutomation,
       items: [
         MoreItemConfig(
-          title: 'Recurring & Bills',
+          title: l10n.moreRecurringBills,
           icon: Icons.repeat,
           destination: (_) => const RecurringScreen(),
         ),
         MoreItemConfig(
-          title: 'Scan SMS Inbox',
-          subtitle: 'Import M-Pesa SMS from your inbox',
+          title: l10n.moreScanSms,
+          subtitle: l10n.moreScanSmsSub,
           icon: Icons.sms_outlined,
           destination: (_) => const SmsInboxScreen(),
         ),
       ],
     ),
     MoreSectionConfig(
-      header: 'Organize',
+      header: l10n.sectionOrganize,
       items: [
         MoreItemConfig(
-          title: 'Categories',
+          title: l10n.moreCategories,
           icon: Icons.category_outlined,
           destination: (_) => const CategoriesScreen(),
         ),
         MoreItemConfig(
-          title: 'Savings Goals',
+          title: l10n.moreSavingsGoals,
           icon: Icons.savings_outlined,
           destination: (_) => const GoalsScreen(),
         ),
         MoreItemConfig(
-          title: 'Insights & Analytics',
+          title: l10n.moreInsights,
           icon: Icons.insights_outlined,
           destination: (_) => const InsightsScreen(),
         ),
       ],
     ),
     MoreSectionConfig(
-      header: 'App',
+      header: l10n.sectionApp,
       items: [
         MoreItemConfig(
-          title: 'Settings',
+          title: l10n.moreSettings,
           icon: Icons.settings_outlined,
           destination: (_) => const SettingsScreen(),
         ),
         MoreItemConfig(
-          title: 'Export & Backup',
+          title: l10n.moreExportBackup,
           icon: Icons.import_export_outlined,
           destination: (_) => DataPortabilityScreen(db: ref.read(dbProvider)),
         ),
@@ -127,7 +131,8 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final allSections = buildMoreSections(ref);
+    final l10n = context.l10n;
+    final allSections = buildMoreSections(ref, l10n);
 
     final filteredSections = allSections.map((section) {
       if (_query.isEmpty) return section;
@@ -144,7 +149,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('More'),
+        title: Text(l10n.moreTitle),
       ),
       body: Column(
         children: [
@@ -152,7 +157,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: SearchBar(
               controller: _searchCtrl,
-              hintText: 'Search features...',
+              hintText: l10n.searchFeaturesHint,
               leading: const Icon(Icons.search),
               trailing: [
                 if (_query.isNotEmpty)
@@ -171,7 +176,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
             child: filteredSections.isEmpty
                 ? Center(
                     child: Text(
-                      'No matching features found',
+                      l10n.noMatchingFeatures,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

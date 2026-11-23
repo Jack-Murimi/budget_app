@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/category_icon_helper.dart';
+import '../../../shared/utils/color_utils.dart';
 import '../providers/category_providers.dart';
 
 /// Shows a category picker bottom sheet with transaction type tabs and sub-category drilling.
@@ -36,18 +38,11 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
     _activeType = widget.initialType ?? 'expense';
   }
 
-  Color _hexColor(String hex) {
-    try {
-      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
-    } catch (_) {
-      return Colors.grey;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesStreamProvider);
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.65,
@@ -85,14 +80,14 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                   child: Text(
                     _selectedParent != null
                         ? _selectedParent!.name
-                        : 'Select Category',
+                        : l10n.selectCategory,
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
                 if (_selectedParent != null)
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(_selectedParent),
-                    child: const Text('Use this'),
+                    child: Text(l10n.useThis),
                   ),
               ],
             ),
@@ -107,21 +102,21 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                 style: const ButtonStyle(
                   visualDensity: VisualDensity.compact,
                 ),
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: 'expense',
-                    label: Text('Expense'),
-                    icon: Icon(Icons.arrow_upward_rounded, size: 16),
+                    label: Text(l10n.expense),
+                    icon: const Icon(Icons.arrow_upward_rounded, size: 16),
                   ),
                   ButtonSegment(
                     value: 'income',
-                    label: Text('Income'),
-                    icon: Icon(Icons.arrow_downward_rounded, size: 16),
+                    label: Text(l10n.income),
+                    icon: const Icon(Icons.arrow_downward_rounded, size: 16),
                   ),
                   ButtonSegment(
                     value: 'transfer',
-                    label: Text('Transfer'),
-                    icon: Icon(Icons.swap_horiz_rounded, size: 16),
+                    label: Text(l10n.transfer),
+                    icon: const Icon(Icons.swap_horiz_rounded, size: 16),
                   ),
                 ],
                 selected: {_activeType},
@@ -150,7 +145,7 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                 if (toShow.isEmpty) {
                   return Center(
                     child: Text(
-                      'No ${_activeType.toUpperCase()} categories found',
+                      l10n.noTypeCategoriesFound(_activeType.toUpperCase()),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -163,9 +158,13 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                   itemCount: toShow.length,
                   itemBuilder: (_, i) {
                     final cat = toShow[i];
-                    final color = _hexColor(cat.colorHex);
+                    final color = parseHexColor(cat.colorHex);
                     final children = hasChildren(cat);
-                    final icon = CategoryIconHelper.getIcon(cat.icon, type: cat.transactionType);
+                    final icon = CategoryIconHelper.resolveCategoryIcon(
+                      iconName: cat.icon,
+                      categoryName: cat.name,
+                      type: cat.transactionType,
+                    );
 
                     return ListTile(
                       leading: CircleAvatar(

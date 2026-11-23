@@ -33,10 +33,10 @@ class AuthService {
     }
   }
 
-  Future<bool> authenticate() async {
+  Future<bool> authenticate({String? localizedReason}) async {
     try {
       return await _localAuth.authenticate(
-        localizedReason: 'Authenticate to open Budget KE',
+        localizedReason: localizedReason ?? 'Authenticate to open Budget KE',
         persistAcrossBackgrounding: true,
       );
     } on MissingPluginException {

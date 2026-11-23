@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/converters/cents_converter.dart';
@@ -10,53 +8,67 @@ class AccountRepository {
 
   const AccountRepository(this.db);
 
-  Stream<List<AccountWithBalance>> watchAccountsWithBalance({bool includeArchived = false}) {
-    final trigger = db.customSelect(
-      'SELECT 1',
-      readsFrom: {db.accounts, db.transactions},
-    ).watch();
+  Stream<List<AccountWithBalance>> watchAccountsWithBalance({
+    bool includeArchived = false,
+  }) {
+    const sql = '''
+      WITH outgoing AS (
+        SELECT
+          account_id,
+          SUM(
+            CASE
+              WHEN type = 'income' THEN amount
+              WHEN type = 'expense' THEN -(
+                CASE
+                  WHEN (amount + transaction_cost - fuliza_amount) > 0
+                  THEN (amount + transaction_cost - fuliza_amount)
+                  ELSE 0
+                END
+              )
+              WHEN type = 'transfer' THEN -(amount + transaction_cost)
+              ELSE 0
+            END
+          ) AS delta_cents
+        FROM transactions
+        WHERE account_id IS NOT NULL
+        GROUP BY account_id
+      ),
+      incoming AS (
+        SELECT
+          to_account_id AS account_id,
+          SUM(amount) AS delta_cents
+        FROM transactions
+        WHERE type = 'transfer' AND to_account_id IS NOT NULL
+        GROUP BY to_account_id
+      )
+      SELECT
+        a.*,
+        (a.initial_balance + COALESCE(o.delta_cents, 0) + COALESCE(i.delta_cents, 0)) AS balance_cents
+      FROM accounts a
+      LEFT JOIN outgoing o ON o.account_id = a.id
+      LEFT JOIN incoming i ON i.account_id = a.id
+      WHERE (? = 1 OR a.is_archived = 0)
+      ORDER BY a.is_default DESC, a.name ASC
+    ''';
 
-    return trigger.asyncMap((_) async {
-      final accounts = await getAll(includeArchived: includeArchived);
-      final transactions = await db.select(db.transactions).get();
-
-      final accountsWithBalance = accounts.map((account) {
-        int balanceCents = CentsConverter.toCents(account.initialBalance);
-
-        for (final t in transactions) {
-          if (t.accountId == account.id) {
-            if (t.type == 'income') {
-              balanceCents += CentsConverter.toCents(t.amount);
-            } else if (t.type == 'expense') {
-              final totalOutflowCents = CentsConverter.toCents(t.amount) +
-                  CentsConverter.toCents(t.transactionCost);
-              final fulizaCoveredCents = CentsConverter.toCents(t.fulizaAmount);
-              balanceCents -= math.max(0, totalOutflowCents - fulizaCoveredCents);
-            } else if (t.type == 'transfer') {
-              balanceCents -= CentsConverter.toCents(t.amount) +
-                  CentsConverter.toCents(t.transactionCost);
-            }
-          }
-
-          if (t.toAccountId == account.id && t.type == 'transfer') {
-            balanceCents += CentsConverter.toCents(t.amount);
-          }
-        }
-
-        return AccountWithBalance(
-          account: account,
-          balance: CentsConverter.fromCents(balanceCents),
+    return db
+        .customSelect(
+          sql,
+          variables: [Variable.withInt(includeArchived ? 1 : 0)],
+          readsFrom: {db.accounts, db.transactions},
+        )
+        .watch()
+        .map(
+          (rows) => [
+            for (final row in rows)
+              AccountWithBalance(
+                account: db.accounts.map(row.data),
+                balance: CentsConverter.fromCents(
+                  row.read<int>('balance_cents'),
+                ),
+              ),
+          ],
         );
-      }).toList();
-
-      accountsWithBalance.sort((a, b) {
-        if (a.isDefault && !b.isDefault) return -1;
-        if (!a.isDefault && b.isDefault) return 1;
-        return a.name.compareTo(b.name);
-      });
-
-      return accountsWithBalance;
-    });
   }
 
   Stream<List<Transaction>> watchTransactionsByAccount(int accountId) {

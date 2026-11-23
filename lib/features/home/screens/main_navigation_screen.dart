@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../l10n/l10n.dart';
 import '../../budgets/screens/budgets_screen.dart';
 import '../../more/screens/more_screen.dart';
 import '../../transactions/screens/transactions_screen.dart';
@@ -12,6 +13,7 @@ class MainNavigationScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final selectedIndex = ref.watch(selectedTabProvider);
     final clampedIndex = selectedIndex.clamp(0, 3);
 
@@ -30,26 +32,26 @@ class MainNavigationScreen extends ConsumerWidget {
         onDestinationSelected: (i) {
           ref.read(selectedTabProvider.notifier).state = i;
         },
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Home',
+            icon: const Icon(Icons.dashboard_outlined),
+            selectedIcon: const Icon(Icons.dashboard),
+            label: l10n.navHome,
           ),
           NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
-            label: 'Transactions',
+            icon: const Icon(Icons.receipt_long_outlined),
+            selectedIcon: const Icon(Icons.receipt_long),
+            label: l10n.navTransactions,
           ),
           NavigationDestination(
-            icon: Icon(Icons.pie_chart_outline),
-            selectedIcon: Icon(Icons.pie_chart),
-            label: 'Budgets',
+            icon: const Icon(Icons.pie_chart_outline),
+            selectedIcon: const Icon(Icons.pie_chart),
+            label: l10n.navBudgets,
           ),
           NavigationDestination(
-            icon: Icon(Icons.more_horiz),
-            selectedIcon: Icon(Icons.more_horiz),
-            label: 'More',
+            icon: const Icon(Icons.more_horiz),
+            selectedIcon: const Icon(Icons.more_horiz),
+            label: l10n.navMore,
           ),
         ],
       ),

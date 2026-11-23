@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/category_icon_helper.dart';
+import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../categories/widgets/category_picker.dart';
 import '../models/budget_model.dart';
 import '../providers/budget_providers.dart';
-import '../repositories/budget_repository.dart';
+import '../utils/budget_period_helper.dart';
 import 'budget_detail_screen.dart';
 
 class BudgetsScreen extends ConsumerStatefulWidget {
@@ -23,16 +25,17 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final budgetsAsync = ref.watch(allBudgetsWithProgressProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Budgets'),
+        title: Text(l10n.budgetsTitle),
         actions: [
           IconButton(
             icon: Icon(_showArchived ? Icons.unarchive : Icons.archive_outlined),
             onPressed: () => setState(() => _showArchived = !_showArchived),
-            tooltip: _showArchived ? 'Show active' : 'Show archived',
+            tooltip: _showArchived ? l10n.showActive : l10n.showArchived,
           ),
         ],
       ),
@@ -56,7 +59,7 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
                   Padding(
                     padding: const EdgeInsets.all(32),
                     child: Text(
-                      'No archived budgets',
+                      l10n.noArchivedBudgets,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Theme.of(context).colorScheme.outline,
                           ),
@@ -68,7 +71,7 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(l10n.errorLabel('$e'))),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreateDialog,
@@ -77,25 +80,15 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
     );
   }
 
-  Color _parseColor(String? hex, Color fallback) {
-    if (hex == null || hex.isEmpty) return fallback;
-    try {
-      var normalized = hex.replaceFirst('#', '');
-      if (normalized.length == 6) normalized = 'FF$normalized';
-      return Color(int.parse(normalized, radix: 16));
-    } catch (_) {
-      return fallback;
-    }
-  }
-
-  String _periodLabel(String period) => switch (period) {
-        'monthly' => 'Monthly',
-        'weekly' => 'Weekly',
-        _ => 'Custom',
+  String _periodLabel(String period, AppLocalizations l10n) => switch (period) {
+        'monthly' => l10n.monthly,
+        'weekly' => l10n.weekly,
+        _ => l10n.custom,
       };
 
   Widget _buildBudgetCard(BudgetWithProgress b) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final isOver = b.isOverBudget;
     final progressColor = isOver
         ? theme.colorScheme.error
@@ -104,7 +97,7 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
             : theme.colorScheme.primary;
 
     if (b.isOverall) {
-      final daysLeft = _daysRemaining(b.budget);
+      final daysLeft = BudgetPeriodHelper.daysRemaining(b.budget);
       return Card(
         margin: const EdgeInsets.all(16),
         child: ListTile(
@@ -113,7 +106,7 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
             size: 48,
             color: theme.colorScheme.primary,
           ),
-          title: const Text('Overall Budget'),
+          title: Text(l10n.overallBudget),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -124,7 +117,9 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
               ),
               if (b.rolloverAmount > 0)
                 Text(
-                  '+${CurrencyFormatter.format(b.rolloverAmount)} rollover',
+                  l10n.rolloverPlusBadge(
+                    CurrencyFormatter.format(b.rolloverAmount),
+                  ),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.primary,
                   ),
@@ -142,8 +137,10 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
               const SizedBox(height: 4),
               Text(
                 isOver
-                    ? 'Over budget by ${CurrencyFormatter.format(b.spent - b.amount)}'
-                    : '${CurrencyFormatter.format(b.remaining)} left',
+                    ? l10n.overBudgetBy(
+                        CurrencyFormatter.format(b.spent - b.amount),
+                      )
+                    : l10n.amountLeft(CurrencyFormatter.format(b.remaining)),
                 style: TextStyle(
                   color: isOver
                       ? theme.colorScheme.error
@@ -156,22 +153,22 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
           trailing: _showArchived
               ? IconButton(
                   icon: const Icon(Icons.unarchive_outlined),
-                  tooltip: 'Unarchive',
+                  tooltip: l10n.unarchive,
                   onPressed: () => ref
                       .read(budgetRepositoryProvider)
                       .archiveBudget(b.id, archive: false),
                 )
               : Text(
-                  daysLeft == 1 ? '1 day' : '$daysLeft days',
+                  l10n.daysCount(daysLeft),
                   style: theme.textTheme.bodySmall,
                 ),
           onTap: () => _openDetail(b),
         ),
       );
     } else {
-      final categoryColor = _parseColor(
+      final categoryColor = parseHexColor(
         b.categoryColorHex,
-        theme.colorScheme.primary,
+        fallback: theme.colorScheme.primary,
       );
 
       return Card(
@@ -180,7 +177,10 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
           leading: CircleAvatar(
             backgroundColor: categoryColor.withValues(alpha: 0.15),
             child: Icon(
-              CategoryIconHelper.getIcon(b.categoryIcon),
+              CategoryIconHelper.resolveCategoryIcon(
+                iconName: b.categoryIcon,
+                categoryName: b.categoryName,
+              ),
               color: categoryColor,
             ),
           ),
@@ -195,7 +195,9 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
               ),
               if (b.rolloverAmount > 0)
                 Text(
-                  '+${CurrencyFormatter.format(b.rolloverAmount)} rollover',
+                  l10n.rolloverPlusBadge(
+                    CurrencyFormatter.format(b.rolloverAmount),
+                  ),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.primary,
                   ),
@@ -213,7 +215,9 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
               const SizedBox(height: 4),
               Text(
                 isOver
-                    ? 'Over budget by ${CurrencyFormatter.format(b.spent - b.amount)}'
+                    ? l10n.overBudgetBy(
+                        CurrencyFormatter.format(b.spent - b.amount),
+                      )
                     : (b.categoryName ?? ''),
                 style: TextStyle(
                   color: isOver
@@ -227,14 +231,14 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
           trailing: _showArchived
               ? IconButton(
                   icon: const Icon(Icons.unarchive_outlined),
-                  tooltip: 'Unarchive',
+                  tooltip: l10n.unarchive,
                   onPressed: () => ref
                       .read(budgetRepositoryProvider)
                       .archiveBudget(b.id, archive: false),
                 )
               : Chip(
                   label: Text(
-                    _periodLabel(b.budget.period),
+                    _periodLabel(b.budget.period, l10n),
                     style: const TextStyle(fontSize: 12),
                   ),
                 ),
@@ -242,14 +246,6 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
         ),
       );
     }
-  }
-
-  int _daysRemaining(Budget budget) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final (_, end) = BudgetRepository.getPeriodWindow(budget, now);
-    final endDay = DateTime(end.year, end.month, end.day);
-    return endDay.difference(today).inDays.clamp(0, 999999);
   }
 
   void _openDetail(BudgetWithProgress b) {
@@ -270,7 +266,7 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
     await ref.read(budgetRepositoryProvider).insertBudget(result);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Budget created')),
+      SnackBar(content: Text(context.l10n.budgetCreated)),
     );
   }
 }
@@ -348,9 +344,10 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final fmt = DateFormat('d MMM yyyy');
     return AlertDialog(
-      title: Text(_isEdit ? 'Edit Budget' : 'Create Budget'),
+      title: Text(_isEdit ? l10n.editBudget : l10n.createBudget),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -358,9 +355,9 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
           children: [
             TextField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Name *',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.nameRequired,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 16),
@@ -368,22 +365,22 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
               controller: _amountCtrl,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Amount (KES) *',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.budgetAmountRequired,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               initialValue: _period,
-              decoration: const InputDecoration(
-                labelText: 'Period',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.period,
+                border: const OutlineInputBorder(),
               ),
-              items: const [
-                DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
-                DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
-                DropdownMenuItem(value: 'custom', child: Text('Custom')),
+              items: [
+                DropdownMenuItem(value: 'monthly', child: Text(l10n.monthly)),
+                DropdownMenuItem(value: 'weekly', child: Text(l10n.weekly)),
+                DropdownMenuItem(value: 'custom', child: Text(l10n.custom)),
               ],
               onChanged: (v) {
                 if (v != null) setState(() => _period = v);
@@ -397,7 +394,7 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
                     child: OutlinedButton.icon(
                       onPressed: _pickStartDate,
                       icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                      label: Text('Start: ${fmt.format(_customStart)}'),
+                      label: Text(l10n.startWithDate(fmt.format(_customStart))),
                     ),
                   ),
                 ],
@@ -409,7 +406,7 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
                     child: OutlinedButton.icon(
                       onPressed: _pickEndDate,
                       icon: const Icon(Icons.event_outlined, size: 16),
-                      label: Text('End: ${fmt.format(_customEnd)}'),
+                      label: Text(l10n.endWithDate(fmt.format(_customEnd))),
                     ),
                   ),
                 ],
@@ -417,16 +414,16 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
             ],
             const SizedBox(height: 16),
             ListTile(
-              title: const Text('Category'),
+              title: Text(l10n.category),
               subtitle: Text(
                 _selectedCategory == null
-                    ? 'Overall Budget (All Expenses)'
+                    ? l10n.overallBudgetAllExpenses
                     : _selectedCategory!.name,
               ),
               trailing: _selectedCategory != null
                   ? IconButton(
                       icon: const Icon(Icons.clear),
-                      tooltip: 'Use Overall Budget',
+                      tooltip: l10n.useOverallBudget,
                       onPressed: () =>
                           setState(() => _selectedCategory = null),
                     )
@@ -441,10 +438,8 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
             if (_period != 'custom') ...[
               const SizedBox(height: 8),
               SwitchListTile(
-                title: const Text('Rollover remaining budget'),
-                subtitle: _isEdit
-                    ? const Text('Carry over unused amount to next period')
-                    : null,
+                title: Text(l10n.rolloverRemainingBudget),
+                subtitle: _isEdit ? Text(l10n.rolloverSubtitle) : null,
                 value: _rollover,
                 onChanged: (v) => setState(() => _rollover = v),
               ),
@@ -455,7 +450,7 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: () {
@@ -464,13 +459,13 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
                 double.tryParse(_amountCtrl.text.replaceAll(',', '').trim());
             if (name.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Name is required')),
+                SnackBar(content: Text(l10n.budgetNameRequiredError)),
               );
               return;
             }
             if (amount == null || amount <= 0) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Enter a valid amount')),
+                SnackBar(content: Text(l10n.errorValidAmount)),
               );
               return;
             }
@@ -509,7 +504,7 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
               );
             }
           },
-          child: const Text('Save'),
+          child: Text(l10n.save),
         ),
       ],
     );
@@ -523,6 +518,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -534,13 +530,13 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'No budgets set yet',
+            l10n.noBudgetsSetYet,
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           FilledButton(
             onPressed: onCreateBudget,
-            child: const Text('Create Budget'),
+            child: Text(l10n.createBudget),
           ),
         ],
       ),

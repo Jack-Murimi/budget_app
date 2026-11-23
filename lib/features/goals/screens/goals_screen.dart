@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/utils/date_formatter.dart';
 import '../../accounts/providers/account_providers.dart';
@@ -13,18 +14,19 @@ class GoalsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final goals = ref.watch(savingsGoalsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Savings goals')),
+      appBar: AppBar(title: Text(l10n.goalsTitle)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateDialog(context),
         icon: const Icon(Icons.add),
-        label: const Text('Add goal'),
+        label: Text(l10n.addGoal),
       ),
       body: goals.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) =>
-            Center(child: Text('Unable to load goals: $error')),
+            Center(child: Text(l10n.unableToLoadGoals('$error'))),
         data: (items) => items.isEmpty
             ? const _EmptyGoals()
             : ListView.separated(
@@ -44,7 +46,7 @@ class GoalsScreen extends ConsumerWidget {
     );
     if (saved == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Savings goal saved')),
+        SnackBar(content: Text(context.l10n.savingsGoalSaved)),
       );
     }
   }
@@ -84,10 +86,11 @@ class _CreateEditGoalDialogState extends ConsumerState<_CreateEditGoalDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     return AlertDialog(
-      title: Text(_isEditing ? 'Edit savings goal' : 'Add savings goal'),
+      title: Text(_isEditing ? l10n.editSavingsGoal : l10n.addSavingsGoal),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -96,12 +99,12 @@ class _CreateEditGoalDialogState extends ConsumerState<_CreateEditGoalDialog> {
             children: [
               TextFormField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Goal name',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.goalName,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Enter a goal name'
+                    ? l10n.enterGoalName
                     : null,
               ),
               const SizedBox(height: 12),
@@ -109,15 +112,15 @@ class _CreateEditGoalDialogState extends ConsumerState<_CreateEditGoalDialog> {
                 controller: _targetCtrl,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Target (KES)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.targetKes,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (v) {
                   final parsed =
                       double.tryParse((v ?? '').replaceAll(',', '').trim());
                   if (parsed == null || parsed <= 0) {
-                    return 'Enter a positive target amount';
+                    return l10n.enterPositiveTarget;
                   }
                   return null;
                 },
@@ -141,15 +144,18 @@ class _CreateEditGoalDialogState extends ConsumerState<_CreateEditGoalDialog> {
                       icon: const Icon(Icons.calendar_today_outlined),
                       label: Text(
                         _targetDate == null
-                            ? 'Add target date'
-                            : 'Target ${MaterialLocalizations.of(context).formatMediumDate(_targetDate!)}',
+                            ? l10n.addTargetDate
+                            : l10n.targetDateLabel(
+                                MaterialLocalizations.of(context)
+                                    .formatMediumDate(_targetDate!),
+                              ),
                       ),
                     ),
                   ),
                   if (_targetDate != null)
                     IconButton(
                       icon: const Icon(Icons.clear, size: 18),
-                      tooltip: 'Clear target date',
+                      tooltip: l10n.clearTargetDate,
                       onPressed: () => setState(() => _targetDate = null),
                     ),
                 ],
@@ -161,11 +167,11 @@ class _CreateEditGoalDialogState extends ConsumerState<_CreateEditGoalDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _isSaving ? null : _submit,
-          child: const Text('Save'),
+          child: Text(l10n.save),
         ),
       ],
     );
@@ -197,7 +203,7 @@ class _CreateEditGoalDialogState extends ConsumerState<_CreateEditGoalDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to save goal: $e')),
+          SnackBar(content: Text(context.l10n.unableToSaveGoal('$e'))),
         );
         setState(() => _isSaving = false);
       }
@@ -230,6 +236,7 @@ class _ContributeGoalDialogState extends ConsumerState<_ContributeGoalDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final accounts = ref.watch(accountsWithBalanceProvider).asData?.value ?? [];
     if (!_accountInitialized && accounts.isNotEmpty) {
       _selectedAccountId =
@@ -240,7 +247,7 @@ class _ContributeGoalDialogState extends ConsumerState<_ContributeGoalDialog> {
         accounts.any((a) => a.id == _selectedAccountId) ? _selectedAccountId : null;
 
     return AlertDialog(
-      title: Text('Add to ${widget.goal.name}'),
+      title: Text(l10n.addToGoal(widget.goal.name)),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -251,15 +258,15 @@ class _ContributeGoalDialogState extends ConsumerState<_ContributeGoalDialog> {
                 controller: _amountCtrl,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Amount (KES)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.amountKES,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (v) {
                   final parsed =
                       double.tryParse((v ?? '').replaceAll(',', '').trim());
                   if (parsed == null || parsed <= 0) {
-                    return 'Enter a positive amount';
+                    return l10n.errorPositiveAmount;
                   }
                   return null;
                 },
@@ -267,14 +274,14 @@ class _ContributeGoalDialogState extends ConsumerState<_ContributeGoalDialog> {
               const SizedBox(height: 12),
               DropdownButtonFormField<int?>(
                 initialValue: validAccountValue,
-                decoration: const InputDecoration(
-                  labelText: 'From account',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.fromAccountLower,
+                  border: const OutlineInputBorder(),
                 ),
                 items: [
-                  const DropdownMenuItem<int?>(
+                  DropdownMenuItem<int?>(
                     value: null,
-                    child: Text('No account (track only)'),
+                    child: Text(l10n.noAccountTrackOnly),
                   ),
                   ...accounts.map(
                     (a) => DropdownMenuItem<int?>(
@@ -292,11 +299,11 @@ class _ContributeGoalDialogState extends ConsumerState<_ContributeGoalDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _isSaving ? null : _submit,
-          child: const Text('Add'),
+          child: Text(l10n.add),
         ),
       ],
     );
@@ -316,7 +323,9 @@ class _ContributeGoalDialogState extends ConsumerState<_ContributeGoalDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to record contribution: $e')),
+          SnackBar(
+            content: Text(context.l10n.unableToRecordContribution('$e')),
+          ),
         );
         setState(() => _isSaving = false);
       }
@@ -331,11 +340,15 @@ class _GoalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final progress = goal.targetAmount > 0
         ? (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0)
         : 0.0;
     final remaining =
         (goal.targetAmount - goal.currentAmount).clamp(0.0, double.infinity);
+    final targetPart = goal.targetDate == null
+        ? ''
+        : ' · ${l10n.targetDateLabel(MaterialLocalizations.of(context).formatMediumDate(goal.targetDate!))}';
 
     return Card(
       child: InkWell(
@@ -364,15 +377,15 @@ class _GoalCard extends ConsumerWidget {
                       }
                     },
                     itemBuilder: (_) => [
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'history',
-                        child: Text('Contribution history'),
+                        child: Text(l10n.contributionHistory),
                       ),
-                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                      PopupMenuItem(value: 'edit', child: Text(l10n.edit)),
                       PopupMenuItem(
                         value: 'delete',
                         child: Text(
-                          'Delete',
+                          l10n.delete,
                           style: TextStyle(color: theme.colorScheme.error),
                         ),
                       ),
@@ -384,10 +397,16 @@ class _GoalCard extends ConsumerWidget {
               LinearProgressIndicator(value: progress),
               const SizedBox(height: 8),
               Text(
-                '${CurrencyFormatter.format(goal.currentAmount)} of ${CurrencyFormatter.format(goal.targetAmount)}',
+                l10n.goalAmountProgress(
+                  CurrencyFormatter.format(goal.currentAmount),
+                  CurrencyFormatter.format(goal.targetAmount),
+                ),
               ),
               Text(
-                'Remaining ${CurrencyFormatter.format(remaining)}${goal.targetDate == null ? '' : ' · Target ${MaterialLocalizations.of(context).formatMediumDate(goal.targetDate!)}'}',
+                l10n.remainingTarget(
+                  CurrencyFormatter.format(remaining),
+                  targetPart,
+                ),
               ),
               const SizedBox(height: 4),
               Row(
@@ -395,11 +414,11 @@ class _GoalCard extends ConsumerWidget {
                 children: [
                   TextButton(
                     onPressed: () => _showHistory(context),
-                    child: const Text('History'),
+                    child: Text(l10n.history),
                   ),
                   TextButton(
                     onPressed: () => _contribute(context),
-                    child: const Text('Add money'),
+                    child: Text(l10n.addMoney),
                   ),
                 ],
               ),
@@ -417,7 +436,7 @@ class _GoalCard extends ConsumerWidget {
     );
     if (saved == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Added contribution to ${goal.name}')),
+        SnackBar(content: Text(context.l10n.addedContributionTo(goal.name))),
       );
     }
   }
@@ -429,17 +448,18 @@ class _GoalCard extends ConsumerWidget {
     );
     if (saved == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Goal updated')),
+        SnackBar(content: Text(context.l10n.goalUpdated)),
       );
     }
   }
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    final l10n = context.l10n;
     final res = await showDialog<({bool confirmed, bool deleteLinked})>(
       context: context,
       builder: (_) => ConfirmDeleteWithLinkedTxnsDialog(
-        title: 'Delete goal',
-        message: 'Delete "${goal.name}" and its contribution history?',
+        title: l10n.deleteGoalTitle,
+        message: l10n.deleteGoalConfirm(goal.name),
       ),
     );
     if (res?.confirmed != true) return;
@@ -449,7 +469,7 @@ class _GoalCard extends ConsumerWidget {
         );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Deleted "${goal.name}"')),
+        SnackBar(content: Text(l10n.deletedItemToast(goal.name))),
       );
     }
   }
@@ -471,6 +491,7 @@ class _GoalContributionsSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final contributionsAsync = ref.watch(goalContributionsProvider(goal.id));
     final accounts = ref.watch(allAccountsWithBalanceProvider).valueOrNull ?? [];
     final accountNames = {for (final a in accounts) a.id: a.name};
@@ -483,20 +504,20 @@ class _GoalContributionsSheet extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${goal.name} · Contributions',
+              l10n.goalContributionsHeader(goal.name),
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
             contributionsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Text('Unable to load contributions: $e'),
+              error: (e, _) => Text(l10n.unableToLoadContributions('$e')),
               data: (items) {
                 if (items.isEmpty) {
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Center(
                       child: Text(
-                        'No contributions recorded yet.',
+                        l10n.noContributionsYet,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.outline,
                         ),
@@ -536,18 +557,16 @@ class _GoalContributionsSheet extends ConsumerWidget {
                             Icons.delete_outline,
                             color: theme.colorScheme.outline,
                           ),
-                          tooltip: 'Delete contribution',
+                          tooltip: l10n.deleteContributionTooltip,
                           onPressed: () async {
                             final res = await showDialog<
                                 ({bool confirmed, bool deleteLinked})>(
                               context: context,
                               builder: (_) =>
-                                  const ConfirmDeleteWithLinkedTxnsDialog(
-                                title: 'Delete contribution',
-                                message:
-                                    'Remove this contribution from the goal total?',
-                                checkboxLabel:
-                                    'Also delete linked ledger transaction',
+                                  ConfirmDeleteWithLinkedTxnsDialog(
+                                title: l10n.deleteContributionTitle,
+                                message: l10n.deleteContributionConfirm,
+                                checkboxLabel: l10n.alsoDeleteLinkedTxn,
                               ),
                             );
                             if (res?.confirmed != true) return;
@@ -576,22 +595,25 @@ class _EmptyGoals extends StatelessWidget {
   const _EmptyGoals();
 
   @override
-  Widget build(BuildContext context) => const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.savings_outlined, size: 56),
-              SizedBox(height: 12),
-              Text('No savings goals'),
-              SizedBox(height: 4),
-              Text(
-                'Set a target, then allocate money from an account.',
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.savings_outlined, size: 56),
+            const SizedBox(height: 12),
+            Text(l10n.noSavingsGoals),
+            const SizedBox(height: 4),
+            Text(
+              l10n.noSavingsGoalsDesc,
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }

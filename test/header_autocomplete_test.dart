@@ -102,6 +102,7 @@ void main() {
 
     // Type 'Nai' into the header field
     await tester.enterText(headerField, 'Nai');
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
 
     // Verify both suggestions are displayed with category and sub-category
@@ -117,6 +118,38 @@ void main() {
     expect(textFormField.controller?.text, 'Naivas');
 
     // Category selector should now reflect 'Food & Drinks > Groceries'
+    expect(find.text('Food & Drinks > Groceries'), findsOneWidget);
+  });
+
+  testWidgets('debounces rapid header typing before querying suggestions',
+      (tester) async {
+    final container = ProviderContainer(
+      overrides: [dbProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: AddTransactionScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final headerField = find.widgetWithText(TextFormField, 'Title *');
+    await tester.enterText(headerField, 'N');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.enterText(headerField, 'Na');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.enterText(headerField, 'Nai');
+    await tester.pump(const Duration(milliseconds: 100));
+    // Prior timers were cancelled; suggestions should not appear yet.
+    expect(find.text('Food & Drinks > Groceries'), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
     expect(find.text('Food & Drinks > Groceries'), findsOneWidget);
   });
 }

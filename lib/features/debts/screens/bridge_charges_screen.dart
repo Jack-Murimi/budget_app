@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../debts/models/debt_model.dart';
 import '../../debts/providers/debt_providers.dart';
 
 final _bridgeDebtsProvider =
-    StreamProvider.family<List<DebtWithRepayments>, _DateRange>(
+    StreamProvider.autoDispose.family<List<DebtWithRepayments>, _DateRange>(
   (ref, range) => ref
       .watch(debtRepositoryProvider)
       .watchBridgeDebts(from: range.from, to: range.to),
@@ -86,11 +87,12 @@ class _BridgeChargesScreenState extends ConsumerState<BridgeChargesScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final range = _DateRange(from: _from, to: _to);
     final loansAsync = ref.watch(_bridgeDebtsProvider(range));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Bridge Loan Charges')),
+      appBar: AppBar(title: Text(l10n.bridgeChargesTitle)),
       body: Column(
         children: [
           // Filter presets
@@ -100,19 +102,19 @@ class _BridgeChargesScreenState extends ConsumerState<BridgeChargesScreen> {
             child: Row(
               children: [
                 ChoiceChip(
-                  label: const Text('All time'),
+                  label: Text(l10n.allTime),
                   selected: _presetIndex == 0,
                   onSelected: (_) => _applyPreset(0),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
-                  label: const Text('This month'),
+                  label: Text(l10n.thisMonth),
                   selected: _presetIndex == 1,
                   onSelected: (_) => _applyPreset(1),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
-                  label: const Text('Last month'),
+                  label: Text(l10n.lastMonth),
                   selected: _presetIndex == 2,
                   onSelected: (_) => _applyPreset(2),
                 ),
@@ -129,7 +131,7 @@ class _BridgeChargesScreenState extends ConsumerState<BridgeChargesScreen> {
                     onPressed: () => _pickDate(isFrom: true),
                     icon: const Icon(Icons.calendar_today, size: 14),
                     label: Text(
-                      _from == null ? 'From' : _fmt.format(_from!),
+                      _from == null ? l10n.from : _fmt.format(_from!),
                       style: const TextStyle(fontSize: 12),
                     ),
                   ),
@@ -142,7 +144,7 @@ class _BridgeChargesScreenState extends ConsumerState<BridgeChargesScreen> {
                     onPressed: () => _pickDate(isFrom: false),
                     icon: const Icon(Icons.calendar_today, size: 14),
                     label: Text(
-                      _to == null ? 'To' : _fmt.format(_to!),
+                      _to == null ? l10n.to : _fmt.format(_to!),
                       style: const TextStyle(fontSize: 12),
                     ),
                   ),
@@ -160,7 +162,7 @@ class _BridgeChargesScreenState extends ConsumerState<BridgeChargesScreen> {
             child: loansAsync.when(
               loading: () =>
                   const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (e, _) => Center(child: Text(l10n.errorLabel('$e'))),
               data: (loans) {
                 if (loans.isEmpty) {
                   return _EmptyState(hasFilter: _from != null || _to != null);
@@ -185,7 +187,7 @@ class _BridgeChargesScreenState extends ConsumerState<BridgeChargesScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Total Bridge charges',
+                              l10n.totalBridgeCharges,
                               style: theme.textTheme.titleSmall?.copyWith(
                                 color: theme.colorScheme.onPrimaryContainer,
                               ),
@@ -202,25 +204,24 @@ class _BridgeChargesScreenState extends ConsumerState<BridgeChargesScreen> {
                             const Divider(height: 1),
                             const SizedBox(height: 12),
                             _SummaryRow(
-                              label: 'Upfront deductions (shortfall)',
+                              label: l10n.upfrontDeductionsShortfall,
                               value: totalShortfall,
-                              tooltip:
-                                  'Difference between borrowed principal and credited cash',
+                              tooltip: l10n.upfrontDeductionsTooltip,
                             ),
                             const SizedBox(height: 6),
                             _SummaryRow(
-                              label: 'Repayment interest',
+                              label: l10n.repaymentInterest,
                               value: totalInterest,
-                              tooltip: 'Extra paid back on top of principal',
+                              tooltip: l10n.repaymentInterestTooltip,
                             ),
                             const SizedBox(height: 6),
                             _SummaryRow(
-                              label: 'Total principal borrowed',
+                              label: l10n.totalPrincipalBorrowed,
                               value: totalPrincipal,
                             ),
                             const SizedBox(height: 6),
                             _SummaryRow(
-                              label: 'Total loans',
+                              label: l10n.totalLoans,
                               count: loans.length,
                             ),
                           ],
@@ -228,7 +229,7 @@ class _BridgeChargesScreenState extends ConsumerState<BridgeChargesScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Text('Loans', style: theme.textTheme.titleSmall),
+                    Text(l10n.loansHeader, style: theme.textTheme.titleSmall),
                     const SizedBox(height: 8),
                     ...loans.map((loan) => _LoanChargeRow(loan: loan)),
                   ],
@@ -302,6 +303,7 @@ class _LoanChargeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final debt = loan.debt;
     final charge = debt.disbursementShortfall + debt.interest;
     final isSettled = loan.isSettled;
@@ -331,7 +333,7 @@ class _LoanChargeRow extends StatelessWidget {
           children: [
             Flexible(
               child: Text(
-                'Borrowed ${CurrencyFormatter.format(debt.principal)}',
+                l10n.borrowedAmount(CurrencyFormatter.format(debt.principal)),
                 style: const TextStyle(fontWeight: FontWeight.bold),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -344,7 +346,7 @@ class _LoanChargeRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                isSettled ? 'Settled' : 'Active',
+                isSettled ? l10n.settled : l10n.active,
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
@@ -359,14 +361,34 @@ class _LoanChargeRow extends StatelessWidget {
           children: [
             if (debt.disbursementShortfall > 0)
               Text(
-                  'Upfront deduction: ${CurrencyFormatter.format(debt.disbursementShortfall)} (received ${CurrencyFormatter.format(debt.principal - debt.disbursementShortfall)})'),
+                l10n.upfrontDeductionRow(
+                  CurrencyFormatter.format(debt.disbursementShortfall),
+                  CurrencyFormatter.format(
+                    debt.principal - debt.disbursementShortfall,
+                  ),
+                ),
+              ),
             if (debt.interest > 0)
-              Text('Repayment interest: ${CurrencyFormatter.format(debt.interest)}'),
+              Text(
+                l10n.repaymentInterestRow(
+                  CurrencyFormatter.format(debt.interest),
+                ),
+              ),
             if (!isSettled)
-              Text('Outstanding: ${CurrencyFormatter.format(debt.outstanding)}'),
+              Text(
+                l10n.outstandingRow(
+                  CurrencyFormatter.format(debt.outstanding),
+                ),
+              ),
             if (lastRepayment != null)
               Text(
-                '${isSettled ? 'Settled' : 'Last payment'}: ${DateFormat('dd MMM yyyy').format(lastRepayment.paymentDate)}',
+                isSettled
+                    ? l10n.settledOnDate(
+                        DateFormat('dd MMM yyyy').format(lastRepayment.paymentDate),
+                      )
+                    : l10n.lastPaymentOnDate(
+                        DateFormat('dd MMM yyyy').format(lastRepayment.paymentDate),
+                      ),
               ),
           ],
         ),
@@ -382,9 +404,11 @@ class _LoanChargeRow extends StatelessWidget {
                 fontSize: 15,
               ),
             ),
-            Text('total charges',
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: theme.colorScheme.error)),
+            Text(
+              l10n.totalChargesLabel,
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(color: theme.colorScheme.error),
+            ),
           ],
         ),
         isThreeLine: true,
@@ -398,31 +422,34 @@ class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.hasFilter});
 
   @override
-  Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(48),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.account_balance_outlined,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.primary),
-              const SizedBox(height: 16),
-              Text(
-                hasFilter
-                    ? 'No Bridge loans found in this period'
-                    : 'No Bridge loans recorded yet',
-                style: Theme.of(context).textTheme.titleMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Record a loan received from Bridge under Income with category "Loan Received"',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
-          ),
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(48),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.account_balance_outlined,
+                size: 64,
+                color: Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 16),
+            Text(
+              hasFilter
+                  ? l10n.noBridgeLoansInPeriod
+                  : l10n.noBridgeLoansRecorded,
+              style: Theme.of(context).textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.bridgeEmptyHint,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }

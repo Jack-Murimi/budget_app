@@ -11,7 +11,12 @@ final categoriesStreamProvider = StreamProvider<List<Category>>((ref) {
   return ref.watch(categoryRepositoryProvider).watchAll();
 });
 
-final categoriesByFilterProvider = StreamProvider.family<
+final categoriesByIdProvider = Provider<Map<int, Category>>((ref) {
+  final categories = ref.watch(categoriesStreamProvider).valueOrNull ?? const [];
+  return {for (final c in categories) c.id: c};
+});
+
+final categoriesByFilterProvider = StreamProvider.autoDispose.family<
     List<Category>, ({bool includeArchived, String? transactionType})>(
   (ref, filter) => ref.watch(categoryRepositoryProvider).watchAll(
         includeArchived: filter.includeArchived,

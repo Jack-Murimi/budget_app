@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/converters/cents_converter.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../providers/debt_providers.dart';
@@ -69,6 +70,7 @@ class _CreateEditDebtDialogState extends ConsumerState<CreateEditDebtDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final accounts = ref.watch(accountsWithBalanceProvider).asData?.value ?? [];
     if (!_isEditing && !_accountInitialized && accounts.isNotEmpty) {
       _selectedAccountId =
@@ -81,8 +83,8 @@ class _CreateEditDebtDialogState extends ConsumerState<CreateEditDebtDialog> {
     return AlertDialog(
       title: Text(
         _isEditing
-            ? 'Edit debt'
-            : (_selectedDirection == 'lent' ? 'Add loan given' : 'Add debt'),
+            ? l10n.editDebt
+            : (_selectedDirection == 'lent' ? l10n.addLoanGiven : l10n.addDebt),
       ),
       content: Form(
         key: _formKey,
@@ -94,28 +96,28 @@ class _CreateEditDebtDialogState extends ConsumerState<CreateEditDebtDialog> {
                 controller: _nameCtrl,
                 decoration: InputDecoration(
                   labelText: _selectedDirection == 'lent'
-                      ? 'Person (borrower)'
-                      : 'Person or lender',
+                      ? l10n.personBorrower
+                      : l10n.personOrLender,
                   border: const OutlineInputBorder(),
                 ),
                 validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Please enter a name'
+                    ? l10n.enterAName
                     : null,
               ),
               const SizedBox(height: 12),
               if (!_isEditing && widget.initialDirection == null) ...[
                 DropdownButtonFormField<String>(
                   initialValue: _selectedDirection,
-                  decoration: const InputDecoration(
-                    labelText: 'Direction',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.direction,
+                    border: const OutlineInputBorder(),
                   ),
-                  items: const [
+                  items: [
                     DropdownMenuItem(
                       value: 'borrowed',
-                      child: Text('I borrowed'),
+                      child: Text(l10n.iBorrowed),
                     ),
-                    DropdownMenuItem(value: 'lent', child: Text('I lent')),
+                    DropdownMenuItem(value: 'lent', child: Text(l10n.iLent)),
                   ],
                   onChanged: (value) {
                     if (value != null) setState(() => _selectedDirection = value);
@@ -133,19 +135,19 @@ class _CreateEditDebtDialogState extends ConsumerState<CreateEditDebtDialog> {
                 ].contains(_product)
                     ? _product
                     : 'personal',
-                decoration: const InputDecoration(
-                  labelText: 'Type',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.type,
+                  border: const OutlineInputBorder(),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'personal', child: Text('Personal')),
-                  DropdownMenuItem(value: 'mshwari', child: Text('M-Shwari')),
-                  DropdownMenuItem(value: 'fuliza', child: Text('Fuliza')),
+                items: [
+                  DropdownMenuItem(value: 'personal', child: Text(l10n.personal)),
+                  DropdownMenuItem(value: 'mshwari', child: Text(l10n.mshwari)),
+                  DropdownMenuItem(value: 'fuliza', child: Text(l10n.fulizaBadge)),
                   DropdownMenuItem(
                     value: 'hustler_fund',
-                    child: Text('Hustler Fund'),
+                    child: Text(l10n.hustlerFund),
                   ),
-                  DropdownMenuItem(value: 'bridge', child: Text('Bridge')),
+                  DropdownMenuItem(value: 'bridge', child: Text(l10n.bridge)),
                 ],
                 onChanged: (value) {
                   if (value != null) setState(() => _product = value);
@@ -156,15 +158,15 @@ class _CreateEditDebtDialogState extends ConsumerState<CreateEditDebtDialog> {
                 controller: _principalCtrl,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Principal (KES)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.principalKes,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (v) {
                   final parsed =
                       double.tryParse((v ?? '').replaceAll(',', '').trim());
                   if (parsed == null || parsed <= 0) {
-                    return 'Enter a positive principal';
+                    return l10n.enterPositivePrincipal;
                   }
                   return null;
                 },
@@ -175,11 +177,10 @@ class _CreateEditDebtDialogState extends ConsumerState<CreateEditDebtDialog> {
                   controller: _actualCreditedCtrl,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Actual amount credited (KES)',
-                    helperText:
-                        'e.g. borrow 600 but only 570 hits your M-Pesa',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.actualCreditedKes,
+                    helperText: l10n.actualCreditedBridgeExample,
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -188,15 +189,15 @@ class _CreateEditDebtDialogState extends ConsumerState<CreateEditDebtDialog> {
                 controller: _interestCtrl,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Total interest/repayment extra (KES)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.totalInterestExtraKes,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return null;
                   final parsed = double.tryParse(v.replaceAll(',', '').trim());
                   if (parsed == null || parsed < 0) {
-                    return 'Enter 0 or more';
+                    return l10n.enterZeroOrMore;
                   }
                   return null;
                 },
@@ -205,14 +206,14 @@ class _CreateEditDebtDialogState extends ConsumerState<CreateEditDebtDialog> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int?>(
                   initialValue: validAccountValue,
-                  decoration: const InputDecoration(
-                    labelText: 'Account',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.account,
+                    border: const OutlineInputBorder(),
                   ),
                   items: [
-                    const DropdownMenuItem<int?>(
+                    DropdownMenuItem<int?>(
                       value: null,
-                      child: Text('No account (track only)'),
+                      child: Text(l10n.noAccountTrackOnly),
                     ),
                     ...accounts.map(
                       (a) => DropdownMenuItem<int?>(
@@ -243,15 +244,15 @@ class _CreateEditDebtDialogState extends ConsumerState<CreateEditDebtDialog> {
                       icon: const Icon(Icons.calendar_today_outlined),
                       label: Text(
                         _dueDate == null
-                            ? 'Add due date'
-                            : 'Due ${_dueDate!.toLocal().toString().split(' ').first}',
+                            ? l10n.addDueDate
+                            : l10n.dueDateLabel(_dueDate!.toLocal().toString().split(' ').first),
                       ),
                     ),
                   ),
                   if (_dueDate != null)
                     IconButton(
                       icon: const Icon(Icons.clear, size: 18),
-                      tooltip: 'Clear due date',
+                      tooltip: l10n.clearDueDate,
                       onPressed: () => setState(() => _dueDate = null),
                     ),
                 ],
@@ -259,9 +260,9 @@ class _CreateEditDebtDialogState extends ConsumerState<CreateEditDebtDialog> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _notesCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.notesOptional,
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ],
@@ -271,11 +272,11 @@ class _CreateEditDebtDialogState extends ConsumerState<CreateEditDebtDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _isSaving ? null : _submit,
-          child: const Text('Save'),
+          child: Text(l10n.save),
         ),
       ],
     );
@@ -327,7 +328,7 @@ class _CreateEditDebtDialogState extends ConsumerState<CreateEditDebtDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to save debt: $e')),
+          SnackBar(content: Text(context.l10n.unableToSaveDebt('$e'))),
         );
         setState(() => _isSaving = false);
       }
@@ -360,6 +361,7 @@ class _RecordRepaymentDialogState extends ConsumerState<RecordRepaymentDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final accounts = ref.watch(accountsWithBalanceProvider).asData?.value ?? [];
     if (!_accountInitialized && accounts.isNotEmpty) {
       _selectedAccountId =
@@ -371,7 +373,7 @@ class _RecordRepaymentDialogState extends ConsumerState<RecordRepaymentDialog> {
     final isBorrowed = widget.debt.direction == 'borrowed';
 
     return AlertDialog(
-      title: Text('Repay ${widget.debt.counterparty}'),
+      title: Text(l10n.repayTarget(widget.debt.counterparty)),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -383,20 +385,21 @@ class _RecordRepaymentDialogState extends ConsumerState<RecordRepaymentDialog> {
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
-                  labelText:
-                      'Amount, max ${CurrencyFormatter.format(widget.debt.outstanding)}',
+                  labelText: l10n.amountMaxOutstanding(
+                    CurrencyFormatter.format(widget.debt.outstanding),
+                  ),
                   border: const OutlineInputBorder(),
                 ),
                 validator: (v) {
                   final parsed =
                       double.tryParse((v ?? '').replaceAll(',', '').trim());
                   if (parsed == null || parsed <= 0) {
-                    return 'Enter a valid positive amount';
+                    return l10n.errorValidPositiveAmount;
                   }
                   if (!isBorrowed &&
                       CentsConverter.toCents(parsed) >
                           CentsConverter.toCents(widget.debt.outstanding)) {
-                    return 'Enter an amount up to the outstanding balance';
+                    return l10n.amountUpToOutstanding;
                   }
                   return null;
                 },
@@ -405,13 +408,14 @@ class _RecordRepaymentDialogState extends ConsumerState<RecordRepaymentDialog> {
               DropdownButtonFormField<int?>(
                 initialValue: validAccountValue,
                 decoration: InputDecoration(
-                  labelText: isBorrowed ? 'Pay from account' : 'Receive into account',
+                  labelText:
+                      isBorrowed ? l10n.payFromAccount : l10n.receiveIntoAccount,
                   border: const OutlineInputBorder(),
                 ),
                 items: [
-                  const DropdownMenuItem<int?>(
+                  DropdownMenuItem<int?>(
                     value: null,
-                    child: Text('No account (track only)'),
+                    child: Text(l10n.noAccountTrackOnly),
                   ),
                   ...accounts.map(
                     (a) => DropdownMenuItem<int?>(
@@ -429,11 +433,11 @@ class _RecordRepaymentDialogState extends ConsumerState<RecordRepaymentDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _isSaving ? null : _submit,
-          child: const Text('Record'),
+          child: Text(l10n.record),
         ),
       ],
     );
@@ -454,8 +458,8 @@ class _RecordRepaymentDialogState extends ConsumerState<RecordRepaymentDialog> {
     } on ArgumentError {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Enter an amount up to the outstanding balance'),
+          SnackBar(
+            content: Text(context.l10n.amountUpToOutstanding),
           ),
         );
         setState(() => _isSaving = false);
@@ -467,13 +471,13 @@ class _RecordRepaymentDialogState extends ConsumerState<RecordRepaymentDialog> {
 class ConfirmDeleteWithLinkedTxnsDialog extends StatefulWidget {
   final String title;
   final String message;
-  final String checkboxLabel;
+  final String? checkboxLabel;
 
   const ConfirmDeleteWithLinkedTxnsDialog({
     super.key,
     required this.title,
     required this.message,
-    this.checkboxLabel = 'Also delete linked ledger transactions',
+    this.checkboxLabel,
   });
 
   @override
@@ -488,6 +492,7 @@ class _ConfirmDeleteWithLinkedTxnsDialogState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     return AlertDialog(
       title: Text(widget.title),
       content: Column(
@@ -501,7 +506,7 @@ class _ConfirmDeleteWithLinkedTxnsDialogState
             value: _deleteLinked,
             onChanged: (v) => setState(() => _deleteLinked = v ?? false),
             title: Text(
-              widget.checkboxLabel,
+              widget.checkboxLabel ?? l10n.alsoDeleteLinkedTxns,
               style: theme.textTheme.bodyMedium,
             ),
             controlAffinity: ListTileControlAffinity.leading,
@@ -511,7 +516,7 @@ class _ConfirmDeleteWithLinkedTxnsDialogState
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
@@ -522,7 +527,7 @@ class _ConfirmDeleteWithLinkedTxnsDialogState
             context,
             (confirmed: true, deleteLinked: _deleteLinked),
           ),
-          child: const Text('Delete'),
+          child: Text(l10n.delete),
         ),
       ],
     );

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/converters/cents_converter.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../providers/fuliza_providers.dart';
 
@@ -15,9 +16,10 @@ class FulizaScreen extends ConsumerWidget {
     final recordsAsync = ref.watch(fulizaRecordsProvider);
     final totalFeesAsync = ref.watch(fulizaTotalFeesProvider);
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Fuliza M-PESA')),
+      appBar: AppBar(title: Text(l10n.fulizaTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -37,7 +39,7 @@ class FulizaScreen extends ConsumerWidget {
             error: (_, __) => const SizedBox.shrink(),
           ),
           const SizedBox(height: 16),
-          Text('Fuliza Usage History', style: theme.textTheme.titleSmall),
+          Text(l10n.fulizaUsageHistory, style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
           recordsAsync.when(
             data: (records) => records.isEmpty
@@ -48,7 +50,7 @@ class FulizaScreen extends ConsumerWidget {
                         .toList(),
                   ),
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text('Error: $e'),
+            error: (e, _) => Text(l10n.errorLabel('$e')),
           ),
         ],
       ),
@@ -60,6 +62,7 @@ class FulizaScreen extends ConsumerWidget {
     WidgetRef ref,
     double outstanding,
   ) async {
+    final l10n = context.l10n;
     final amount = await showDialog<double>(
       context: context,
       builder: (_) => _FulizaRepayDialog(outstanding: outstanding),
@@ -77,8 +80,10 @@ class FulizaScreen extends ConsumerWidget {
         SnackBar(
           content: Text(
             isFull
-                ? 'Fuliza balance cleared.'
-                : 'Fuliza repayment of ${CurrencyFormatter.format(amount)} recorded.',
+                ? l10n.fulizaBalanceCleared
+                : l10n.fulizaRepaymentRecorded(
+                    CurrencyFormatter.format(amount),
+                  ),
           ),
         ),
       );
@@ -108,8 +113,9 @@ class _FulizaRepayDialogState extends State<_FulizaRepayDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AlertDialog(
-      title: const Text('Record Fuliza Repayment'),
+      title: Text(l10n.recordFulizaRepayment),
       content: Form(
         key: _formKey,
         child: TextFormField(
@@ -117,9 +123,10 @@ class _FulizaRepayDialogState extends State<_FulizaRepayDialog> {
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
-            labelText: 'Amount (KES)',
-            helperText:
-                'Outstanding: ${CurrencyFormatter.format(widget.outstanding)}',
+            labelText: l10n.amountKES,
+            helperText: l10n.outstandingHelper(
+              CurrencyFormatter.format(widget.outstanding),
+            ),
             border: const OutlineInputBorder(),
           ),
           validator: (v) {
@@ -127,7 +134,7 @@ class _FulizaRepayDialogState extends State<_FulizaRepayDialog> {
               (v ?? '').replaceAll(',', '').trim(),
             );
             if (parsed == null || !parsed.isFinite || parsed <= 0) {
-              return 'Enter a valid positive amount';
+              return l10n.errorValidPositiveAmount;
             }
             return null;
           },
@@ -136,7 +143,7 @@ class _FulizaRepayDialogState extends State<_FulizaRepayDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: () {
@@ -146,7 +153,7 @@ class _FulizaRepayDialogState extends State<_FulizaRepayDialog> {
             );
             Navigator.pop(context, parsed);
           },
-          child: const Text('Record'),
+          child: Text(l10n.record),
         ),
       ],
     );
@@ -166,6 +173,7 @@ class _OutstandingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final outstanding = latest?.outstandingTotal ?? 0;
     final dueDate = latest?.dueDate;
     final now = DateTime.now();
@@ -204,8 +212,8 @@ class _OutstandingCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   outstanding > 0
-                      ? 'Fuliza Outstanding'
-                      : 'No Fuliza Balance',
+                      ? l10n.fulizaOutstanding
+                      : l10n.noFulizaBalance,
                   style: theme.textTheme.titleSmall?.copyWith(color: fgColor),
                 ),
               ],
@@ -221,7 +229,13 @@ class _OutstandingCard extends StatelessWidget {
               ),
               if (dueDate != null)
                 Text(
-                  'Due ${DateFormat('dd MMM yyyy').format(dueDate)}${overdue ? ' — OVERDUE' : ''}',
+                  overdue
+                      ? l10n.dueDateOverdue(
+                          DateFormat('dd MMM yyyy').format(dueDate),
+                        )
+                      : l10n.dueDateLabel(
+                          DateFormat('dd MMM yyyy').format(dueDate),
+                        ),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: fgColor,
                     fontWeight: overdue ? FontWeight.bold : FontWeight.normal,
@@ -232,14 +246,14 @@ class _OutstandingCard extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: onRecordRepayment,
                   icon: const Icon(Icons.payments_outlined),
-                  label: const Text('Record Repayment'),
+                  label: Text(l10n.recordRepaymentButton),
                 ),
               ],
             ],
             if (totalFees > 0) ...[
               const SizedBox(height: 12),
               Text(
-                'Total fees paid: ${CurrencyFormatter.format(totalFees)}',
+                l10n.totalFeesPaid(CurrencyFormatter.format(totalFees)),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: fgColor,
                   fontWeight: FontWeight.w500,
@@ -260,6 +274,7 @@ class _FulizaListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final isRepayment = record.fulizaAmount < 0;
     final displayAmount = record.fulizaAmount.abs();
 
@@ -279,18 +294,24 @@ class _FulizaListItem extends StatelessWidget {
         ),
         title: Text(
           isRepayment
-              ? 'Repaid ${CurrencyFormatter.format(displayAmount)}'
+              ? l10n.repaidAmount(CurrencyFormatter.format(displayAmount))
               : CurrencyFormatter.format(displayAmount),
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Ref: ${record.mpesaRef}'),
+            Text(l10n.refPrefix(record.mpesaRef)),
             if (!isRepayment || record.accessFee > 0)
-              Text('Access fee: ${CurrencyFormatter.format(record.accessFee)}'),
+              Text(
+                l10n.accessFeeRow(CurrencyFormatter.format(record.accessFee)),
+              ),
             if (record.dueDate != null)
-              Text('Due: ${DateFormat('dd MMM yyyy').format(record.dueDate!)}'),
+              Text(
+                l10n.dueColonDate(
+                  DateFormat('dd MMM yyyy').format(record.dueDate!),
+                ),
+              ),
           ],
         ),
         trailing: Column(
@@ -298,7 +319,7 @@ class _FulizaListItem extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              'Outstanding',
+              l10n.outstanding,
               style: theme.textTheme.labelSmall,
             ),
             Text(
@@ -324,6 +345,7 @@ class _EmptyFuliza extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Padding(
       padding: const EdgeInsets.all(48),
       child: Column(
@@ -331,11 +353,11 @@ class _EmptyFuliza extends StatelessWidget {
           Icon(Icons.check_circle_outline,
               size: 64, color: Theme.of(context).colorScheme.primary),
           const SizedBox(height: 16),
-          Text('No Fuliza usage recorded',
+          Text(l10n.noFulizaUsageRecorded,
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(
-            'Paste Fuliza M-PESA SMS messages to track your Fuliza usage',
+            l10n.pasteFulizaHint,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium,
           ),

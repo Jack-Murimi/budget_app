@@ -167,25 +167,25 @@ Related: [[Budget KE/context|context]] · [[Budget KE/decisions|decisions]] · [
 ## Phase 5 — Localization, Performance, Code Health & Release Readiness
 
 ### Localization (`en` + `sw`)
-- [ ] Expand `lib/l10n/app_en.arb` and `lib/l10n/app_sw.arb` to cover all user-facing strings across screens, dialogs, errors, and empty states.
-- [ ] Wire `AppLocalizations.of(context)!` across all UI screens and add a persisted locale selector (`System` / `English` / `Kiswahili`) in `SettingsScreen` + `BudgetApp`.
+- [x] Expand `lib/l10n/app_en.arb` and `lib/l10n/app_sw.arb` to cover all user-facing strings across screens, dialogs, errors, and empty states.
+- [x] Wire `AppLocalizations.of(context)!` across all UI screens and add a persisted locale selector (`System` / `English` / `Kiswahili`) in `SettingsScreen` + `BudgetApp`.
 
 ### Performance & Memory/Stream Hygiene
-- [ ] Rewrite `AccountRepository.watchAccountsWithBalance` (`lib/features/accounts/repositories/account_repository.dart:11-57`) to compute balances in SQLite (`SUM(...) GROUP BY`) instead of loading all transactions into Dart.
-- [ ] Eliminate N+1 query loops in `BudgetRepository.watchBudgetsWithProgress` and `DebtRepository.watchAll`.
-- [ ] Switch `TransactionsScreen` to `ListView.builder` over a flattened header+item list and add a `categoriesByIdProvider` lookup map for `O(1)` lookup in `TransactionListItem`.
-- [ ] Move `WidgetUpdateService.update(...)` out of `HomeScreen.build` (`lib/features/home/screens/home_screen.dart:48-54`) into `ref.listen`.
-- [ ] Debounce `TransactionForm` header autocomplete (`transaction_form.dart:841-847`).
-- [ ] Dispose every `TextEditingController` created in dialogs (`AccountsScreen`, `AccountDetailScreen`, `BudgetsScreen`, `BudgetDetailScreen`, `DebtsScreen`, `LoanDetailScreen`, `RecurringScreen`).
-- [ ] Store/cancel the `StreamSubscription` in `DeepLinkService` (`lib/core/services/deep_link_service.dart:18-24`) with an `onError` handler, and add `.autoDispose` to family stream providers (`accountTransactionsProvider`, `_bridgeDebtsProvider`).
+- [x] Rewrite `AccountRepository.watchAccountsWithBalance` (`lib/features/accounts/repositories/account_repository.dart:11-57`) to compute balances in SQLite (`SUM(...) GROUP BY`) instead of loading all transactions into Dart.
+- [x] Eliminate N+1 query loops in `BudgetRepository.watchBudgetsWithProgress` and `DebtRepository.watchAll`.
+- [x] Switch `TransactionsScreen` to `ListView.builder` over a flattened header+item list and add a `categoriesByIdProvider` lookup map for `O(1)` lookup in `TransactionListItem`.
+- [x] Move `WidgetUpdateService.update(...)` out of `HomeScreen.build` (`lib/features/home/screens/home_screen.dart:48-54`) into `ref.listen`.
+- [x] Debounce `TransactionForm` header autocomplete (`transaction_form.dart:841-847`).
+- [x] Dispose every `TextEditingController` created in dialogs (`AccountsScreen`, `AccountDetailScreen`, `BudgetsScreen`, `BudgetDetailScreen`, `DebtsScreen`, `LoanDetailScreen`, `RecurringScreen`).
+- [x] Store/cancel the `StreamSubscription` in `DeepLinkService` (`lib/core/services/deep_link_service.dart:18-24`) with an `onError` handler, and add `.autoDispose` to family stream providers (`accountTransactionsProvider`, `_bridgeDebtsProvider`).
 
 ### Architecture, Analyzer Cleanup & Release Config
-- [ ] Refactor 1,229-line `TransactionForm` (`lib/features/add_transaction/widgets/transaction_form.dart`) into smaller focused widgets/controllers, move `_fetchCategory` into `CategoryRepository`, and replace hardcoded English category-name matching (`'loan given'`, etc.) with a `systemKey` column on `Categories`.
-- [ ] Centralize duplicated hex-color parsing (`parseHexColor` safe helper), category icon mapping (`CategoryIconHelper`), and budget period window helpers; delete dead `ParsePreviewScreen` (`lib/features/add_transaction/screens/parse_preview_screen.dart`).
-- [ ] Bundle Poppins `.ttf` assets under `assets/fonts/` (`pubspec.yaml`) and set `GoogleFonts.config.allowRuntimeFetching = false` for true offline-first typography without `INTERNET` permission.
-- [ ] Fix all 27 `flutter analyze` info diagnostics (`DropdownButtonFormField.initialValue`, `RadioGroup`, `mounted` checks, `const` constructors) until `flutter analyze` exits with 0 issues.
-- [ ] Harden Android release config: set `android:label="@string/app_name"` and remove invalid `android:autoVerify="true"` on custom `budgetke://` scheme in `android/app/src/main/AndroidManifest.xml`, configure non-placeholder `applicationId`, release signing config, and R8 shrinking/proguard in `android/app/build.gradle.kts`.
-- [ ] Add unit/widget test suites for previously uncovered screens: `AuthGate`, `SmsInboxScreen`, `InsightsScreen`, `GoalsScreen`, `FulizaScreen`, `DataPortabilityScreen`, `RecurringScreen`, `LoanDetailScreen`, `BudgetDetailScreen`, and `AccountDetailScreen`.
+- [x] Refactor 1,229-line `TransactionForm` (`lib/features/add_transaction/widgets/transaction_form.dart`) into smaller focused widgets/controllers, move `_fetchCategory` into `CategoryRepository`, and replace hardcoded English category-name matching (`'loan given'`, etc.) with a `systemKey` column on `Categories`.
+- [x] Centralize duplicated hex-color parsing (`parseHexColor` safe helper), category icon mapping (`CategoryIconHelper`), and budget period window helpers; delete dead `ParsePreviewScreen` (`lib/features/add_transaction/screens/parse_preview_screen.dart`).
+- [x] Bundle Poppins `.ttf` assets under `assets/fonts/` (`pubspec.yaml`) and set `GoogleFonts.config.allowRuntimeFetching = false` for true offline-first typography without `INTERNET` permission.
+- [x] Fix all 27 `flutter analyze` info diagnostics (`DropdownButtonFormField.initialValue`, `RadioGroup`, `mounted` checks, `const` constructors) until `flutter analyze` exits with 0 issues.
+- [x] Harden Android release config: set `android:label="@string/app_name"` and remove invalid `android:autoVerify="true"` on custom `budgetke://` scheme in `android/app/src/main/AndroidManifest.xml`, configure non-placeholder `applicationId`, release signing config, and R8 shrinking/proguard in `android/app/build.gradle.kts`.
+- [x] Add unit/widget test suites for previously uncovered screens: `AuthGate`, `SmsInboxScreen`, `InsightsScreen`, `GoalsScreen`, `FulizaScreen`, `DataPortabilityScreen`, `RecurringScreen`, `LoanDetailScreen`, `BudgetDetailScreen`, and `AccountDetailScreen`.
 
 ### Phase 5 Final Verification
-- [ ] Run `flutter gen-l10n && flutter analyze && flutter test && flutter build apk --debug`.
+- [x] Run `flutter gen-l10n && flutter analyze && flutter test && flutter build apk --debug`.

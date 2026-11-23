@@ -32,7 +32,7 @@ final overallBudgetProvider = StreamProvider<BudgetWithProgress?>((ref) {
 });
 
 final budgetTransactionsAsyncProvider =
-    StreamProvider.family<List<Transaction>, Budget>((ref, budget) {
+    StreamProvider.autoDispose.family<List<Transaction>, Budget>((ref, budget) {
   final repo = ref.watch(budgetRepositoryProvider);
   return repo.watchBudgetTransactions(budget);
 });

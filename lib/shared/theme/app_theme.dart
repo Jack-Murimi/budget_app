@@ -32,6 +32,7 @@ class AppTheme {
 
   static ThemeData _build(ColorScheme base,
       {bool darkText = false, bool oled = false}) {
+    GoogleFonts.config.allowRuntimeFetching = false;
     return ThemeData(
       useMaterial3: true,
       colorScheme: base,

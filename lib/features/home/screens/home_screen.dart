@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/services/widget_update_service.dart';
+import '../../../l10n/l10n.dart';
+import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../../accounts/screens/account_detail_screen.dart';
@@ -15,16 +17,52 @@ import '../widgets/spending_summary_card.dart';
 import '../widgets/category_pie_chart.dart';
 import '../widgets/transaction_list_item.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  double? _lastSyncedSpend;
+  double? _lastSyncedBalance;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncWidgetIfReady();
+    });
+  }
+
+  void _syncWidgetIfReady() {
+    final spend = ref.read(monthSummaryProvider).valueOrNull?.totalExpenses;
+    final balance = ref.read(totalNetWorthProvider).valueOrNull;
+    if (spend == null || balance == null) return;
+    if (spend == _lastSyncedSpend && balance == _lastSyncedBalance) return;
+    _lastSyncedSpend = spend;
+    _lastSyncedBalance = balance;
+    WidgetUpdateService.update(monthSpend: spend, totalBalance: balance);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final isDark = theme.brightness == Brightness.dark;
     final transactionsAsync = ref.watch(recentTransactionsProvider);
     final monthTxnsAsync = ref.watch(currentMonthTransactionsProvider);
     final summaryAsync = ref.watch(monthSummaryProvider);
+
+    ref.listen<AsyncValue<MonthSummary>>(
+      monthSummaryProvider,
+      (_, __) => _syncWidgetIfReady(),
+    );
+    ref.listen<AsyncValue<double>>(
+      totalNetWorthProvider,
+      (_, __) => _syncWidgetIfReady(),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -36,7 +74,7 @@ class HomeScreen extends ConsumerWidget {
               width: 32,
             ),
             const SizedBox(width: 10),
-            const Text('Budget KE'),
+            Text(l10n.appTitle),
           ],
         ),
       ),
@@ -50,21 +88,11 @@ class HomeScreen extends ConsumerWidget {
           padding: const EdgeInsets.only(bottom: 120),
           children: [
             summaryAsync.when(
-              data: (summary) {
-                // Fire-and-forget widget update whenever home data loads
-                final netWorth = ref.read(totalNetWorthProvider);
-                netWorth.whenData((balance) {
-                  WidgetUpdateService.update(
-                    monthSpend: summary.totalExpenses,
-                    totalBalance: balance,
-                  );
-                });
-                return SpendingSummaryCard(
-                  totalSpent: summary.totalExpenses,
-                  totalIncome: summary.totalIncome,
-                  month: summary.month,
-                );
-              },
+              data: (summary) => SpendingSummaryCard(
+                totalSpent: summary.totalExpenses,
+                totalIncome: summary.totalIncome,
+                month: summary.month,
+              ),
               loading: () => const Padding(
                 padding: EdgeInsets.all(16),
                 child: LinearProgressIndicator(),
@@ -121,8 +149,8 @@ class HomeScreen extends ConsumerWidget {
                               Expanded(
                                 child: Text(
                                   isAlert
-                                      ? '$overdueCount bill${overdueCount == 1 ? '' : 's'} overdue!'
-                                      : '${items.length} bill${items.length == 1 ? '' : 's'} due soon',
+                                      ? l10n.billsOverdueCount(overdueCount)
+                                      : l10n.billsDueSoonCount(items.length),
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: isAlert
@@ -132,7 +160,7 @@ class HomeScreen extends ConsumerWidget {
                                 ),
                               ),
                               Text(
-                                'View',
+                                l10n.view,
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: isAlert
                                       ? theme.colorScheme.error
@@ -180,17 +208,21 @@ class HomeScreen extends ConsumerWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Row(
+                                    Row(
                                       children: [
-                                        Icon(Icons.account_balance_wallet,
+                                        const Icon(Icons.account_balance_wallet,
                                             size: 20),
-                                        SizedBox(width: 8),
-                                        Text('Overall Budget'),
+                                        const SizedBox(width: 8),
+                                        Text(l10n.overallBudget),
                                       ],
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      'KES ${budget.spent.toStringAsFixed(0)} / KES ${budget.amount.toStringAsFixed(0)} (${budget.percentage.toStringAsFixed(0)}%)',
+                                      l10n.budgetProgressSummary(
+                                        budget.spent.toStringAsFixed(0),
+                                        budget.amount.toStringAsFixed(0),
+                                        budget.percentage.toStringAsFixed(0),
+                                      ),
                                       style: theme.textTheme.bodyMedium,
                                     ),
                                     const SizedBox(height: 4),
@@ -236,9 +268,9 @@ class HomeScreen extends ConsumerWidget {
                             child: Row(
                               children: accounts.map((a) {
                                 final isDefault = a.isDefault;
-                                final accountColor = Color(
-                                  int.parse(
-                                      a.colorHex.replaceFirst('#', '0xFF')),
+                                final accountColor = parseHexColor(
+                                  a.colorHex,
+                                  fallback: theme.colorScheme.primary,
                                 );
                                 return GestureDetector(
                                   onTap: () => Navigator.push(
@@ -316,14 +348,14 @@ class HomeScreen extends ConsumerWidget {
               child: Row(
                 children: [
                   Text(
-                    'Recent Transactions',
+                    l10n.recentTransactions,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const Spacer(),
                   TextButton(
                     onPressed: () =>
                         ref.read(selectedTabProvider.notifier).state = 1,
-                    child: const Text('See all'),
+                    child: Text(l10n.seeAll),
                   ),
                 ],
               ),
@@ -354,7 +386,7 @@ class HomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Could not load your transactions.',
+                      l10n.couldNotLoadTransactions,
                       style: Theme.of(context).textTheme.titleSmall,
                       textAlign: TextAlign.center,
                     ),
@@ -365,7 +397,7 @@ class HomeScreen extends ConsumerWidget {
                         ref.invalidate(monthSummaryProvider);
                       },
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
+                      label: Text(l10n.retry),
                     ),
                   ],
                 ),
@@ -383,6 +415,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Padding(
       padding: const EdgeInsets.all(48),
       child: Column(
@@ -391,12 +424,12 @@ class _EmptyState extends StatelessWidget {
               size: 64, color: Theme.of(context).colorScheme.outline),
           const SizedBox(height: 16),
           Text(
-            'No transactions yet',
+            l10n.noTransactionsYet,
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Paste an M-Pesa SMS or add manually',
+            l10n.pasteOrAddHint,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.outline,
                 ),

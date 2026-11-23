@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/cashflow_calculator.dart';
+import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../../categories/providers/category_providers.dart';
@@ -36,27 +38,30 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     super.dispose();
   }
 
-  String _formatGroupDate(DateTime dt) {
+  String _formatGroupDate(DateTime dt, AppLocalizations l10n) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final txnDate = DateTime(dt.year, dt.month, dt.day);
-    if (txnDate == today) return 'Today';
-    if (txnDate == today.subtract(const Duration(days: 1))) return 'Yesterday';
+    if (txnDate == today) return l10n.today;
+    if (txnDate == today.subtract(const Duration(days: 1))) {
+      return l10n.yesterday;
+    }
     return DateFormat('EEE, d MMM yyyy').format(dt);
   }
 
   Future<void> _confirmDelete(BuildContext context, TransactionModel txn) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Transaction'),
-        content: Text('Delete "${txn.header}"?'),
+        title: Text(l10n.deleteTransactionTitle),
+        content: Text(l10n.deleteItemQuestion(txn.header)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -65,7 +70,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       await ref.read(transactionRepositoryProvider).delete(txn.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Deleted "${txn.header}"'), duration: const Duration(seconds: 2)),
+        SnackBar(
+          content: Text(l10n.deletedItemToast(txn.header)),
+          duration: const Duration(seconds: 2),
+        ),
       );
     }
   }
@@ -81,6 +89,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   }
 
   Future<void> _pickAccount(BuildContext context) async {
+    final l10n = context.l10n;
     final accounts = ref.read(accountsWithBalanceProvider).asData?.value ?? [];
     if (accounts.isEmpty) return;
     final picked = await showModalBottomSheet<int>(
@@ -91,11 +100,11 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text('Filter by Account', style: Theme.of(ctx).textTheme.titleSmall),
+              child: Text(l10n.filterByAccount, style: Theme.of(ctx).textTheme.titleSmall),
             ),
             ...accounts.map((a) => ListTile(
               leading: CircleAvatar(
-                backgroundColor: Color(int.parse(a.colorHex.replaceFirst('#', '0xFF'))),
+                backgroundColor: parseHexColor(a.colorHex),
                 radius: 14,
                 child: Text(a.name.isNotEmpty ? a.name[0] : '?', style: const TextStyle(color: Colors.white, fontSize: 12)),
               ),
@@ -116,12 +125,13 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final filteredAsync = ref.watch(filteredTransactionsProvider);
     final selectedType = ref.watch(transactionTypeFilterProvider);
     final selectedCategoryId = ref.watch(transactionCategoryFilterProvider);
     final selectedDateRange = ref.watch(transactionDateRangeFilterProvider);
     final selectedAccountId = ref.watch(transactionAccountFilterProvider);
-    final categoriesAsync = ref.watch(categoriesStreamProvider);
+    final categoriesById = ref.watch(categoriesByIdProvider);
     final accountsAsync = ref.watch(accountsWithBalanceProvider);
 
     final activeFilterCount = [
@@ -131,17 +141,22 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       selectedAccountId != null,
     ].where((b) => b).length;
 
-    String categoryName = 'Category';
-    if (selectedCategoryId != null) {
-      final match = categoriesAsync.asData?.value.where((c) => c.id == selectedCategoryId).firstOrNull;
-      if (match != null) categoryName = match.name;
-    }
+    final categoryName = selectedCategoryId != null
+        ? (categoriesById[selectedCategoryId]?.name ?? l10n.category)
+        : l10n.category;
 
-    String accountName = 'Account';
+    String accountName = l10n.account;
     if (selectedAccountId != null) {
       final match = accountsAsync.asData?.value.where((a) => a.id == selectedAccountId).firstOrNull;
       if (match != null) accountName = match.name;
     }
+
+    String typeLabel(String t) => switch (t) {
+          'income' => l10n.income,
+          'expense' => l10n.expense,
+          'transfer' => l10n.transfer,
+          _ => l10n.all,
+        };
 
     return Scaffold(
       appBar: AppBar(
@@ -151,7 +166,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 controller: _searchCtrl,
                 autofocus: true,
                 decoration: InputDecoration(
-                  hintText: 'Search transactions...',
+                  hintText: l10n.searchTransactionsHint,
                   border: InputBorder.none,
                   hintStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                 ),
@@ -161,12 +176,12 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                   setState(() {});
                 },
               )
-            : const Text('Transactions', overflow: TextOverflow.ellipsis),
+            : Text(l10n.transactionsTitle, overflow: TextOverflow.ellipsis),
         actions: [
           // Search toggle
           IconButton(
             icon: Icon(_searchExpanded ? Icons.close : Icons.search),
-            tooltip: _searchExpanded ? 'Close search' : 'Search',
+            tooltip: _searchExpanded ? l10n.closeSearch : l10n.search,
             onPressed: () {
               setState(() => _searchExpanded = !_searchExpanded);
               if (!_searchExpanded) {
@@ -181,7 +196,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.tune),
-                tooltip: 'Filters',
+                tooltip: l10n.filters,
                 onPressed: () => _showFilterSheet(context),
               ),
               if (activeFilterCount > 0)
@@ -204,7 +219,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           if (activeFilterCount > 0)
             IconButton(
               icon: const Icon(Icons.filter_alt_off_outlined),
-              tooltip: 'Clear filters',
+              tooltip: l10n.clearFilters,
               onPressed: _clearAllFilters,
             ),
         ],
@@ -222,7 +237,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 children: [
                   if (selectedType != 'all')
                     _ActiveChip(
-                      label: selectedType[0].toUpperCase() + selectedType.substring(1),
+                      label: typeLabel(selectedType),
                       onRemove: () => ref.read(transactionTypeFilterProvider.notifier).state = 'all',
                     ),
                   if (selectedCategoryId != null)
@@ -233,9 +248,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                   if (selectedDateRange != 'all')
                     _ActiveChip(
                       label: switch (selectedDateRange) {
-                        'today' => 'Today',
-                        'this_week' => 'This Week',
-                        _ => 'This Month',
+                        'today' => l10n.today,
+                        'this_week' => l10n.thisWeekTitle,
+                        _ => l10n.thisMonth,
                       },
                       onRemove: () => ref.read(transactionDateRangeFilterProvider.notifier).state = 'all',
                     ),
@@ -251,7 +266,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           Expanded(
             child: filteredAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (e, _) => Center(child: Text(l10n.errorLabel('$e'))),
               data: (txns) {
                 if (txns.isEmpty) {
                   return Center(
@@ -260,10 +275,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                       children: [
                         Icon(Icons.search_off, size: 48, color: theme.colorScheme.outline),
                         const SizedBox(height: 8),
-                        Text('No transactions found', style: theme.textTheme.bodyMedium),
+                        Text(l10n.noTransactionsFound, style: theme.textTheme.bodyMedium),
                         if (activeFilterCount > 0) ...[
                           const SizedBox(height: 8),
-                          TextButton(onPressed: _clearAllFilters, child: const Text('Clear filters')),
+                          TextButton(onPressed: _clearAllFilters, child: Text(l10n.clearFilters)),
                         ],
                       ],
                     ),
@@ -277,56 +292,67 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
                 final Map<String, List<TransactionModel>> grouped = {};
                 for (final t in txns) {
-                  grouped.putIfAbsent(_formatGroupDate(t.transactionDate), () => []).add(t);
+                  grouped.putIfAbsent(_formatGroupDate(t.transactionDate, l10n), () => []).add(t);
                 }
 
-                return ListView(
+                final listItems = <_TransactionsListItem>[
+                  _SummaryBarItem(
+                    count: txns.length,
+                    income: income,
+                    expense: expense,
+                    net: net,
+                  ),
+                  for (final entry in grouped.entries) ...[
+                    _DateHeaderItem(
+                      title: entry.key,
+                      net: CashflowCalculator.summarize(entry.value).net,
+                    ),
+                    for (final txn in entry.value) _TransactionRowItem(txn),
+                  ],
+                ];
+
+                return ListView.builder(
                   padding: EdgeInsets.only(bottom: widget.isEmbedded ? 120 : 32),
-                  children: [
-                    // Summary bar
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 10,
-                          runSpacing: 6,
-                          children: [
-                            Text(
-                              '${txns.length} transaction${txns.length == 1 ? '' : 's'}',
-                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
-                            ),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 4,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                _SummaryPill(label: '▲', amount: expense, color: theme.colorScheme.error),
-                                _SummaryPill(label: '▼', amount: income, color: theme.colorScheme.primary),
-                                Text(
-                                  '${net >= 0 ? '+' : ''}${CurrencyFormatter.format(net)}',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: net >= 0 ? theme.colorScheme.primary : theme.colorScheme.error,
+                  itemCount: listItems.length,
+                  itemBuilder: (context, index) => switch (listItems[index]) {
+                    _SummaryBarItem(:final count, :final income, :final expense, :final net) =>
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 10,
+                            runSpacing: 6,
+                            children: [
+                              Text(
+                                l10n.transactionCount(count),
+                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                              ),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  _SummaryPill(label: '▲', amount: expense, color: theme.colorScheme.error),
+                                  _SummaryPill(label: '▼', amount: income, color: theme.colorScheme.primary),
+                                  Text(
+                                    '${net >= 0 ? '+' : ''}${CurrencyFormatter.format(net)}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: net >= 0 ? theme.colorScheme.primary : theme.colorScheme.error,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-
-                    for (final entry in grouped.entries) ...[
-                      Builder(
+                    _DateHeaderItem(:final title, :final net) => Builder(
                         builder: (context) {
-                          // Calculate net daily delta: Income - (Expenses + Fees)
-                          // Transfers are intra-account shifts, so they are excluded from net cashflow.
-                          final net = CashflowCalculator.summarize(entry.value).net;
-
                           final isPositive = net > 0;
                           final isNegative = net < 0;
                           final netColor = isPositive
@@ -341,7 +367,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    entry.key,
+                                    title,
                                     style: theme.textTheme.labelMedium?.copyWith(
                                       color: theme.colorScheme.outline,
                                       fontWeight: FontWeight.w600,
@@ -360,27 +386,25 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                           );
                         },
                       ),
-                      for (final txn in entry.value)
-                        Dismissible(
-                          key: ValueKey(txn.id),
-                          direction: DismissDirection.endToStart,
-                          background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20),
-                            color: theme.colorScheme.error,
-                            child: const Icon(Icons.delete, color: Colors.white),
-                          ),
-                          confirmDismiss: (_) async {
-                            await _confirmDelete(context, txn);
-                            return false;
-                          },
-                          child: TransactionListItem(
-                            transaction: txn,
-                            onDelete: () => _confirmDelete(context, txn),
-                          ),
+                    _TransactionRowItem(:final transaction) => Dismissible(
+                        key: ValueKey(transaction.id),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          color: theme.colorScheme.error,
+                          child: const Icon(Icons.delete, color: Colors.white),
                         ),
-                    ],
-                  ],
+                        confirmDismiss: (_) async {
+                          await _confirmDelete(context, transaction);
+                          return false;
+                        },
+                        child: TransactionListItem(
+                          transaction: transaction,
+                          onDelete: () => _confirmDelete(context, transaction),
+                        ),
+                      ),
+                  },
                 );
               },
             ),
@@ -391,6 +415,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   }
 
   void _showFilterSheet(BuildContext context) {
+    final l10n = context.l10n;
     String localType = ref.read(transactionTypeFilterProvider);
     String localDate = ref.read(transactionDateRangeFilterProvider);
 
@@ -408,25 +433,30 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               children: [
                 Row(
                   children: [
-                    Text('Filters', style: Theme.of(ctx).textTheme.titleMedium),
+                    Text(l10n.filters, style: Theme.of(ctx).textTheme.titleMedium),
                     const Spacer(),
                     TextButton(
                       onPressed: () {
                         Navigator.pop(ctx);
                         _clearAllFilters();
                       },
-                      child: const Text('Clear all'),
+                      child: Text(l10n.clearAll),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
 
-                Text('Type', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(color: Theme.of(ctx).colorScheme.primary)),
+                Text(l10n.type, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(color: Theme.of(ctx).colorScheme.primary)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   children: ['all', 'income', 'expense', 'transfer'].map((t) {
-                    final label = t == 'all' ? 'All' : t[0].toUpperCase() + t.substring(1);
+                    final label = switch (t) {
+                      'income' => l10n.income,
+                      'expense' => l10n.expense,
+                      'transfer' => l10n.transfer,
+                      _ => l10n.all,
+                    };
                     final selected = localType == t;
                     return ChoiceChip(
                       label: Text(label),
@@ -437,15 +467,15 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                Text('Date', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(color: Theme.of(ctx).colorScheme.primary)),
+                Text(l10n.date, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(color: Theme.of(ctx).colorScheme.primary)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   children: {
-                    'all': 'All time',
-                    'today': 'Today',
-                    'this_week': 'This week',
-                    'this_month': 'This month',
+                    'all': l10n.allTime,
+                    'today': l10n.today,
+                    'this_week': l10n.thisWeek,
+                    'this_month': l10n.thisMonth,
                   }.entries.map((e) {
                     return ChoiceChip(
                       label: Text(e.value),
@@ -456,16 +486,13 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                Text('Category', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(color: Theme.of(ctx).colorScheme.primary)),
+                Text(l10n.category, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(color: Theme.of(ctx).colorScheme.primary)),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.category_outlined, size: 16),
                   label: Text(ref.read(transactionCategoryFilterProvider) != null
-                      ? (ref.read(categoriesStreamProvider).asData?.value
-                              .where((c) => c.id == ref.read(transactionCategoryFilterProvider))
-                              .firstOrNull
-                              ?.name ?? 'Category')
-                      : 'Pick category'),
+                      ? (ref.read(categoriesByIdProvider)[ref.read(transactionCategoryFilterProvider)!]?.name ?? l10n.category)
+                      : l10n.pickCategory),
                   onPressed: () async {
                     Navigator.pop(ctx);
                     final picked = await showCategoryPicker(context);
@@ -476,7 +503,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                Text('Account', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(color: Theme.of(ctx).colorScheme.primary)),
+                Text(l10n.account, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(color: Theme.of(ctx).colorScheme.primary)),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.account_balance_wallet_outlined, size: 16),
@@ -484,8 +511,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                       ? (ref.read(accountsWithBalanceProvider).asData?.value
                               .where((a) => a.id == ref.read(transactionAccountFilterProvider))
                               .firstOrNull
-                              ?.name ?? 'Account')
-                      : 'Pick account'),
+                              ?.name ?? l10n.account)
+                      : l10n.pickAccount),
                   onPressed: () async {
                     Navigator.pop(ctx);
                     await _pickAccount(context);
@@ -501,7 +528,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                       ref.read(transactionDateRangeFilterProvider.notifier).state = localDate;
                       Navigator.pop(ctx);
                     },
-                    child: const Text('Apply'),
+                    child: Text(l10n.apply),
                   ),
                 ),
               ],
@@ -559,4 +586,35 @@ class _SummaryPill extends StatelessWidget {
       style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w600),
     );
   }
+}
+
+sealed class _TransactionsListItem {
+  const _TransactionsListItem();
+}
+
+class _SummaryBarItem extends _TransactionsListItem {
+  final int count;
+  final double income;
+  final double expense;
+  final double net;
+
+  const _SummaryBarItem({
+    required this.count,
+    required this.income,
+    required this.expense,
+    required this.net,
+  });
+}
+
+class _DateHeaderItem extends _TransactionsListItem {
+  final String title;
+  final double net;
+
+  const _DateHeaderItem({required this.title, required this.net});
+}
+
+class _TransactionRowItem extends _TransactionsListItem {
+  final TransactionModel transaction;
+
+  const _TransactionRowItem(this.transaction);
 }

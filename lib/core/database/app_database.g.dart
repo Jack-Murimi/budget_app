@@ -1039,6 +1039,12 @@ class $CategoriesTable extends Categories
       type: DriftSqlType.string,
       requiredDuringInsert: false,
       defaultValue: const Constant('expense'));
+  static const VerificationMeta _systemKeyMeta =
+      const VerificationMeta('systemKey');
+  @override
+  late final GeneratedColumn<String> systemKey = GeneratedColumn<String>(
+      'system_key', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _isDefaultMeta =
       const VerificationMeta('isDefault');
   @override
@@ -1083,6 +1089,7 @@ class $CategoriesTable extends Categories
         colorHex,
         parentId,
         transactionType,
+        systemKey,
         isDefault,
         isArchived,
         sortOrder,
@@ -1125,6 +1132,10 @@ class $CategoriesTable extends Categories
           transactionType.isAcceptableOrUnknown(
               data['transaction_type']!, _transactionTypeMeta));
     }
+    if (data.containsKey('system_key')) {
+      context.handle(_systemKeyMeta,
+          systemKey.isAcceptableOrUnknown(data['system_key']!, _systemKeyMeta));
+    }
     if (data.containsKey('is_default')) {
       context.handle(_isDefaultMeta,
           isDefault.isAcceptableOrUnknown(data['is_default']!, _isDefaultMeta));
@@ -1164,6 +1175,8 @@ class $CategoriesTable extends Categories
           .read(DriftSqlType.int, data['${effectivePrefix}parent_id']),
       transactionType: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}transaction_type'])!,
+      systemKey: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}system_key']),
       isDefault: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_default'])!,
       isArchived: attachedDatabase.typeMapping
@@ -1188,6 +1201,7 @@ class Category extends DataClass implements Insertable<Category> {
   final String colorHex;
   final int? parentId;
   final String transactionType;
+  final String? systemKey;
   final bool isDefault;
   final bool isArchived;
   final int sortOrder;
@@ -1199,6 +1213,7 @@ class Category extends DataClass implements Insertable<Category> {
       required this.colorHex,
       this.parentId,
       required this.transactionType,
+      this.systemKey,
       required this.isDefault,
       required this.isArchived,
       required this.sortOrder,
@@ -1214,6 +1229,9 @@ class Category extends DataClass implements Insertable<Category> {
       map['parent_id'] = Variable<int>(parentId);
     }
     map['transaction_type'] = Variable<String>(transactionType);
+    if (!nullToAbsent || systemKey != null) {
+      map['system_key'] = Variable<String>(systemKey);
+    }
     map['is_default'] = Variable<bool>(isDefault);
     map['is_archived'] = Variable<bool>(isArchived);
     map['sort_order'] = Variable<int>(sortOrder);
@@ -1231,6 +1249,9 @@ class Category extends DataClass implements Insertable<Category> {
           ? const Value.absent()
           : Value(parentId),
       transactionType: Value(transactionType),
+      systemKey: systemKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(systemKey),
       isDefault: Value(isDefault),
       isArchived: Value(isArchived),
       sortOrder: Value(sortOrder),
@@ -1248,6 +1269,7 @@ class Category extends DataClass implements Insertable<Category> {
       colorHex: serializer.fromJson<String>(json['colorHex']),
       parentId: serializer.fromJson<int?>(json['parentId']),
       transactionType: serializer.fromJson<String>(json['transactionType']),
+      systemKey: serializer.fromJson<String?>(json['systemKey']),
       isDefault: serializer.fromJson<bool>(json['isDefault']),
       isArchived: serializer.fromJson<bool>(json['isArchived']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
@@ -1264,6 +1286,7 @@ class Category extends DataClass implements Insertable<Category> {
       'colorHex': serializer.toJson<String>(colorHex),
       'parentId': serializer.toJson<int?>(parentId),
       'transactionType': serializer.toJson<String>(transactionType),
+      'systemKey': serializer.toJson<String?>(systemKey),
       'isDefault': serializer.toJson<bool>(isDefault),
       'isArchived': serializer.toJson<bool>(isArchived),
       'sortOrder': serializer.toJson<int>(sortOrder),
@@ -1278,6 +1301,7 @@ class Category extends DataClass implements Insertable<Category> {
           String? colorHex,
           Value<int?> parentId = const Value.absent(),
           String? transactionType,
+          Value<String?> systemKey = const Value.absent(),
           bool? isDefault,
           bool? isArchived,
           int? sortOrder,
@@ -1289,6 +1313,7 @@ class Category extends DataClass implements Insertable<Category> {
         colorHex: colorHex ?? this.colorHex,
         parentId: parentId.present ? parentId.value : this.parentId,
         transactionType: transactionType ?? this.transactionType,
+        systemKey: systemKey.present ? systemKey.value : this.systemKey,
         isDefault: isDefault ?? this.isDefault,
         isArchived: isArchived ?? this.isArchived,
         sortOrder: sortOrder ?? this.sortOrder,
@@ -1304,6 +1329,7 @@ class Category extends DataClass implements Insertable<Category> {
       transactionType: data.transactionType.present
           ? data.transactionType.value
           : this.transactionType,
+      systemKey: data.systemKey.present ? data.systemKey.value : this.systemKey,
       isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
       isArchived:
           data.isArchived.present ? data.isArchived.value : this.isArchived,
@@ -1321,6 +1347,7 @@ class Category extends DataClass implements Insertable<Category> {
           ..write('colorHex: $colorHex, ')
           ..write('parentId: $parentId, ')
           ..write('transactionType: $transactionType, ')
+          ..write('systemKey: $systemKey, ')
           ..write('isDefault: $isDefault, ')
           ..write('isArchived: $isArchived, ')
           ..write('sortOrder: $sortOrder, ')
@@ -1331,7 +1358,7 @@ class Category extends DataClass implements Insertable<Category> {
 
   @override
   int get hashCode => Object.hash(id, name, icon, colorHex, parentId,
-      transactionType, isDefault, isArchived, sortOrder, createdAt);
+      transactionType, systemKey, isDefault, isArchived, sortOrder, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1342,6 +1369,7 @@ class Category extends DataClass implements Insertable<Category> {
           other.colorHex == this.colorHex &&
           other.parentId == this.parentId &&
           other.transactionType == this.transactionType &&
+          other.systemKey == this.systemKey &&
           other.isDefault == this.isDefault &&
           other.isArchived == this.isArchived &&
           other.sortOrder == this.sortOrder &&
@@ -1355,6 +1383,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
   final Value<String> colorHex;
   final Value<int?> parentId;
   final Value<String> transactionType;
+  final Value<String?> systemKey;
   final Value<bool> isDefault;
   final Value<bool> isArchived;
   final Value<int> sortOrder;
@@ -1366,6 +1395,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     this.colorHex = const Value.absent(),
     this.parentId = const Value.absent(),
     this.transactionType = const Value.absent(),
+    this.systemKey = const Value.absent(),
     this.isDefault = const Value.absent(),
     this.isArchived = const Value.absent(),
     this.sortOrder = const Value.absent(),
@@ -1378,6 +1408,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     this.colorHex = const Value.absent(),
     this.parentId = const Value.absent(),
     this.transactionType = const Value.absent(),
+    this.systemKey = const Value.absent(),
     this.isDefault = const Value.absent(),
     this.isArchived = const Value.absent(),
     this.sortOrder = const Value.absent(),
@@ -1390,6 +1421,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     Expression<String>? colorHex,
     Expression<int>? parentId,
     Expression<String>? transactionType,
+    Expression<String>? systemKey,
     Expression<bool>? isDefault,
     Expression<bool>? isArchived,
     Expression<int>? sortOrder,
@@ -1402,6 +1434,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       if (colorHex != null) 'color_hex': colorHex,
       if (parentId != null) 'parent_id': parentId,
       if (transactionType != null) 'transaction_type': transactionType,
+      if (systemKey != null) 'system_key': systemKey,
       if (isDefault != null) 'is_default': isDefault,
       if (isArchived != null) 'is_archived': isArchived,
       if (sortOrder != null) 'sort_order': sortOrder,
@@ -1416,6 +1449,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       Value<String>? colorHex,
       Value<int?>? parentId,
       Value<String>? transactionType,
+      Value<String?>? systemKey,
       Value<bool>? isDefault,
       Value<bool>? isArchived,
       Value<int>? sortOrder,
@@ -1427,6 +1461,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       colorHex: colorHex ?? this.colorHex,
       parentId: parentId ?? this.parentId,
       transactionType: transactionType ?? this.transactionType,
+      systemKey: systemKey ?? this.systemKey,
       isDefault: isDefault ?? this.isDefault,
       isArchived: isArchived ?? this.isArchived,
       sortOrder: sortOrder ?? this.sortOrder,
@@ -1455,6 +1490,9 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     if (transactionType.present) {
       map['transaction_type'] = Variable<String>(transactionType.value);
     }
+    if (systemKey.present) {
+      map['system_key'] = Variable<String>(systemKey.value);
+    }
     if (isDefault.present) {
       map['is_default'] = Variable<bool>(isDefault.value);
     }
@@ -1479,6 +1517,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
           ..write('colorHex: $colorHex, ')
           ..write('parentId: $parentId, ')
           ..write('transactionType: $transactionType, ')
+          ..write('systemKey: $systemKey, ')
           ..write('isDefault: $isDefault, ')
           ..write('isArchived: $isArchived, ')
           ..write('sortOrder: $sortOrder, ')
@@ -6619,6 +6658,7 @@ typedef $$CategoriesTableCreateCompanionBuilder = CategoriesCompanion Function({
   Value<String> colorHex,
   Value<int?> parentId,
   Value<String> transactionType,
+  Value<String?> systemKey,
   Value<bool> isDefault,
   Value<bool> isArchived,
   Value<int> sortOrder,
@@ -6631,6 +6671,7 @@ typedef $$CategoriesTableUpdateCompanionBuilder = CategoriesCompanion Function({
   Value<String> colorHex,
   Value<int?> parentId,
   Value<String> transactionType,
+  Value<String?> systemKey,
   Value<bool> isDefault,
   Value<bool> isArchived,
   Value<int> sortOrder,
@@ -6664,6 +6705,9 @@ class $$CategoriesTableFilterComposer
   ColumnFilters<String> get transactionType => $composableBuilder(
       column: $table.transactionType,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get systemKey => $composableBuilder(
+      column: $table.systemKey, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get isDefault => $composableBuilder(
       column: $table.isDefault, builder: (column) => ColumnFilters(column));
@@ -6706,6 +6750,9 @@ class $$CategoriesTableOrderingComposer
       column: $table.transactionType,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get systemKey => $composableBuilder(
+      column: $table.systemKey, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get isDefault => $composableBuilder(
       column: $table.isDefault, builder: (column) => ColumnOrderings(column));
 
@@ -6745,6 +6792,9 @@ class $$CategoriesTableAnnotationComposer
 
   GeneratedColumn<String> get transactionType => $composableBuilder(
       column: $table.transactionType, builder: (column) => column);
+
+  GeneratedColumn<String> get systemKey =>
+      $composableBuilder(column: $table.systemKey, builder: (column) => column);
 
   GeneratedColumn<bool> get isDefault =>
       $composableBuilder(column: $table.isDefault, builder: (column) => column);
@@ -6788,6 +6838,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             Value<String> colorHex = const Value.absent(),
             Value<int?> parentId = const Value.absent(),
             Value<String> transactionType = const Value.absent(),
+            Value<String?> systemKey = const Value.absent(),
             Value<bool> isDefault = const Value.absent(),
             Value<bool> isArchived = const Value.absent(),
             Value<int> sortOrder = const Value.absent(),
@@ -6800,6 +6851,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             colorHex: colorHex,
             parentId: parentId,
             transactionType: transactionType,
+            systemKey: systemKey,
             isDefault: isDefault,
             isArchived: isArchived,
             sortOrder: sortOrder,
@@ -6812,6 +6864,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             Value<String> colorHex = const Value.absent(),
             Value<int?> parentId = const Value.absent(),
             Value<String> transactionType = const Value.absent(),
+            Value<String?> systemKey = const Value.absent(),
             Value<bool> isDefault = const Value.absent(),
             Value<bool> isArchived = const Value.absent(),
             Value<int> sortOrder = const Value.absent(),
@@ -6824,6 +6877,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             colorHex: colorHex,
             parentId: parentId,
             transactionType: transactionType,
+            systemKey: systemKey,
             isDefault: isDefault,
             isArchived: isArchived,
             sortOrder: sortOrder,

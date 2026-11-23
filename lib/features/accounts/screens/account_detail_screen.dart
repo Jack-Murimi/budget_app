@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
+import '../../../l10n/l10n.dart';
+import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../add_transaction/screens/add_transaction_screen.dart';
 import '../../transactions/models/transaction_model.dart';
@@ -26,12 +28,14 @@ class AccountDetailScreen extends ConsumerWidget {
     '#607D8B': 'Grey',
   };
 
-  String _formatDate(DateTime dt) {
+  String _formatDate(DateTime dt, AppLocalizations l10n) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final txDate = DateTime(dt.year, dt.month, dt.day);
-    if (txDate == today) return 'Today';
-    if (txDate == today.subtract(const Duration(days: 1))) return 'Yesterday';
+    if (txDate == today) return l10n.today;
+    if (txDate == today.subtract(const Duration(days: 1))) {
+      return l10n.yesterday;
+    }
     return DateFormat('EEE, d MMM yyyy').format(dt);
   }
 
@@ -82,17 +86,16 @@ class AccountDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     AccountWithBalance currentAccount,
   ) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Account'),
-        content: Text(
-          'Delete "${currentAccount.name}"? All linked transactions will lose their account reference.',
-        ),
+        title: Text(l10n.deleteAccountTitle),
+        content: Text(l10n.deleteAccountConfirm(currentAccount.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -100,7 +103,7 @@ class AccountDetailScreen extends ConsumerWidget {
               foregroundColor: Theme.of(ctx).colorScheme.onError,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -136,13 +139,16 @@ class AccountDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final allAccounts =
         ref.watch(allAccountsWithBalanceProvider).asData?.value ?? const [];
     final currentAccount =
         allAccounts.where((a) => a.id == account.id).firstOrNull ?? account;
     final txnsAsync = ref.watch(accountTransactionsProvider(currentAccount.id));
-    final accountColor =
-        Color(int.parse(currentAccount.colorHex.replaceFirst('#', '0xFF')));
+    final accountColor = parseHexColor(
+      currentAccount.colorHex,
+      fallback: theme.colorScheme.primary,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -160,7 +166,9 @@ class AccountDetailScreen extends ConsumerWidget {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('${currentAccount.name} set as default'),
+                      content: Text(
+                        l10n.accountSetAsDefault(currentAccount.name),
+                      ),
                     ),
                   );
                 case 'archive':
@@ -173,8 +181,8 @@ class AccountDetailScreen extends ConsumerWidget {
                     SnackBar(
                       content: Text(
                         nextArchived
-                            ? '${currentAccount.name} archived'
-                            : '${currentAccount.name} unarchived',
+                            ? l10n.accountArchived(currentAccount.name)
+                            : l10n.accountUnarchived(currentAccount.name),
                       ),
                     ),
                   );
@@ -186,20 +194,20 @@ class AccountDetailScreen extends ConsumerWidget {
               }
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'edit',
                 child: ListTile(
-                  leading: Icon(Icons.edit_outlined),
-                  title: Text('Edit'),
+                  leading: const Icon(Icons.edit_outlined),
+                  title: Text(l10n.edit),
                   dense: true,
                 ),
               ),
               if (!currentAccount.isDefault)
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'default',
                   child: ListTile(
-                    leading: Icon(Icons.star_outline),
-                    title: Text('Set as Default'),
+                    leading: const Icon(Icons.star_outline),
+                    title: Text(l10n.setAsDefault),
                     dense: true,
                   ),
                 ),
@@ -212,7 +220,7 @@ class AccountDetailScreen extends ConsumerWidget {
                         : Icons.archive_outlined,
                   ),
                   title: Text(
-                    currentAccount.isArchived ? 'Unarchive' : 'Archive',
+                    currentAccount.isArchived ? l10n.unarchive : l10n.archive,
                   ),
                   dense: true,
                 ),
@@ -225,7 +233,7 @@ class AccountDetailScreen extends ConsumerWidget {
                     color: theme.colorScheme.error,
                   ),
                   title: Text(
-                    'Delete',
+                    l10n.delete,
                     style: TextStyle(color: theme.colorScheme.error),
                   ),
                   dense: true,
@@ -237,14 +245,14 @@ class AccountDetailScreen extends ConsumerWidget {
       ),
       body: txnsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(l10n.errorLabel('$e'))),
         data: (rawTxns) {
           final balance = currentAccount.balance;
           final txns = rawTxns.map((t) => t.toModel()).toList();
 
           final Map<String, List<TransactionModel>> grouped = {};
           for (final t in txns) {
-            grouped.putIfAbsent(_formatDate(t.transactionDate), () => []).add(t);
+            grouped.putIfAbsent(_formatDate(t.transactionDate, l10n), () => []).add(t);
           }
 
           return ListView(
@@ -307,9 +315,9 @@ class AccountDetailScreen extends ConsumerWidget {
                               color: Colors.white24,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text(
-                              'Default',
-                              style: TextStyle(
+                            child: Text(
+                              l10n.defaultLabel,
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,
                               ),
@@ -319,7 +327,7 @@ class AccountDetailScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Balance',
+                      l10n.balanceLabel,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.7),
                         fontSize: 13,
@@ -343,7 +351,7 @@ class AccountDetailScreen extends ConsumerWidget {
                         onPressed: () =>
                             _adjustBalance(context, currentAccount, balance),
                         icon: const Icon(Icons.tune, size: 16),
-                        label: const Text('Adjust Balance'),
+                        label: Text(l10n.adjustBalance),
                       ),
                     ),
                   ],
@@ -355,10 +363,10 @@ class AccountDetailScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                 child: Row(
                   children: [
-                    Text('Transactions', style: theme.textTheme.titleSmall),
+                    Text(l10n.transactionsTitle, style: theme.textTheme.titleSmall),
                     const Spacer(),
                     Text(
-                      '${txns.length} total',
+                      l10n.totalCount(txns.length),
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: theme.colorScheme.outline),
                     ),
@@ -378,7 +386,7 @@ class AccountDetailScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'No transactions yet',
+                        l10n.noTransactionsYet,
                         style: theme.textTheme.bodyMedium,
                       ),
                     ],
@@ -482,24 +490,25 @@ class _EditAccountDialogState extends ConsumerState<_EditAccountDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AlertDialog(
-      title: const Text('Edit Account'),
+      title: Text(l10n.editAccount),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.name,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Type',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.type,
+                border: const OutlineInputBorder(),
               ),
               initialValue: _selectedType,
               items: _validTypes
@@ -516,9 +525,9 @@ class _EditAccountDialogState extends ConsumerState<_EditAccountDialog> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Color',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.colorLabel,
+                border: const OutlineInputBorder(),
               ),
               initialValue: _selectedColor,
               items: widget.colorOptions.entries
@@ -532,9 +541,7 @@ class _EditAccountDialogState extends ConsumerState<_EditAccountDialog> {
                             height: 16,
                             margin: const EdgeInsets.only(right: 8),
                             decoration: BoxDecoration(
-                              color: Color(
-                                int.parse(e.key.replaceFirst('#', '0xFF')),
-                              ),
+                              color: parseHexColor(e.key),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -554,11 +561,11 @@ class _EditAccountDialogState extends ConsumerState<_EditAccountDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _isSaving ? null : _submit,
-          child: const Text('Save'),
+          child: Text(l10n.save),
         ),
       ],
     );
@@ -608,22 +615,23 @@ class _AdjustBalanceDialogState extends ConsumerState<_AdjustBalanceDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AlertDialog(
-      title: const Text('Adjust Balance'),
+      title: Text(l10n.adjustBalance),
       content: Form(
         key: _formKey,
         child: TextFormField(
           controller: _ctrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'New Balance',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: l10n.newBalance,
+            border: const OutlineInputBorder(),
           ),
           validator: (v) {
             final parsed =
                 double.tryParse((v ?? '').replaceAll(',', '').trim());
             if (parsed == null || !parsed.isFinite) {
-              return 'Enter a valid balance';
+              return l10n.errorValidNumberShort;
             }
             return null;
           },
@@ -632,11 +640,11 @@ class _AdjustBalanceDialogState extends ConsumerState<_AdjustBalanceDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _isSaving ? null : _submit,
-          child: const Text('Update'),
+          child: Text(l10n.update),
         ),
       ],
     );

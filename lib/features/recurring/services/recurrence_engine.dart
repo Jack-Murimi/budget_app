@@ -1,3 +1,4 @@
+import '../../../l10n/l10n.dart';
 import '../models/recurring_model.dart';
 
 class RecurrenceEngine {
@@ -74,6 +75,29 @@ class RecurrenceEngine {
       'weekly' => 'Every $effectiveCount weeks',
       'yearly' => 'Every $effectiveCount years',
       _ => 'Every $effectiveCount months',
+    };
+  }
+
+  /// Localized human-readable label for frequency.
+  static String localizedFrequencyLabel(
+    AppLocalizations l10n,
+    String frequency,
+    int count,
+  ) {
+    final effectiveCount = count > 0 ? count : 1;
+    if (effectiveCount == 1) {
+      return switch (frequency.toLowerCase()) {
+        'daily' => l10n.daily,
+        'weekly' => l10n.weekly,
+        'yearly' => l10n.yearly,
+        _ => l10n.monthly,
+      };
+    }
+    return switch (frequency.toLowerCase()) {
+      'daily' => l10n.everyNDays(effectiveCount),
+      'weekly' => l10n.everyNWeeks(effectiveCount),
+      'yearly' => l10n.everyNYears(effectiveCount),
+      _ => l10n.everyNMonths(effectiveCount),
     };
   }
 }

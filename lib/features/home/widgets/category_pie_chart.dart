@@ -7,7 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/converters/cents_converter.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/cashflow_calculator.dart';
+import '../../../shared/utils/color_utils.dart';
 import '../../categories/providers/category_providers.dart';
 import '../../transactions/models/transaction_model.dart';
 
@@ -54,10 +56,10 @@ class _CategoryPieChartSectionState
 
   // Stable fallback: same category always gets the same color.
   Color _colorFor(Category c) =>
-      _tryParseColor(c.colorHex) ?? _palette[c.id % _palette.length];
+      tryParseHexColor(c.colorHex) ?? _palette[c.id % _palette.length];
 
   /// Pure aggregation: no state mutation during build.
-  List<_Slice> _buildSlices(List<Category> categories) {
+  List<_Slice> _buildSlices(List<Category> categories, AppLocalizations l10n) {
     final byId = {for (final c in categories) c.id: c};
     final totalsCents = <int?, int>{};
     final cats = <int?, Category?>{};
@@ -84,7 +86,7 @@ class _CategoryPieChartSectionState
     final slices = <_Slice>[
       for (final e in entries.take(_maxSlices))
         _Slice(
-          cats[e.key]?.name ?? 'Uncategorized',
+          cats[e.key]?.name ?? l10n.uncategorized,
           CentsConverter.fromCents(e.value),
           cats[e.key] == null ? _uncategorizedColor : _colorFor(cats[e.key]!),
         ),
@@ -94,7 +96,7 @@ class _CategoryPieChartSectionState
         entries.skip(_maxSlices).fold<int>(0, (s, e) => s + e.value);
     if (restCents > 0) {
       slices.add(
-          _Slice('Other', CentsConverter.fromCents(restCents), _otherColor));
+          _Slice(l10n.otherLabel, CentsConverter.fromCents(restCents), _otherColor));
     }
     return slices;
   }
@@ -106,11 +108,12 @@ class _CategoryPieChartSectionState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final categoriesAsync = ref.watch(categoriesStreamProvider);
 
     return categoriesAsync.when(
       skipLoadingOnReload: true, // no flicker when the stream re-emits
-      data: (categories) => _buildCard(context, _buildSlices(categories)),
+      data: (categories) => _buildCard(context, _buildSlices(categories, l10n)),
       loading: () =>
           const SizedBox(height: 220), // reserve space, no layout jump
       error: (_, __) => const SizedBox.shrink(),
@@ -119,6 +122,7 @@ class _CategoryPieChartSectionState
 
   Widget _buildCard(BuildContext context, List<_Slice> slices) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final total = slices.fold<double>(0, (s, e) => s + e.value);
     final selected = (_touchedIndex != null && _touchedIndex! < slices.length)
         ? _touchedIndex
@@ -131,14 +135,14 @@ class _CategoryPieChartSectionState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Spending Breakdown', style: theme.textTheme.titleSmall),
+            Text(l10n.spendingBreakdown, style: theme.textTheme.titleSmall),
             const SizedBox(height: 12),
             SegmentedButton<bool>(
               showSelectedIcon: false,
               style: const ButtonStyle(visualDensity: VisualDensity.compact),
-              segments: const [
-                ButtonSegment(value: false, label: Text('Category')),
-                ButtonSegment(value: true, label: Text('Subcategory')),
+              segments: [
+                ButtonSegment(value: false, label: Text(l10n.category)),
+                ButtonSegment(value: true, label: Text(l10n.subcategory)),
               ],
               selected: {_showSubcategories},
               onSelectionChanged: (s) => setState(() {
@@ -152,7 +156,7 @@ class _CategoryPieChartSectionState
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: Text(
-                    'No expenses in this period',
+                    l10n.noExpensesInPeriod,
                     style: theme.textTheme.bodySmall
                         ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
@@ -182,13 +186,15 @@ class _CategoryPieChartSectionState
 
   Widget _buildChart(ThemeData theme, List<_Slice> slices, double total,
       int? selected, double size) {
+    final l10n = context.l10n;
     final scale = size / 160;
-    final centerLabel = selected != null ? slices[selected].label : 'Total';
+    final centerLabel = selected != null ? slices[selected].label : l10n.total;
     final centerValue = selected != null ? slices[selected].value : total;
 
     return Semantics(
-      label:
-          'Spending breakdown: ${slices.map((s) => '${s.label} Ksh ${_money.format(s.value)}').join(', ')}',
+      label: l10n.spendingBreakdownSemantic(
+        slices.map((s) => '${s.label} Ksh ${_money.format(s.value)}').join(', '),
+      ),
       excludeSemantics: true,
       child: SizedBox(
         width: size,
@@ -323,16 +329,5 @@ class _CategoryPieChartSectionState
         );
       }),
     );
-  }
-}
-
-Color? _tryParseColor(String? hex) {
-  if (hex == null || hex.isEmpty) return null;
-  try {
-    var v = hex.replaceFirst('#', '');
-    if (v.length == 6) v = 'FF$v';
-    return Color(int.parse(v, radix: 16));
-  } catch (_) {
-    return null;
   }
 }

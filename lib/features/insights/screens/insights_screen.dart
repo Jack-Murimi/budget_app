@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/converters/cents_converter.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/utils/cashflow_calculator.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../categories/providers/category_providers.dart';
@@ -37,15 +38,16 @@ class CashflowAggregation {
 @visibleForTesting
 CashflowAggregation aggregateCashflowBuckets(
   Map<DateTime, Cashflow> byDay,
-  DateRange range,
-) {
+  DateRange range, {
+  AppLocalizations? l10n,
+}) {
   final sortedDays = byDay.entries.toList()
     ..sort((a, b) => a.key.compareTo(b.key));
   final totalDays = math.max(1, range.end.difference(range.start).inDays);
 
   if (totalDays <= 31) {
     return CashflowAggregation(
-      title: 'Daily cashflow',
+      title: l10n?.dailyCashflow ?? 'Daily cashflow',
       buckets: [
         for (final entry in sortedDays)
           CashflowBucket(
@@ -72,7 +74,9 @@ CashflowAggregation aggregateCashflowBuckets(
   final sortedBuckets = grouped.entries.toList()
     ..sort((a, b) => a.key.compareTo(b.key));
   return CashflowAggregation(
-    title: useMonthly ? 'Monthly cashflow' : 'Weekly cashflow',
+    title: useMonthly
+        ? (l10n?.monthlyCashflow ?? 'Monthly cashflow')
+        : (l10n?.weeklyCashflow ?? 'Weekly cashflow'),
     buckets: [
       for (final entry in sortedBuckets)
         CashflowBucket(
@@ -112,6 +116,7 @@ class InsightsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final period = ref.watch(insightsPeriodProvider);
     final range = ref.watch(insightsRangeProvider);
     final summary = ref.watch(insightsSummaryProvider);
@@ -121,7 +126,7 @@ class InsightsScreen extends ConsumerWidget {
     final title =
         '${DateFormat.MMMd().format(range.start)} - ${DateFormat.MMMd().format(range.end.subtract(const Duration(days: 1)))}';
     return Scaffold(
-      appBar: AppBar(title: const Text('Insights')),
+      appBar: AppBar(title: Text(l10n.insightsTitle)),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(allTransactionsProvider),
         child: ListView(
@@ -135,8 +140,8 @@ class InsightsScreen extends ConsumerWidget {
                   ChoiceChip(
                     label: Text(
                       value == InsightsPeriod.custom
-                          ? 'Custom'
-                          : _periodLabel(value),
+                          ? l10n.custom
+                          : _periodLabel(l10n, value),
                     ),
                     selected: period == value,
                     onSelected: (_) => value == InsightsPeriod.custom
@@ -151,7 +156,7 @@ class InsightsScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             summary.when(
               loading: () => const LinearProgressIndicator(),
-              error: (error, _) => Text('Unable to load insights: $error'),
+              error: (error, _) => Text(l10n.unableToLoadInsights('$error')),
               data: (data) => Column(
                 children: [
                   _SummaryCard(summary: data, range: range),
@@ -188,12 +193,12 @@ class InsightsScreen extends ConsumerWidget {
   }
 }
 
-String _periodLabel(InsightsPeriod value) => switch (value) {
-      InsightsPeriod.week => 'This week',
-      InsightsPeriod.month => 'This month',
-      InsightsPeriod.lastMonth => 'Last month',
-      InsightsPeriod.year => 'This year',
-      InsightsPeriod.custom => 'Custom',
+String _periodLabel(AppLocalizations l10n, InsightsPeriod value) => switch (value) {
+      InsightsPeriod.week => l10n.thisWeek,
+      InsightsPeriod.month => l10n.thisMonth,
+      InsightsPeriod.lastMonth => l10n.lastMonth,
+      InsightsPeriod.year => l10n.thisYear,
+      InsightsPeriod.custom => l10n.custom,
     };
 
 class _SummaryCard extends StatelessWidget {
@@ -219,9 +224,11 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final delta = summary.expenseDelta;
     final days = _burnDays(DateTime.now());
     final burnRate = summary.expenses / days;
+    final pct = (delta.abs() * 100).toStringAsFixed(0);
 
     return Card(
       child: Padding(
@@ -229,27 +236,27 @@ class _SummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Cashflow summary', style: theme.textTheme.titleMedium),
+            Text(l10n.cashflowSummary, style: theme.textTheme.titleMedium),
             const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: _Metric(
-                    label: 'Income',
+                    label: l10n.income,
                     value: summary.income,
                     color: theme.colorScheme.primary,
                   ),
                 ),
                 Expanded(
                   child: _Metric(
-                    label: 'Spent',
+                    label: l10n.spent,
                     value: summary.expenses,
                     color: theme.colorScheme.error,
                   ),
                 ),
                 Expanded(
                   child: _Metric(
-                    label: 'Net',
+                    label: l10n.net,
                     value: summary.net,
                     color: summary.net < 0
                         ? theme.colorScheme.error
@@ -260,7 +267,7 @@ class _SummaryCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Avg daily spend: ${CurrencyFormatter.format(burnRate)}/day',
+              l10n.avgDailySpend(CurrencyFormatter.format(burnRate)),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -269,7 +276,9 @@ class _SummaryCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  '${delta >= 0 ? 'Up' : 'Down'} ${(delta.abs() * 100).toStringAsFixed(0)}% from previous period',
+                  delta >= 0
+                      ? l10n.upPercentFromPrevious(pct)
+                      : l10n.downPercentFromPrevious(pct),
                   style: theme.textTheme.bodySmall,
                 ),
               ),
@@ -316,10 +325,12 @@ class _CashflowChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final aggregation = aggregateCashflowBuckets(summary.byDay, range);
+    final l10n = context.l10n;
+    final aggregation =
+        aggregateCashflowBuckets(summary.byDay, range, l10n: l10n);
     final buckets = aggregation.buckets;
     if (buckets.isEmpty) {
-      return const _EmptyCard(message: 'No cashflow in this period');
+      return _EmptyCard(message: l10n.noCashflowInPeriod);
     }
 
     final theme = Theme.of(context);
@@ -405,18 +416,19 @@ class _CategoryChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final groupedCents = <String, int>{};
     for (final item in items.where((item) => item.type == 'expense')) {
       final name = item.categoryId == null
-          ? 'Uncategorized'
-          : (categoryNames[item.categoryId] ?? 'Uncategorized');
+          ? l10n.uncategorized
+          : (categoryNames[item.categoryId] ?? l10n.uncategorized);
       groupedCents[name] =
           (groupedCents[name] ?? 0) + CashflowCalculator.expenseTotalCents(item);
     }
     final sortedCents = groupedCents.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     if (sortedCents.isEmpty) {
-      return const _EmptyCard(message: 'No expenses in this period');
+      return _EmptyCard(message: l10n.noExpensesInPeriod);
     }
 
     final entries = <MapEntry<String, double>>[
@@ -426,7 +438,7 @@ class _CategoryChart extends StatelessWidget {
     final otherCents =
         sortedCents.skip(5).fold<int>(0, (sum, e) => sum + e.value);
     if (otherCents > 0) {
-      entries.add(MapEntry('Other', CentsConverter.fromCents(otherCents)));
+      entries.add(MapEntry(l10n.otherLabel, CentsConverter.fromCents(otherCents)));
     }
 
     const colors = [
@@ -445,7 +457,7 @@ class _CategoryChart extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Spending by category',
+              l10n.spendingByCategory,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
@@ -515,7 +527,7 @@ class _NetWorthChart extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Net worth trend',
+              context.l10n.netWorthTrend,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
