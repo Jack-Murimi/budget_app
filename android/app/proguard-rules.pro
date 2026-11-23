@@ -13,3 +13,6 @@
 -keep class org.sqlite.** { *; }
 -keep class androidx.sqlite.** { *; }
 -keep class eu.simonbinder.sqlite3_flutter_libs.** { *; }
+
+# Flutter Play Store deferred components are unused in this app
+-dontwarn com.google.android.play.core.**
