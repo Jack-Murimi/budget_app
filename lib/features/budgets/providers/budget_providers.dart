@@ -24,9 +24,9 @@ final allBudgetsWithProgressProvider =
   return repo.watchBudgetsWithProgress(includeArchived: true);
 });
 
-final overallBudgetProvider = StreamProvider<BudgetWithProgress?>((ref) {
-  final repo = ref.watch(budgetRepositoryProvider);
-  return repo.watchBudgetsWithProgress().map(
+final overallBudgetProvider = Provider<AsyncValue<BudgetWithProgress?>>((ref) {
+  final budgetsAsync = ref.watch(budgetsWithProgressProvider);
+  return budgetsAsync.whenData(
     (budgets) => budgets.where((b) => b.isOverall && !b.isArchived).firstOrNull,
   );
 });

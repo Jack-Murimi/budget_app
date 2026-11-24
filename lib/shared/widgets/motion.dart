@@ -4,10 +4,10 @@ import 'package:flutter/services.dart';
 /// Shared motion language: one set of durations & curves so every screen
 /// moves with the same personality.
 abstract final class Motion {
-  static const fast = Duration(milliseconds: 160);
-  static const medium = Duration(milliseconds: 320);
-  static const slow = Duration(milliseconds: 600);
-  static const stagger = Duration(milliseconds: 55);
+  static const fast = Duration(milliseconds: 140);
+  static const medium = Duration(milliseconds: 220);
+  static const slow = Duration(milliseconds: 320);
+  static const stagger = Duration(milliseconds: 25);
 
   /// Material 3 "emphasized" feel.
   static const Curve emphasized = Cubic(0.2, 0.0, 0.0, 1.0);
@@ -135,7 +135,7 @@ class AnimatedAmount extends StatelessWidget {
     }
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: value),
-      duration: Motion.slow + const Duration(milliseconds: 300),
+      duration: Motion.slow + const Duration(milliseconds: 120),
       curve: Motion.emphasizedDecelerate,
       builder: (_, v, __) => Text(
         format(v),

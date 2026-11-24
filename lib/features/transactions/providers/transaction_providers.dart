@@ -29,17 +29,15 @@ class MonthSummary {
   double get net => totalIncome - totalExpenses;
 }
 
-final monthSummaryProvider = StreamProvider<MonthSummary>((ref) {
-  final repo = ref.watch(transactionRepositoryProvider);
+final monthSummaryProvider = FutureProvider<MonthSummary>((ref) async {
+  final rows = await ref.watch(currentMonthTransactionsProvider.future);
   final now = DateTime.now();
-  return repo.watchMonthSummary(year: now.year, month: now.month).map((rows) {
-    final summary = CashflowCalculator.summarize(rows);
-    return MonthSummary(
-      totalExpenses: summary.expenses,
-      totalIncome: summary.income,
-      month: DateFormat('MMMM yyyy').format(now),
-    );
-  });
+  final summary = CashflowCalculator.summarize(rows);
+  return MonthSummary(
+    totalExpenses: summary.expenses,
+    totalIncome: summary.income,
+    month: DateFormat('MMMM yyyy').format(now),
+  );
 });
 
 /// Action provider: insert a transaction and return its ID.

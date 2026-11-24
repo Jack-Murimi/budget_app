@@ -21,7 +21,8 @@ class MainActivity : FlutterFragmentActivity() {
     private val smsChannel = "budget_app/sms"
     private var pendingLink: String? = null
     private var eventSink: EventChannel.EventSink? = null
-    private val smsExecutor = Executors.newSingleThreadExecutor()
+    private val smsExecutorLazy = lazy { Executors.newSingleThreadExecutor() }
+    private val smsExecutor by smsExecutorLazy
     private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -135,7 +136,9 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onDestroy() {
-        smsExecutor.shutdown()
+        if (smsExecutorLazy.isInitialized()) {
+            smsExecutor.shutdown()
+        }
         super.onDestroy()
     }
 }

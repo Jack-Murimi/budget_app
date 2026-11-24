@@ -1,9 +1,20 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   static const _seedColor = Color(0xFF1F9D55); // deeper "money" green
+  static const _fontFamily = 'Poppins';
+
+  static ThemeData? _cachedDefaultLight;
+  static ThemeData? _cachedDefaultDark;
+  static ThemeData? _cachedDefaultOledDark;
+
+  static ColorScheme? _lastDynamicLightScheme;
+  static ThemeData? _lastDynamicLightTheme;
+
+  static ColorScheme? _lastDynamicDarkScheme;
+  static bool? _lastDynamicDarkOled;
+  static ThemeData? _lastDynamicDarkTheme;
 
   static ColorScheme _lightBase([ColorScheme? dynamic]) =>
       dynamic ??
@@ -14,22 +25,46 @@ class AppTheme {
       ColorScheme.fromSeed(seedColor: _seedColor, brightness: Brightness.dark);
 
   static ThemeData light([ColorScheme? dynamicScheme]) {
-    final base = _lightBase(dynamicScheme);
-    return _build(base);
+    if (dynamicScheme == null) {
+      return _cachedDefaultLight ??= _build(_lightBase(null));
+    }
+    if (identical(dynamicScheme, _lastDynamicLightScheme) ||
+        dynamicScheme == _lastDynamicLightScheme) {
+      return _lastDynamicLightTheme!;
+    }
+    final built = _build(dynamicScheme);
+    _lastDynamicLightScheme = dynamicScheme;
+    _lastDynamicLightTheme = built;
+    return built;
   }
 
   static ThemeData dark([ColorScheme? dynamicScheme, bool oled = false]) {
-    var base = _darkBase(dynamicScheme);
-    if (oled) {
-      base = base.copyWith(
+    if (dynamicScheme == null) {
+      if (oled) {
+        return _cachedDefaultOledDark ??=
+            _build(_applyOled(_darkBase(null)), darkText: true, oled: true);
+      }
+      return _cachedDefaultDark ??= _build(_darkBase(null), darkText: true);
+    }
+    if ((identical(dynamicScheme, _lastDynamicDarkScheme) ||
+            dynamicScheme == _lastDynamicDarkScheme) &&
+        oled == _lastDynamicDarkOled) {
+      return _lastDynamicDarkTheme!;
+    }
+    final base = oled ? _applyOled(dynamicScheme) : dynamicScheme;
+    final built = _build(base, darkText: true, oled: oled);
+    _lastDynamicDarkScheme = dynamicScheme;
+    _lastDynamicDarkOled = oled;
+    _lastDynamicDarkTheme = built;
+    return built;
+  }
+
+  static ColorScheme _applyOled(ColorScheme base) => base.copyWith(
         surface: Colors.black,
         onSurface: Colors.white,
         surfaceContainerLow: const Color(0xFF0A0A0A),
         surfaceContainerHigh: const Color(0xFF111111),
       );
-    }
-    return _build(base, darkText: true, oled: oled);
-  }
 
   /// Editorial type scale: large, tight, heavy headlines; calm, roomy body.
   static TextTheme _typography(TextTheme t) {
@@ -55,12 +90,11 @@ class AppTheme {
 
   static ThemeData _build(ColorScheme base,
       {bool darkText = false, bool oled = false}) {
-    GoogleFonts.config.allowRuntimeFetching = false;
-    final textTheme = _typography(
-      darkText
-          ? GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme)
-          : GoogleFonts.poppinsTextTheme(),
-    ).apply(
+    final baseTextTheme = (darkText
+            ? ThemeData.dark(useMaterial3: true).textTheme
+            : ThemeData.light(useMaterial3: true).textTheme)
+        .apply(fontFamily: _fontFamily);
+    final textTheme = _typography(baseTextTheme).apply(
       bodyColor: base.onSurface,
       displayColor: base.onSurface,
     );
@@ -71,6 +105,7 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      fontFamily: _fontFamily,
       colorScheme: base,
       scaffoldBackgroundColor: oled ? Colors.black : null,
       textTheme: textTheme,

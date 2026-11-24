@@ -10,29 +10,40 @@ import '../providers/navigation_providers.dart';
 import '../widgets/floating_action_buttons.dart';
 import 'home_screen.dart';
 
-class MainNavigationScreen extends ConsumerWidget {
+class MainNavigationScreen extends ConsumerStatefulWidget {
   const MainNavigationScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MainNavigationScreen> createState() =>
+      _MainNavigationScreenState();
+}
+
+class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
+  final Set<int> _mountedTabs = {};
+
+  static const _pages = <Widget>[
+    HomeScreen(),
+    TransactionsScreen(isEmbedded: true),
+    BudgetsScreen(),
+    MoreScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final selectedIndex = ref.watch(selectedTabProvider);
     final clampedIndex = selectedIndex.clamp(0, 3);
     final showFab = clampedIndex == 0 || clampedIndex == 1;
-
-    const pages = <Widget>[
-      HomeScreen(),
-      TransactionsScreen(isEmbedded: true),
-      BudgetsScreen(),
-      MoreScreen(),
-    ];
+    _mountedTabs.add(clampedIndex);
 
     return Scaffold(
       body: IndexedStack(
         index: clampedIndex,
         children: [
-          for (var i = 0; i < pages.length; i++)
-            _TabFade(active: i == clampedIndex, child: pages[i]),
+          for (var i = 0; i < _pages.length; i++)
+            _mountedTabs.contains(i)
+                ? _TabFade(active: i == clampedIndex, child: _pages[i])
+                : const SizedBox.shrink(),
         ],
       ),
       bottomNavigationBar: NavigationBar(

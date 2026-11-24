@@ -14,12 +14,18 @@ class WidgetUpdateService {
   static Future<void> update({
     required double monthSpend,
     required double totalBalance,
+    SharedPreferences? prefs,
   }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keySpend, 'KES ${monthSpend.toStringAsFixed(0)}');
-      await prefs.setString(
-          _keyBalance, 'KES ${totalBalance.toStringAsFixed(0)}');
+      final resolvedPrefs = prefs ?? await SharedPreferences.getInstance();
+      final spendStr = 'KES ${monthSpend.toStringAsFixed(0)}';
+      final balanceStr = 'KES ${totalBalance.toStringAsFixed(0)}';
+      if (resolvedPrefs.getString(_keySpend) == spendStr &&
+          resolvedPrefs.getString(_keyBalance) == balanceStr) {
+        return;
+      }
+      await resolvedPrefs.setString(_keySpend, spendStr);
+      await resolvedPrefs.setString(_keyBalance, balanceStr);
       await _channel.invokeMethod('updateWidgetData');
     } on MissingPluginException {
       // Not on Android / widget not installed
