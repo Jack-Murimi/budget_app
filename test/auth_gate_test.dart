@@ -6,12 +6,10 @@ import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/add_transaction/screens/add_transaction_screen.dart';
 import 'package:budget_app/features/settings/auth_gate.dart';
 import 'package:budget_app/features/settings/auth_service.dart';
-import 'package:budget_app/features/sms/screens/sms_inbox_screen.dart';
 import 'package:budget_app/main.dart';
 import 'package:budget_app/shared/providers/theme_provider.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -169,7 +167,7 @@ void main() {
     expect(find.byType(AddTransactionScreen), findsOneWidget);
   });
 
-  testWidgets('scan_sms deep link opens SmsInboxScreen when unlocked',
+  testWidgets('debug add_transaction deep link opens AddTransactionScreen when unlocked',
       (tester) async {
     SharedPreferences.setMockInitialValues({'bio_enabled': false});
     final prefs = await SharedPreferences.getInstance();
@@ -179,18 +177,6 @@ void main() {
     addTearDown(db.close);
     addTearDown(linkCtrl.close);
 
-    const permChannel = MethodChannel('flutter.baseflow.com/permissions/methods');
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(permChannel, (call) async {
-      if (call.method == 'requestPermissions') {
-        return <int, int>{}; // denied cleanly without platform error
-      }
-      return null;
-    });
-    addTearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(permChannel, null);
-    });
     final container = ProviderContainer(
       overrides: [
         dbProvider.overrideWithValue(db),
@@ -210,9 +196,9 @@ void main() {
     );
     await tester.pump();
 
-    linkCtrl.add('budgetke://scan_sms');
+    linkCtrl.add('budgetke-debug://add_transaction');
     await tester.pumpAndSettle();
 
-    expect(find.byType(SmsInboxScreen), findsOneWidget);
+    expect(find.byType(AddTransactionScreen), findsOneWidget);
   });
 }

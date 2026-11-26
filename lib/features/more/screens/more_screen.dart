@@ -14,7 +14,6 @@ import '../../insights/screens/insights_screen.dart';
 import '../../portability/screens/data_portability_screen.dart';
 import '../../recurring/screens/recurring_screen.dart';
 import '../../settings/settings_screen.dart';
-import '../../sms/screens/sms_inbox_screen.dart';
 import '../models/more_item_config.dart';
 
 List<MoreSectionConfig> buildMoreSections(
@@ -55,12 +54,6 @@ List<MoreSectionConfig> buildMoreSections(
           title: l10n.moreRecurringBills,
           icon: Icons.repeat,
           destination: (_) => const RecurringScreen(),
-        ),
-        MoreItemConfig(
-          title: l10n.moreScanSms,
-          subtitle: l10n.moreScanSmsSub,
-          icon: Icons.sms_outlined,
-          destination: (_) => const SmsInboxScreen(),
         ),
       ],
     ),

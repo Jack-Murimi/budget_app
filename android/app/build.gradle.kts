@@ -1,5 +1,6 @@
 import java.io.FileInputStream
 import java.util.Properties
+import org.gradle.api.GradleException
 
 plugins {
     id("com.android.application")
@@ -12,9 +13,21 @@ val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
     FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
 }
-val hasReleaseKeystore =
-    keystoreProperties.getProperty("storeFile") != null ||
-        System.getenv("KEYSTORE_FILE") != null
+val releaseStorePath =
+    keystoreProperties.getProperty("storeFile")
+        ?: System.getenv("KEYSTORE_FILE")
+val releaseStoreFile = releaseStorePath?.let { file(it) }
+val hasReleaseKeystore = releaseStoreFile?.exists() == true
+val isReleaseTaskRequested = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
+if (isReleaseTaskRequested && !hasReleaseKeystore) {
+    throw GradleException(
+        "Release signing keystore not configured. Create android/key.properties " +
+            "(see android/key.properties.example) or set KEYSTORE_FILE, " +
+            "KEYSTORE_PASSWORD, KEY_ALIAS, and KEY_PASSWORD."
+    )
+}
 
 android {
     namespace = "com.budgetapp.budget_app"
@@ -38,15 +51,13 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["deepLinkScheme"] = "budgetke"
     }
 
     signingConfigs {
         if (hasReleaseKeystore) {
             create("release") {
-                val storePath =
-                    keystoreProperties.getProperty("storeFile")
-                        ?: System.getenv("KEYSTORE_FILE")
-                storeFile = file(storePath)
+                storeFile = releaseStoreFile
                 storePassword =
                     keystoreProperties.getProperty("storePassword")
                         ?: System.getenv("KEYSTORE_PASSWORD")
@@ -61,11 +72,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            manifestPlaceholders["deepLinkScheme"] = "budgetke-debug"
+        }
         release {
-            signingConfig = if (hasReleaseKeystore) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            if (hasReleaseKeystore) {
+                signingConfig = signingConfigs.getByName("release")
             }
             isMinifyEnabled = true
             isShrinkResources = true

@@ -1,7 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
-    <uses-permission android:name="android.permission.READ_SMS"/>
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
@@ -33,7 +32,7 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="budgetke"/>
+                <data android:scheme="${deepLinkScheme}"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

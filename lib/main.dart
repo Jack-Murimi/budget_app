@@ -11,7 +11,6 @@ import 'features/home/screens/main_navigation_screen.dart';
 import 'features/recurring/providers/recurring_providers.dart';
 import 'features/settings/auth_gate.dart';
 import 'features/settings/auth_service.dart';
-import 'features/sms/screens/sms_inbox_screen.dart';
 import 'l10n/l10n.dart';
 import 'shared/providers/locale_provider.dart';
 import 'shared/providers/theme_provider.dart';
@@ -25,76 +24,66 @@ final dbProvider = Provider<AppDatabase>((ref) {
 
 final _navigatorKey = GlobalKey<NavigatorState>();
 
-void main() {
+Future<(ColorScheme?, ColorScheme?)> _preloadDynamicSchemes() async {
+  try {
+    final palette = await DynamicColorPlugin.getCorePalette().timeout(
+      const Duration(milliseconds: 120),
+      onTimeout: () => null,
+    );
+    if (palette == null) return (null, null);
+    return (
+      palette.toColorScheme(),
+      palette.toColorScheme(brightness: Brightness.dark),
+    );
+  } catch (_) {
+    return (null, null);
+  }
+}
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Start SQLite isolate warm-up and SharedPreferences load in parallel
-  // without blocking runApp(), so Flutter draws frame 1 immediately.
+  // Start SQLite isolate warm-up, SharedPreferences, and dynamic palette
+  // concurrently so MaterialApp renders once on frame 1 with final colors.
   final db = AppDatabase();
   final prefsFuture = SharedPreferences.getInstance();
-  runApp(_AppBootstrap(db: db, prefsFuture: prefsFuture));
-}
+  final schemesFuture = _preloadDynamicSchemes();
 
-class _AppBootstrap extends StatefulWidget {
-  final AppDatabase db;
-  final Future<SharedPreferences> prefsFuture;
+  final prefs = await prefsFuture;
+  final (lightDynamic, darkDynamic) = await schemesFuture;
 
-  const _AppBootstrap({
-    required this.db,
-    required this.prefsFuture,
-  });
-
-  @override
-  State<_AppBootstrap> createState() => _AppBootstrapState();
-}
-
-class _AppBootstrapState extends State<_AppBootstrap> {
-  SharedPreferences? _prefs;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.prefsFuture.then((prefs) {
-      if (mounted) {
-        setState(() => _prefs = prefs);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    widget.db.close();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final prefs = _prefs;
-    if (prefs == null) {
-      final brightness =
-          WidgetsBinding.instance.platformDispatcher.platformBrightness;
-      return ColoredBox(
-        color: brightness == Brightness.dark ? Colors.black : Colors.white,
-      );
-    }
-
-    return ProviderScope(
+  runApp(
+    ProviderScope(
       overrides: [
-        dbProvider.overrideWithValue(widget.db),
+        dbProvider.overrideWith((ref) {
+          ref.onDispose(() => db.close());
+          return db;
+        }),
         sharedPreferencesProvider.overrideWithValue(prefs),
       ],
-      child: BudgetApp(navigatorKey: _navigatorKey),
-    );
-  }
+      child: BudgetApp(
+        navigatorKey: _navigatorKey,
+        initialLightDynamic: lightDynamic,
+        initialDarkDynamic: darkDynamic,
+        dynamicColorsPreloaded: true,
+      ),
+    ),
+  );
 }
 
 class BudgetApp extends ConsumerStatefulWidget {
   final GlobalKey<NavigatorState> navigatorKey;
   final Stream<String>? deepLinkStream;
+  final ColorScheme? initialLightDynamic;
+  final ColorScheme? initialDarkDynamic;
+  final bool dynamicColorsPreloaded;
 
   const BudgetApp({
     super.key,
     required this.navigatorKey,
     this.deepLinkStream,
+    this.initialLightDynamic,
+    this.initialDarkDynamic,
+    this.dynamicColorsPreloaded = false,
   });
 
   @override
@@ -113,7 +102,6 @@ class _BudgetAppState extends ConsumerState<BudgetApp> {
       widget.navigatorKey,
       stream: widget.deepLinkStream,
       onAddTransaction: () => _handleDeepLink('budgetke://add_transaction'),
-      onScanSms: () => _handleDeepLink('budgetke://scan_sms'),
       onLink: _handleDeepLink,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -149,13 +137,9 @@ class _BudgetAppState extends ConsumerState<BudgetApp> {
   void _dispatchDeepLink(String link) {
     final nav = widget.navigatorKey.currentState;
     if (nav == null) return;
-    if (link.startsWith('budgetke://add_transaction')) {
+    if (Uri.tryParse(link)?.host == 'add_transaction') {
       nav.push(
         MaterialPageRoute(builder: (_) => const AddTransactionScreen()),
-      );
-    } else if (link.startsWith('budgetke://scan_sms')) {
-      nav.push(
-        MaterialPageRoute(builder: (_) => const SmsInboxScreen()),
       );
     }
   }
@@ -199,6 +183,13 @@ class _BudgetAppState extends ConsumerState<BudgetApp> {
 
     if (!useDynamic) {
       return buildMaterialApp(null, null);
+    }
+
+    if (widget.dynamicColorsPreloaded) {
+      return buildMaterialApp(
+        widget.initialLightDynamic,
+        widget.initialDarkDynamic,
+      );
     }
 
     return DynamicColorBuilder(

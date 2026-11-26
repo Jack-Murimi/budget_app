@@ -1789,12 +1789,6 @@ class AppLocalizationsSw extends AppLocalizations {
   String get moreRecurringBills => 'Malipo ya Mara kwa Mara & Bili';
 
   @override
-  String get moreScanSms => 'Changanua SMS';
-
-  @override
-  String get moreScanSmsSub => 'Ingiza SMS za M-Pesa kutoka kikasha chako';
-
-  @override
   String get moreCategories => 'Kategoria';
 
   @override
@@ -1954,83 +1948,6 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get restore => 'Rejesha';
-
-  @override
-  String get scanSmsTitle => 'Changanua SMS za M-Pesa';
-
-  @override
-  String get rescan => 'Changanua tena';
-
-  @override
-  String get smsPermissionDenied =>
-      'Ruhusa ya SMS imekataliwa. Ipe ruhusa katika Mipangilio ya kifaa.';
-
-  @override
-  String couldNotReadSmsInbox(String detail) {
-    return 'Haikuweza kusoma kikasha cha SMS: $detail';
-  }
-
-  @override
-  String failedToScanSmsInbox(String error) {
-    return 'Imeshindwa kuchanganua kikasha cha SMS: $error';
-  }
-
-  @override
-  String alreadyRecordedRef(String ref) {
-    return 'Tayari imerekodiwa — $ref';
-  }
-
-  @override
-  String get fulizaRecordedAndLinked =>
-      'Fuliza imerekodiwa na kuunganishwa na muamala uliopo.';
-
-  @override
-  String get fulizaDrawdownRecorded => 'Matumizi ya Fuliza yamerekodiwa.';
-
-  @override
-  String bulkImportSummary(int transactions, int fuliza, String skippedPart) {
-    return 'Imeingiza miamala $transactions, rekodi $fuliza za Fuliza$skippedPart.';
-  }
-
-  @override
-  String bulkImportSkippedPart(int count) {
-    return ' (nakala $count zimerukwa)';
-  }
-
-  @override
-  String get openSettings => 'Fungua Mipangilio';
-
-  @override
-  String allMpesaAlreadyImported(int count) {
-    return 'Ujumbe wote wa M-Pesa tayari umeingizwa ($count).';
-  }
-
-  @override
-  String get noMpesaInInbox =>
-      'Hakuna ujumbe wa M-Pesa uliopatikana kwenye kikasha.';
-
-  @override
-  String skippedAlreadyRecorded(int count) {
-    return 'Zimerukwa jumbe $count zilizorekodiwa au kupuuzwa tayari';
-  }
-
-  @override
-  String readyToAddCount(int count) {
-    return 'Tayari Kuongeza ($count)';
-  }
-
-  @override
-  String importAllCount(int count) {
-    return 'Ingiza zote ($count)';
-  }
-
-  @override
-  String needsReviewCount(int count) {
-    return 'Inahitaji Ukaguzi ($count)';
-  }
-
-  @override
-  String get unrecognised => 'Haijatambuliwa';
 
   @override
   String get dismiss => 'Puuza';

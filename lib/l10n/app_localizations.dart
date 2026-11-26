@@ -3165,18 +3165,6 @@ abstract class AppLocalizations {
   /// **'Recurring & Bills'**
   String get moreRecurringBills;
 
-  /// No description provided for @moreScanSms.
-  ///
-  /// In en, this message translates to:
-  /// **'Scan SMS Inbox'**
-  String get moreScanSms;
-
-  /// No description provided for @moreScanSmsSub.
-  ///
-  /// In en, this message translates to:
-  /// **'Import M-Pesa SMS from your inbox'**
-  String get moreScanSmsSub;
-
   /// No description provided for @moreCategories.
   ///
   /// In en, this message translates to:
@@ -3470,114 +3458,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Restore'**
   String get restore;
-
-  /// No description provided for @scanSmsTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Scan M-Pesa SMS'**
-  String get scanSmsTitle;
-
-  /// No description provided for @rescan.
-  ///
-  /// In en, this message translates to:
-  /// **'Rescan'**
-  String get rescan;
-
-  /// No description provided for @smsPermissionDenied.
-  ///
-  /// In en, this message translates to:
-  /// **'SMS permission denied. Grant it in device Settings.'**
-  String get smsPermissionDenied;
-
-  /// No description provided for @couldNotReadSmsInbox.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not read SMS inbox: {detail}'**
-  String couldNotReadSmsInbox(String detail);
-
-  /// No description provided for @failedToScanSmsInbox.
-  ///
-  /// In en, this message translates to:
-  /// **'Failed to scan SMS inbox: {error}'**
-  String failedToScanSmsInbox(String error);
-
-  /// No description provided for @alreadyRecordedRef.
-  ///
-  /// In en, this message translates to:
-  /// **'Already recorded — {ref}'**
-  String alreadyRecordedRef(String ref);
-
-  /// No description provided for @fulizaRecordedAndLinked.
-  ///
-  /// In en, this message translates to:
-  /// **'Fuliza recorded & linked to existing transaction.'**
-  String get fulizaRecordedAndLinked;
-
-  /// No description provided for @fulizaDrawdownRecorded.
-  ///
-  /// In en, this message translates to:
-  /// **'Fuliza drawdown recorded.'**
-  String get fulizaDrawdownRecorded;
-
-  /// No description provided for @bulkImportSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Imported {transactions} transactions, {fuliza} Fuliza records{skippedPart}.'**
-  String bulkImportSummary(int transactions, int fuliza, String skippedPart);
-
-  /// No description provided for @bulkImportSkippedPart.
-  ///
-  /// In en, this message translates to:
-  /// **' ({count} duplicates skipped)'**
-  String bulkImportSkippedPart(int count);
-
-  /// No description provided for @openSettings.
-  ///
-  /// In en, this message translates to:
-  /// **'Open Settings'**
-  String get openSettings;
-
-  /// No description provided for @allMpesaAlreadyImported.
-  ///
-  /// In en, this message translates to:
-  /// **'All M-Pesa messages already imported ({count}).'**
-  String allMpesaAlreadyImported(int count);
-
-  /// No description provided for @noMpesaInInbox.
-  ///
-  /// In en, this message translates to:
-  /// **'No M-Pesa messages found in inbox.'**
-  String get noMpesaInInbox;
-
-  /// No description provided for @skippedAlreadyRecorded.
-  ///
-  /// In en, this message translates to:
-  /// **'Skipped {count} already recorded or dismissed messages'**
-  String skippedAlreadyRecorded(int count);
-
-  /// No description provided for @readyToAddCount.
-  ///
-  /// In en, this message translates to:
-  /// **'Ready to Add ({count})'**
-  String readyToAddCount(int count);
-
-  /// No description provided for @importAllCount.
-  ///
-  /// In en, this message translates to:
-  /// **'Import all ({count})'**
-  String importAllCount(int count);
-
-  /// No description provided for @needsReviewCount.
-  ///
-  /// In en, this message translates to:
-  /// **'Needs Review ({count})'**
-  String needsReviewCount(int count);
-
-  /// No description provided for @unrecognised.
-  ///
-  /// In en, this message translates to:
-  /// **'Unrecognised'**
-  String get unrecognised;
 
   /// No description provided for @dismiss.
   ///

@@ -1777,12 +1777,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get moreRecurringBills => 'Recurring & Bills';
 
   @override
-  String get moreScanSms => 'Scan SMS Inbox';
-
-  @override
-  String get moreScanSmsSub => 'Import M-Pesa SMS from your inbox';
-
-  @override
   String get moreCategories => 'Categories';
 
   @override
@@ -1942,82 +1936,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get restore => 'Restore';
-
-  @override
-  String get scanSmsTitle => 'Scan M-Pesa SMS';
-
-  @override
-  String get rescan => 'Rescan';
-
-  @override
-  String get smsPermissionDenied =>
-      'SMS permission denied. Grant it in device Settings.';
-
-  @override
-  String couldNotReadSmsInbox(String detail) {
-    return 'Could not read SMS inbox: $detail';
-  }
-
-  @override
-  String failedToScanSmsInbox(String error) {
-    return 'Failed to scan SMS inbox: $error';
-  }
-
-  @override
-  String alreadyRecordedRef(String ref) {
-    return 'Already recorded — $ref';
-  }
-
-  @override
-  String get fulizaRecordedAndLinked =>
-      'Fuliza recorded & linked to existing transaction.';
-
-  @override
-  String get fulizaDrawdownRecorded => 'Fuliza drawdown recorded.';
-
-  @override
-  String bulkImportSummary(int transactions, int fuliza, String skippedPart) {
-    return 'Imported $transactions transactions, $fuliza Fuliza records$skippedPart.';
-  }
-
-  @override
-  String bulkImportSkippedPart(int count) {
-    return ' ($count duplicates skipped)';
-  }
-
-  @override
-  String get openSettings => 'Open Settings';
-
-  @override
-  String allMpesaAlreadyImported(int count) {
-    return 'All M-Pesa messages already imported ($count).';
-  }
-
-  @override
-  String get noMpesaInInbox => 'No M-Pesa messages found in inbox.';
-
-  @override
-  String skippedAlreadyRecorded(int count) {
-    return 'Skipped $count already recorded or dismissed messages';
-  }
-
-  @override
-  String readyToAddCount(int count) {
-    return 'Ready to Add ($count)';
-  }
-
-  @override
-  String importAllCount(int count) {
-    return 'Import all ($count)';
-  }
-
-  @override
-  String needsReviewCount(int count) {
-    return 'Needs Review ($count)';
-  }
-
-  @override
-  String get unrecognised => 'Unrecognised';
 
   @override
   String get dismiss => 'Dismiss';
