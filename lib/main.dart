@@ -6,8 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/database/app_database.dart';
 import 'core/services/deep_link_service.dart';
+import 'core/services/reminder_notification_service.dart';
 import 'features/add_transaction/screens/add_transaction_screen.dart';
+import 'features/debts/providers/debt_providers.dart';
+import 'features/fuliza/providers/fuliza_providers.dart';
 import 'features/home/screens/main_navigation_screen.dart';
+import 'features/home/widgets/floating_action_buttons.dart';
 import 'features/recurring/providers/recurring_providers.dart';
 import 'features/settings/auth_gate.dart';
 import 'features/settings/auth_service.dart';
@@ -108,12 +112,7 @@ class _BudgetAppState extends ConsumerState<BudgetApp> {
       if (!mounted) return;
       _autoRecordTimer = Timer(const Duration(milliseconds: 600), () {
         if (!mounted) return;
-        unawaited(
-          ref
-              .read(recurringRepositoryProvider)
-              .processAutoRecordDue()
-              .catchError((_) => 0),
-        );
+        unawaited(_runStartupTasks());
       });
     });
   }
@@ -123,6 +122,29 @@ class _BudgetAppState extends ConsumerState<BudgetApp> {
     _autoRecordTimer?.cancel();
     _deepLinkSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _runStartupTasks() async {
+    try {
+      await ref.read(recurringRepositoryProvider).processAutoRecordDue();
+    } catch (_) {}
+    if (!mounted) return;
+    try {
+      final recurring = await ref
+          .read(recurringRepositoryProvider)
+          .watchAll(includeInactive: true)
+          .first;
+      final debts = await ref.read(debtRepositoryProvider).watchAll().first;
+      final latestFuliza =
+          await ref.read(fulizaRepositoryProvider).watchLatest().first;
+      if (!mounted) return;
+      await ref.read(reminderNotificationServiceProvider).syncReminders(
+            recurring: recurring,
+            debts: debts,
+            latestFuliza: latestFuliza,
+            requestPermission: true,
+          );
+    } catch (_) {}
   }
 
   void _handleDeepLink(String link) {
@@ -137,10 +159,25 @@ class _BudgetAppState extends ConsumerState<BudgetApp> {
   void _dispatchDeepLink(String link) {
     final nav = widget.navigatorKey.currentState;
     if (nav == null) return;
-    if (Uri.tryParse(link)?.host == 'add_transaction') {
+    final host = Uri.tryParse(link)?.host;
+    if (host == 'add_transaction') {
       nav.push(
         MaterialPageRoute(builder: (_) => const AddTransactionScreen()),
       );
+      return;
+    }
+    if (host == 'share_text') {
+      final sharedText = DeepLinkService.extractSharedText(link);
+      if (sharedText != null) {
+        unawaited(
+          HomeFloatingActionButtons.handleIncomingMpesaText(
+            nav.context,
+            ref,
+            sharedText,
+            fromShare: true,
+          ),
+        );
+      }
     }
   }
 

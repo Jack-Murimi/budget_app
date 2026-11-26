@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:ffi';
-import 'dart:io';
 
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/add_transaction/screens/add_transaction_screen.dart';
 import 'package:budget_app/features/settings/auth_gate.dart';
 import 'package:budget_app/features/settings/auth_service.dart';
+import 'package:budget_app/features/transactions/widgets/batch_mpesa_paste_sheet.dart';
 import 'package:budget_app/main.dart';
 import 'package:budget_app/shared/providers/theme_provider.dart';
 import 'package:drift/native.dart';
@@ -13,7 +12,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqlite3/open.dart';
 
 class _FakeAuthService extends AuthService {
   bool nextAvailable = true;
@@ -37,12 +35,6 @@ class _FakeAuthService extends AuthService {
 }
 
 void main() {
-  if (Platform.isLinux) {
-    open.overrideFor(
-      OperatingSystem.linux,
-      () => DynamicLibrary.open('libsqlite3.so.0'),
-    );
-  }
 
   testWidgets('locks immediately on first frame when biometrics enabled and unlocks on auth',
       (tester) async {
@@ -200,5 +192,106 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AddTransactionScreen), findsOneWidget);
+  });
+
+  testWidgets('queues share_text link while locked and opens pre-filled AddTransactionScreen on unlock',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'bio_enabled': true,
+      'auto_lock_seconds': 0,
+    });
+    final prefs = await SharedPreferences.getInstance();
+    final fakeAuth = _FakeAuthService();
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    final linkCtrl = StreamController<String>();
+    final navKey = GlobalKey<NavigatorState>();
+    addTearDown(db.close);
+    addTearDown(linkCtrl.close);
+
+    final container = ProviderContainer(
+      overrides: [
+        dbProvider.overrideWithValue(db),
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        authServiceProvider.overrideWithValue(fakeAuth),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: BudgetApp(
+          navigatorKey: navKey,
+          deepLinkStream: linkCtrl.stream,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    const sms =
+        'UK3QX11U87 Confirmed. Ksh70.00 sent to JOHN DOE 0712345678 on 3/12/26 at 10:41 PM. New M-PESA balance is Ksh500.00. Transaction cost, Ksh0.00';
+    final shareLink = Uri(
+      scheme: 'budgetke',
+      host: 'share_text',
+      queryParameters: {'text': sms},
+    ).toString();
+
+    linkCtrl.add(shareLink);
+    await tester.pump();
+    expect(find.byType(AddTransactionScreen), findsNothing);
+    expect(find.text('App Locked'), findsOneWidget);
+
+    await tester.tap(find.text('Unlock'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AddTransactionScreen), findsOneWidget);
+    expect(find.text('Complete Transaction'), findsOneWidget);
+    expect(find.textContaining('JOHN DOE'), findsWidgets);
+  });
+
+  testWidgets('unlocked share_text with 2 M-Pesa messages opens BatchMpesaPasteSheet',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({'bio_enabled': false});
+    final prefs = await SharedPreferences.getInstance();
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    final linkCtrl = StreamController<String>();
+    final navKey = GlobalKey<NavigatorState>();
+    addTearDown(db.close);
+    addTearDown(linkCtrl.close);
+
+    final container = ProviderContainer(
+      overrides: [
+        dbProvider.overrideWithValue(db),
+        sharedPreferencesProvider.overrideWithValue(prefs),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: BudgetApp(
+          navigatorKey: navKey,
+          deepLinkStream: linkCtrl.stream,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    const batchSms = '''
+UK3QX11U87 Confirmed. Ksh70.00 sent to JOHN DOE 0712345678 on 3/12/26 at 10:41 PM. New M-PESA balance is Ksh500.00.
+VK4QX22V99 Confirmed. Ksh500.00 paid to KPLC PREPAID. on 15/10/26 at 8:00 PM. New M-PESA balance is Ksh2,000.00.
+''';
+    final shareLink = Uri(
+      scheme: 'budgetke',
+      host: 'share_text',
+      queryParameters: {'text': batchSms},
+    ).toString();
+
+    linkCtrl.add(shareLink);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BatchMpesaPasteSheet), findsOneWidget);
+    expect(find.text('2 ready'), findsOneWidget);
   });
 }

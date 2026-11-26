@@ -3464,6 +3464,432 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dismiss'**
   String get dismiss;
+
+  /// No description provided for @categories.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get categories;
+
+  /// No description provided for @selectCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Categories'**
+  String get selectCategories;
+
+  /// No description provided for @searchCategoriesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search categories...'**
+  String get searchCategoriesHint;
+
+  /// No description provided for @categoriesSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Overall Budget (All Expenses)} =1{1 category selected} other{{count} categories selected}}'**
+  String categoriesSelectedCount(int count);
+
+  /// No description provided for @allSubcategoriesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'All {count} subcategories'**
+  String allSubcategoriesCount(int count);
+
+  /// No description provided for @selectedOfTotalSubcategories.
+  ///
+  /// In en, this message translates to:
+  /// **'{selected} of {total} selected'**
+  String selectedOfTotalSubcategories(int selected, int total);
+
+  /// No description provided for @subcategoriesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 subcategory} other{{count} subcategories}}'**
+  String subcategoriesCount(int count);
+
+  /// No description provided for @clearSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clearSelection;
+
+  /// No description provided for @includedCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Included Categories'**
+  String get includedCategories;
+
+  /// No description provided for @chooseProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Provider'**
+  String get chooseProvider;
+
+  /// No description provided for @kenyanBanks.
+  ///
+  /// In en, this message translates to:
+  /// **'Kenyan Banks'**
+  String get kenyanBanks;
+
+  /// No description provided for @mobileMoney.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile Money'**
+  String get mobileMoney;
+
+  /// No description provided for @cashAndCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash & Custom'**
+  String get cashAndCustom;
+
+  /// No description provided for @customAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Account'**
+  String get customAccount;
+
+  /// No description provided for @customAccountSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your own wallet or bank'**
+  String get customAccountSub;
+
+  /// No description provided for @searchProvidersHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search banks or wallets...'**
+  String get searchProvidersHint;
+
+  /// No description provided for @addYourBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Your Bank'**
+  String get addYourBank;
+
+  /// No description provided for @addYourBankSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the Kenyan bank you actually use — Equity, KCB, Co-op, NCBA & more'**
+  String get addYourBankSubtitle;
+
+  /// No description provided for @moreBanks.
+  ///
+  /// In en, this message translates to:
+  /// **'More banks'**
+  String get moreBanks;
+
+  /// No description provided for @changeBrand.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Bank / Brand'**
+  String get changeBrand;
+
+  /// No description provided for @pasteMpesaSmsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste M-Pesa SMS'**
+  String get pasteMpesaSmsAction;
+
+  /// No description provided for @addBankQuick.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Bank'**
+  String get addBankQuick;
+
+  /// No description provided for @addManuallyQuick.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Manually'**
+  String get addManuallyQuick;
+
+  /// No description provided for @accountProviderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Brand / Provider'**
+  String get accountProviderLabel;
+
+  /// No description provided for @brandPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Card Preview'**
+  String get brandPreview;
+
+  /// No description provided for @batchPasteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch Import M-Pesa'**
+  String get batchPasteTitle;
+
+  /// No description provided for @batchPasteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste one or more M-Pesa SMS messages here...'**
+  String get batchPasteHint;
+
+  /// No description provided for @pasteFromClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get pasteFromClipboard;
+
+  /// No description provided for @parseMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Parse Messages'**
+  String get parseMessages;
+
+  /// No description provided for @batchReadyCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} ready'**
+  String batchReadyCount(int count);
+
+  /// No description provided for @batchDuplicateCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} duplicate'**
+  String batchDuplicateCount(int count);
+
+  /// No description provided for @batchUnparsedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} unparsed'**
+  String batchUnparsedCount(int count);
+
+  /// No description provided for @duplicateBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate'**
+  String get duplicateBadge;
+
+  /// No description provided for @importSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Import {count}'**
+  String importSelectedCount(int count);
+
+  /// No description provided for @batchImportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} transactions'**
+  String batchImportSuccess(int count);
+
+  /// No description provided for @batchImportSuccessWithSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} transactions ({skipped} skipped)'**
+  String batchImportSuccessWithSkipped(int count, int skipped);
+
+  /// No description provided for @batchImportNothingNew.
+  ///
+  /// In en, this message translates to:
+  /// **'No new transactions to import'**
+  String get batchImportNothingNew;
+
+  /// No description provided for @batchImportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch Import'**
+  String get batchImportAction;
+
+  /// No description provided for @sharedTextNotMpesa.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared text is not a recognized M-Pesa SMS'**
+  String get sharedTextNotMpesa;
+
+  /// No description provided for @categoryBreakdownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Category Breakdown'**
+  String get categoryBreakdownTitle;
+
+  /// No description provided for @categoryBreakdownShare.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% of spent'**
+  String categoryBreakdownShare(int percent);
+
+  /// No description provided for @categoryTxnCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No expenses} =1{1 expense} other{{count} expenses}}'**
+  String categoryTxnCount(int count);
+
+  /// No description provided for @pinnedBudgets.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned Budgets'**
+  String get pinnedBudgets;
+
+  /// No description provided for @pinToHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin to Home'**
+  String get pinToHome;
+
+  /// No description provided for @unpinFromHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin from Home'**
+  String get unpinFromHome;
+
+  /// No description provided for @budgetPinnedToHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned to Home'**
+  String get budgetPinnedToHome;
+
+  /// No description provided for @budgetUnpinnedFromHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpinned from Home'**
+  String get budgetUnpinnedFromHome;
+
+  /// No description provided for @maxPinnedBudgetsReached.
+  ///
+  /// In en, this message translates to:
+  /// **'You can pin up to {max} budgets on Home'**
+  String maxPinnedBudgetsReached(int max);
+
+  /// No description provided for @budgetWarning80Alert.
+  ///
+  /// In en, this message translates to:
+  /// **'Heads up: {name} budget reached {percent}%'**
+  String budgetWarning80Alert(String name, int percent);
+
+  /// No description provided for @budgetExceededAlert.
+  ///
+  /// In en, this message translates to:
+  /// **'Over budget: {name} is now at {percent}%'**
+  String budgetExceededAlert(String name, int percent);
+
+  /// No description provided for @remindBeforeDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind when due'**
+  String get remindBeforeDue;
+
+  /// No description provided for @remindBeforeDueDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a local reminder when this bill is due or overdue'**
+  String get remindBeforeDueDesc;
+
+  /// No description provided for @debtDueSoonBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 debt or Fuliza balance due soon} other{{count} debts/Fuliza due soon}}'**
+  String debtDueSoonBanner(int count);
+
+  /// No description provided for @debtOverdueBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 debt or Fuliza payment overdue} other{{count} debt/Fuliza payments overdue}}'**
+  String debtOverdueBanner(int count);
+
+  /// No description provided for @splitAcrossCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Split across categories'**
+  String get splitAcrossCategories;
+
+  /// No description provided for @splitAcrossCategoriesDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Divide this payment across multiple categories'**
+  String get splitAcrossCategoriesDesc;
+
+  /// No description provided for @addSplitRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Add category split'**
+  String get addSplitRow;
+
+  /// No description provided for @splitNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Note (optional)'**
+  String get splitNoteHint;
+
+  /// No description provided for @splitBalanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Split balanced ({total})'**
+  String splitBalanced(String total);
+
+  /// No description provided for @splitRemainingAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} left to assign'**
+  String splitRemainingAmount(String amount);
+
+  /// No description provided for @splitOverAllocated.
+  ///
+  /// In en, this message translates to:
+  /// **'Over by {amount}'**
+  String splitOverAllocated(String amount);
+
+  /// No description provided for @fillRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill remaining'**
+  String get fillRemaining;
+
+  /// No description provided for @splitRequiresTwoRows.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least 2 split categories'**
+  String get splitRequiresTwoRows;
+
+  /// No description provided for @splitSelectAllCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a category for every split row'**
+  String get splitSelectAllCategories;
+
+  /// No description provided for @splitAmountsMustMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Split amounts must equal the transaction total'**
+  String get splitAmountsMustMatch;
+
+  /// No description provided for @splitCountBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Split ({count})'**
+  String splitCountBadge(int count);
+
+  /// No description provided for @backupReminderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up your data'**
+  String get backupReminderTitle;
+
+  /// No description provided for @backupReminderNever.
+  ///
+  /// In en, this message translates to:
+  /// **'You haven\'t exported an encrypted backup yet. Save a copy to keep your records safe.'**
+  String get backupReminderNever;
+
+  /// No description provided for @backupReminderDaysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'Last backup was {days} days ago. Export a fresh copy to stay protected.'**
+  String backupReminderDaysAgo(int days);
+
+  /// No description provided for @backupNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up'**
+  String get backupNow;
+
+  /// No description provided for @dismissBackupReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get dismissBackupReminder;
 }
 
 class _AppLocalizationsDelegate

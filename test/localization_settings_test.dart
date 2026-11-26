@@ -1,6 +1,3 @@
-import 'dart:ffi';
-import 'dart:io';
-
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/debts/screens/debts_screen.dart';
 import 'package:budget_app/features/fuliza/screens/fuliza_screen.dart';
@@ -19,15 +16,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqlite3/open.dart';
 
 void main() {
-  if (Platform.isLinux) {
-    open.overrideFor(
-      OperatingSystem.linux,
-      () => DynamicLibrary.open('libsqlite3.so.0'),
-    );
-  }
 
   Widget wrapSwahili(ProviderContainer container, Widget child) {
     return UncontrolledProviderScope(

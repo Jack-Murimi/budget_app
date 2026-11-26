@@ -1,19 +1,9 @@
-import 'dart:ffi';
-import 'dart:io';
-
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/goals/repositories/goal_repository.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/open.dart';
 
 void main() {
-  if (Platform.isLinux) {
-    open.overrideFor(
-      OperatingSystem.linux,
-      () => DynamicLibrary.open('libsqlite3.so.0'),
-    );
-  }
 
   test('contribution updates progress and creates a linked transfer', () async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());

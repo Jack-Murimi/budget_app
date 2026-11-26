@@ -3,6 +3,7 @@ package com.budgetapp.budget_app
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -62,14 +63,32 @@ class MainActivity : FlutterFragmentActivity() {
             })
 
         // Capture launch intent
-        intent?.data?.toString()?.let { pendingLink = it }
+        extractDeepLink(intent)?.let { pendingLink = it }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.data?.toString()?.let { link ->
+        setIntent(intent)
+        extractDeepLink(intent)?.let { link ->
             if (eventSink != null) eventSink?.success(link)
             else pendingLink = link
         }
+    }
+
+    private fun extractDeepLink(intent: Intent?): String? {
+        if (intent?.action == Intent.ACTION_SEND &&
+            intent.type?.startsWith("text/") == true
+        ) {
+            val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim()
+            if (!sharedText.isNullOrEmpty()) {
+                return Uri.Builder()
+                    .scheme("budgetke")
+                    .authority("share_text")
+                    .appendQueryParameter("text", sharedText)
+                    .build()
+                    .toString()
+            }
+        }
+        return intent?.data?.toString()
     }
 }

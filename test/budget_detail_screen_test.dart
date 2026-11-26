@@ -1,6 +1,3 @@
-import 'dart:ffi';
-import 'dart:io';
-
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/budgets/repositories/budget_repository.dart';
 import 'package:budget_app/features/budgets/screens/budget_detail_screen.dart';
@@ -10,15 +7,8 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/open.dart';
 
 void main() {
-  if (Platform.isLinux) {
-    open.overrideFor(
-      OperatingSystem.linux,
-      () => DynamicLibrary.open('libsqlite3.so.0'),
-    );
-  }
 
   late AppDatabase db;
   late BudgetRepository repo;
@@ -162,6 +152,101 @@ void main() {
     expect(find.byType(BudgetDetailScreen), findsNothing);
     expect(find.text('Budget deleted'), findsOneWidget);
     expect(await db.select(db.budgets).get(), isEmpty);
+
+    await unmountTree(tester);
+  });
+
+  testWidgets('BudgetDetailScreen shows Category Breakdown for multi-category budget and toggles pin to Home',
+      (tester) async {
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+    final catTreats = await db.into(db.categories).insert(
+          CategoriesCompanion.insert(
+            name: 'Treats',
+            colorHex: const Value('#E91E63'),
+          ),
+        );
+    final catMisc = await db.into(db.categories).insert(
+          CategoriesCompanion.insert(
+            name: 'Miscellaneous',
+            colorHex: const Value('#9C27B0'),
+          ),
+        );
+
+    final id = await repo.insertBudget(
+      BudgetsCompanion.insert(
+        name: 'Fun & Misc',
+        amount: 5000.0,
+        period: const Value('monthly'),
+        startDate: monthStart,
+      ),
+      categoryIds: [catTreats, catMisc],
+    );
+
+    await db.into(db.transactions).insert(
+          TransactionsCompanion.insert(
+            header: 'Java Coffee',
+            amount: 1500.0,
+            type: const Value('expense'),
+            categoryId: Value(catTreats),
+            transactionDate: now,
+          ),
+        );
+    await db.into(db.transactions).insert(
+          TransactionsCompanion.insert(
+            header: 'Gift Wrap',
+            amount: 500.0,
+            type: const Value('expense'),
+            categoryId: Value(catMisc),
+            transactionDate: now,
+          ),
+        );
+
+    final initial =
+        (await repo.watchBudgetsWithProgress().first).firstWhere((b) => b.id == id);
+    expect(initial.isMultiCategory, isTrue);
+
+    final container = ProviderContainer(
+      overrides: [dbProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: BudgetDetailScreen(budgetWithProgress: initial),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final breakdownCard = find.ancestor(
+      of: find.text('Category Breakdown'),
+      matching: find.byType(Card),
+    );
+    expect(breakdownCard, findsOneWidget);
+    expect(
+      find.descendant(
+        of: breakdownCard,
+        matching: find.text('KES 1,500.00'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: breakdownCard,
+        matching: find.text('KES 500.00'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('75% of spent'), findsOneWidget);
+    expect(find.textContaining('25% of spent'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Pin to Home'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pinned to Home'), findsOneWidget);
+    expect(find.byTooltip('Unpin from Home'), findsOneWidget);
 
     await unmountTree(tester);
   });

@@ -9,7 +9,7 @@ import '../../../shared/utils/category_icon_helper.dart';
 import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/widgets/motion.dart';
-import '../../categories/widgets/category_picker.dart';
+import '../../categories/widgets/multi_category_picker.dart';
 import '../models/budget_model.dart';
 import '../providers/budget_providers.dart';
 import '../utils/budget_period_helper.dart';
@@ -29,6 +29,7 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final budgetsAsync = ref.watch(allBudgetsWithProgressProvider);
+    final pinnedIds = ref.watch(pinnedBudgetIdsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -68,7 +69,10 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
                   FadeSlideIn(
                     key: ValueKey('${b.id}-$_showArchived'),
                     index: i,
-                    child: _buildBudgetCard(b),
+                    child: _buildBudgetCard(
+                      b,
+                      isPinned: pinnedIds.contains(b.id),
+                    ),
                   ),
                 if (_showArchived && filteredBudgets.isEmpty)
                   Padding(
@@ -104,7 +108,7 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
         _ => l10n.custom,
       };
 
-  Widget _buildBudgetCard(BudgetWithProgress b) {
+  Widget _buildBudgetCard(BudgetWithProgress b, {bool isPinned = false}) {
     final theme = Theme.of(context);
     final l10n = context.l10n;
     final isOver = b.isOverBudget;
@@ -240,10 +244,12 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
           leading: CircleAvatar(
             backgroundColor: categoryColor.withValues(alpha: 0.15),
             child: Icon(
-              CategoryIconHelper.resolveCategoryIcon(
-                iconName: b.categoryIcon,
-                categoryName: b.categoryName,
-              ),
+              b.isMultiCategory
+                  ? Icons.layers_outlined
+                  : CategoryIconHelper.resolveCategoryIcon(
+                      iconName: b.categoryIcon,
+                      categoryName: b.categoryName,
+                    ),
               color: categoryColor,
             ),
           ),
@@ -282,7 +288,9 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
                     ? l10n.overBudgetBy(
                         CurrencyFormatter.format(b.spent - b.amount),
                       )
-                    : (b.categoryName ?? ''),
+                    : b.categorySummary,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: isOver
                       ? theme.colorScheme.error
@@ -297,16 +305,56 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
               ? IconButton(
                   icon: const Icon(Icons.unarchive_outlined),
                   tooltip: l10n.unarchive,
-                  onPressed: () => ref
-                      .read(budgetRepositoryProvider)
-                      .archiveBudget(b.id, archive: false),
+                  onPressed: () {
+                    ref.read(pinnedBudgetIdsProvider.notifier).unpin(b.id);
+                    ref
+                        .read(budgetRepositoryProvider)
+                        .archiveBudget(b.id, archive: false);
+                  },
                 )
-              : Chip(
-                  visualDensity: VisualDensity.compact,
-                  label: Text(
-                    _periodLabel(b.budget.period, l10n),
-                    style: theme.textTheme.labelSmall,
-                  ),
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        isPinned
+                            ? Icons.push_pin_rounded
+                            : Icons.push_pin_outlined,
+                        size: 20,
+                        color: isPinned
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                      tooltip: isPinned ? l10n.unpinFromHome : l10n.pinToHome,
+                      onPressed: () {
+                        final ok = ref
+                            .read(pinnedBudgetIdsProvider.notifier)
+                            .toggle(b.id);
+                        ScaffoldMessenger.of(context)
+                          ..clearSnackBars()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                !ok
+                                    ? l10n.maxPinnedBudgetsReached(
+                                        PinnedBudgetsNotifier.maxPinned,
+                                      )
+                                    : (isPinned
+                                        ? l10n.budgetUnpinnedFromHome
+                                        : l10n.budgetPinnedToHome),
+                              ),
+                            ),
+                          );
+                      },
+                    ),
+                    Chip(
+                      visualDensity: VisualDensity.compact,
+                      label: Text(
+                        _periodLabel(b.budget.period, l10n),
+                        style: theme.textTheme.labelSmall,
+                      ),
+                    ),
+                  ],
                 ),
           onTap: () => _openDetail(b),
         ),
@@ -324,12 +372,14 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
   }
 
   Future<void> _showCreateDialog() async {
-    final result = await showDialog<BudgetsCompanion>(
+    final result = await showDialog<BudgetFormResult>(
       context: context,
       builder: (_) => const BudgetFormDialog(),
     );
     if (result == null) return;
-    await ref.read(budgetRepositoryProvider).insertBudget(result);
+    await ref
+        .read(budgetRepositoryProvider)
+        .insertBudget(result.companion, categoryIds: result.categoryIds);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(context.l10n.budgetCreated)),
@@ -340,12 +390,12 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
 /// Shared create/edit budget dialog that owns and disposes its controllers.
 class BudgetFormDialog extends StatefulWidget {
   final BudgetWithProgress? existing;
-  final Category? initialCategory;
+  final List<Category> initialCategories;
 
   const BudgetFormDialog({
     super.key,
     this.existing,
-    this.initialCategory,
+    this.initialCategories = const [],
   });
 
   @override
@@ -361,7 +411,7 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
   );
 
   late String _period = widget.existing?.period ?? 'monthly';
-  late Category? _selectedCategory = widget.initialCategory;
+  late List<Category> _selectedCategories = List.of(widget.initialCategories);
   late bool _rollover = widget.existing?.budget.rollover ?? false;
   late DateTime _customStart =
       widget.existing?.budget.startDate ?? DateTime.now();
@@ -479,26 +529,54 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
             ],
             const SizedBox(height: 16),
             ListTile(
-              title: Text(l10n.category),
+              title: Text(l10n.categories),
               subtitle: Text(
-                _selectedCategory == null
-                    ? l10n.overallBudgetAllExpenses
-                    : _selectedCategory!.name,
+                l10n.categoriesSelectedCount(_selectedCategories.length),
               ),
-              trailing: _selectedCategory != null
+              trailing: _selectedCategories.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear),
                       tooltip: l10n.useOverallBudget,
-                      onPressed: () => setState(() => _selectedCategory = null),
+                      onPressed: () =>
+                          setState(() => _selectedCategories = []),
                     )
                   : const Icon(Icons.chevron_right),
               onTap: () async {
-                final cat = await showCategoryPicker(context);
-                if (cat != null && mounted) {
-                  setState(() => _selectedCategory = cat);
+                final picked = await showMultiCategoryPicker(
+                  context,
+                  initialSelectedIds:
+                      _selectedCategories.map((c) => c.id).toSet(),
+                );
+                if (picked != null && mounted) {
+                  setState(() => _selectedCategories = picked);
                 }
               },
             ),
+            if (_selectedCategories.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final cat in _selectedCategories)
+                    InputChip(
+                      avatar: Icon(
+                        CategoryIconHelper.resolveCategoryIcon(
+                          iconName: cat.icon,
+                          categoryName: cat.name,
+                          type: cat.transactionType,
+                        ),
+                        size: 16,
+                        color: parseHexColor(cat.colorHex),
+                      ),
+                      label: Text(cat.name),
+                      onDeleted: () => setState(() {
+                        _selectedCategories.removeWhere((c) => c.id == cat.id);
+                      }),
+                    ),
+                ],
+              ),
+            ],
             if (_period != 'custom') ...[
               const SizedBox(height: 8),
               SwitchListTile(
@@ -538,32 +616,41 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
                 : (widget.existing?.budget.startDate ?? DateTime.now());
             final endDate = _period == 'custom' ? _customEnd : null;
             final rolloverFlag = _period == 'custom' ? false : _rollover;
+            final categoryIds = _selectedCategories.map((c) => c.id).toList();
+            final primaryCategoryId =
+                categoryIds.isEmpty ? null : categoryIds.first;
 
             if (_isEdit) {
               Navigator.pop(
                 context,
-                BudgetsCompanion(
-                  id: Value(widget.existing!.id),
-                  name: Value(name),
-                  amount: Value(amount),
-                  period: Value(_period),
-                  categoryId: Value(_selectedCategory?.id),
-                  startDate: Value(startDate),
-                  endDate: Value(endDate),
-                  rollover: Value(rolloverFlag),
+                BudgetFormResult(
+                  companion: BudgetsCompanion(
+                    id: Value(widget.existing!.id),
+                    name: Value(name),
+                    amount: Value(amount),
+                    period: Value(_period),
+                    categoryId: Value(primaryCategoryId),
+                    startDate: Value(startDate),
+                    endDate: Value(endDate),
+                    rollover: Value(rolloverFlag),
+                  ),
+                  categoryIds: categoryIds,
                 ),
               );
             } else {
               Navigator.pop(
                 context,
-                BudgetsCompanion.insert(
-                  name: name,
-                  amount: amount,
-                  period: Value(_period),
-                  categoryId: Value(_selectedCategory?.id),
-                  startDate: startDate,
-                  endDate: Value(endDate),
-                  rollover: Value(rolloverFlag),
+                BudgetFormResult(
+                  companion: BudgetsCompanion.insert(
+                    name: name,
+                    amount: amount,
+                    period: Value(_period),
+                    categoryId: Value(primaryCategoryId),
+                    startDate: startDate,
+                    endDate: Value(endDate),
+                    rollover: Value(rolloverFlag),
+                  ),
+                  categoryIds: categoryIds,
                 ),
               );
             }

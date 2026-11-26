@@ -11,7 +11,9 @@ import '../../debts/screens/debts_screen.dart';
 import '../../fuliza/screens/fuliza_screen.dart';
 import '../../goals/screens/goals_screen.dart';
 import '../../insights/screens/insights_screen.dart';
+import '../../portability/providers/backup_reminder_provider.dart';
 import '../../portability/screens/data_portability_screen.dart';
+import '../../portability/widgets/backup_reminder_banner.dart';
 import '../../recurring/screens/recurring_screen.dart';
 import '../../settings/settings_screen.dart';
 import '../models/more_item_config.dart';
@@ -88,7 +90,11 @@ List<MoreSectionConfig> buildMoreSections(
         MoreItemConfig(
           title: l10n.moreExportBackup,
           icon: Icons.import_export_outlined,
-          destination: (_) => DataPortabilityScreen(db: ref.read(dbProvider)),
+          destination: (_) => DataPortabilityScreen(
+            db: ref.read(dbProvider),
+            onBackupCompleted: () =>
+                ref.read(backupReminderProvider.notifier).markBackedUp(),
+          ),
         ),
       ],
     ),
@@ -171,6 +177,10 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               ),
             ),
           ),
+          if (_query.isEmpty)
+            const BackupReminderBanner(
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
+            ),
           Expanded(
             child: filteredSections.isEmpty
                 ? Center(

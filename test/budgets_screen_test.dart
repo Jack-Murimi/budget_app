@@ -1,5 +1,3 @@
-import 'dart:ffi';
-import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -9,14 +7,10 @@ import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/budgets/models/budget_model.dart';
 import 'package:budget_app/features/budgets/screens/budget_detail_screen.dart';
 import 'package:budget_app/main.dart';
-import 'package:sqlite3/open.dart';
 import 'package:budget_app/features/budgets/screens/budgets_screen.dart';
 import 'package:budget_app/shared/theme/app_theme.dart';
 
 void main() {
-  if (Platform.isLinux) {
-    open.overrideFor(OperatingSystem.linux, () => DynamicLibrary.open('libsqlite3.so.0'));
-  }
 
   late AppDatabase db;
 
@@ -59,7 +53,7 @@ void main() {
     expect(find.text('Name *'), findsOneWidget);
     expect(find.text('Amount (KES) *'), findsOneWidget);
     expect(find.text('Period'), findsOneWidget);
-    expect(find.text('Category'), findsOneWidget);
+    expect(find.text('Categories'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
   });
@@ -279,5 +273,113 @@ void main() {
 
     expect(find.text('Fresh Expense'), findsOneWidget);
     expect(find.textContaining('KES 750.00 / KES 5,000.00'), findsOneWidget);
+  });
+
+  testWidgets('BudgetsScreen creates multi-category & subcategory budget and tracks combined spending',
+      (tester) async {
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    final allCats = await db.select(db.categories).get();
+    final giftsParent = allCats.firstWhere((c) => c.name == 'Gifts & Treats');
+    final friendsSub = allCats.firstWhere((c) => c.name == 'Treats & Buying for Friends');
+    final miscParent = allCats.firstWhere((c) => c.name == 'Miscellaneous');
+    final impulseSub = allCats.firstWhere((c) => c.name == 'Impulse / Unplanned');
+
+    await db.into(db.transactions).insert(
+      TransactionsCompanion.insert(
+        header: 'Bought friend lunch',
+        amount: 800.0,
+        type: const Value('expense'),
+        categoryId: Value(friendsSub.id),
+        transactionDate: DateTime.now(),
+      ),
+    );
+    await db.into(db.transactions).insert(
+      TransactionsCompanion.insert(
+        header: 'Random gadget',
+        amount: 1200.0,
+        type: const Value('expense'),
+        categoryId: Value(impulseSub.id),
+        transactionDate: DateTime.now(),
+      ),
+    );
+
+    await pumpBudgetsScreen(tester, container);
+
+    // Open Create Budget dialog
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Name *'),
+      'Friends & Fun',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Amount (KES) *'),
+      '5000',
+    );
+
+    // Open multi-category picker
+    await tester.tap(find.text('Categories'));
+    await tester.pumpAndSettle();
+
+    // Search & expand Gifts & Treats to pick Treats & Buying for Friends
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Search categories...'),
+      'Friends',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Treats & Buying for Friends'));
+    await tester.pumpAndSettle();
+
+    // Clear search, select Miscellaneous parent category
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Search categories...'),
+      'Miscellaneous',
+    );
+    await tester.pumpAndSettle();
+    final miscTile = find.ancestor(
+      of: find.text('Miscellaneous'),
+      matching: find.byType(ListTile),
+    );
+    await tester.tap(
+      find.descendant(of: miscTile, matching: find.byType(Checkbox)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 categories selected'), findsOneWidget);
+    await tester.tap(find.text('Apply'));
+    await tester.pumpAndSettle();
+
+    // Chips shown in form dialog
+    expect(find.widgetWithText(InputChip, 'Treats & Buying for Friends'), findsOneWidget);
+    expect(find.widgetWithText(InputChip, 'Miscellaneous'), findsOneWidget);
+
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    // Verify card shows combined spent across both categories
+    expect(find.text('Friends & Fun'), findsOneWidget);
+    expect(find.text('KES 2,000.00 / KES 5,000.00'), findsOneWidget);
+
+    final createdBudgets = await db.select(db.budgets).get();
+    expect(createdBudgets, hasLength(1));
+    final linked = await db.select(db.budgetCategories).get();
+    expect(
+      linked.map((r) => r.categoryId).toSet(),
+      equals({friendsSub.id, miscParent.id}),
+    );
+    expect(giftsParent.id, isNot(linked.first.categoryId));
+
+    // Open BudgetDetailScreen and verify category chips + contributing txns
+    await tester.tap(find.text('Friends & Fun'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BudgetDetailScreen), findsOneWidget);
+    expect(find.widgetWithText(Chip, 'Treats & Buying for Friends'), findsOneWidget);
+    expect(find.widgetWithText(Chip, 'Miscellaneous'), findsOneWidget);
+    expect(find.text('Bought friend lunch'), findsOneWidget);
+    expect(find.text('Random gadget'), findsOneWidget);
   });
 }

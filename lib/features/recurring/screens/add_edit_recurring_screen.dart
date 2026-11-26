@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/reminder_notification_service.dart';
 import '../../../l10n/l10n.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../../categories/providers/category_providers.dart';
 import '../../categories/widgets/category_picker.dart';
+import '../../debts/providers/debt_providers.dart';
+import '../../fuliza/providers/fuliza_providers.dart';
 import '../models/recurring_model.dart';
 import '../providers/recurring_providers.dart';
 import '../services/recurrence_engine.dart';
@@ -36,6 +40,7 @@ class _AddEditRecurringScreenState
   Category? _selectedCategory;
   bool _categoryInitialized = false;
   bool _autoRecord = false;
+  bool _notify = true;
   bool _isSaving = false;
 
   bool get _isEditing => widget.recurringToEdit != null;
@@ -55,6 +60,7 @@ class _AddEditRecurringScreenState
       _endDate = item.endDate;
       _selectedAccountId = item.accountId;
       _autoRecord = item.autoRecord;
+      _notify = item.notify;
     }
   }
 
@@ -65,6 +71,26 @@ class _AddEditRecurringScreenState
     _notesCtrl.dispose();
     _intervalCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _syncRemindersAfterSave({required bool requestPermission}) async {
+    try {
+      final recurring = await ref
+          .read(recurringRepositoryProvider)
+          .watchAll(includeInactive: true)
+          .first;
+      final debts = await ref.read(debtRepositoryProvider).watchAll().first;
+      final latestFuliza =
+          await ref.read(fulizaRepositoryProvider).watchLatest().first;
+      await ref.read(reminderNotificationServiceProvider).syncReminders(
+            recurring: recurring,
+            debts: debts,
+            latestFuliza: latestFuliza,
+            requestPermission: requestPermission,
+          );
+    } catch (_) {
+      // Non-critical background reminder sync.
+    }
   }
 
   Future<void> _pickDueDate() async {
@@ -138,6 +164,7 @@ class _AddEditRecurringScreenState
           clearCategoryId: _selectedCategory == null,
           notes: _notesCtrl.text.trim(),
           autoRecord: _autoRecord,
+          notify: _notify,
         );
         await repo.update(updated);
       } else {
@@ -155,12 +182,15 @@ class _AddEditRecurringScreenState
           categoryId: _selectedCategory?.id,
           notes: _notesCtrl.text.trim(),
           autoRecord: _autoRecord,
+          notify: _notify,
           isActive: true,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
         await repo.insert(newRecurring);
       }
+
+      unawaited(_syncRemindersAfterSave(requestPermission: _notify));
 
       if (mounted) {
         Navigator.pop(context);
@@ -450,6 +480,13 @@ class _AddEditRecurringScreenState
               subtitle: Text(l10n.autoRecordWhenDueDesc),
               value: _autoRecord,
               onChanged: (v) => setState(() => _autoRecord = v),
+            ),
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+              title: Text(l10n.remindBeforeDue),
+              subtitle: Text(l10n.remindBeforeDueDesc),
+              value: _notify,
+              onChanged: (v) => setState(() => _notify = v),
             ),
             const SizedBox(height: 12),
 

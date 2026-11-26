@@ -1,4 +1,3 @@
-import 'dart:ffi';
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/debts/repositories/debt_repository.dart';
 import 'package:budget_app/features/debts/screens/debts_screen.dart';
@@ -8,12 +7,8 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-// ignore: depend_on_referenced_packages
-import 'package:sqlite3/open.dart';
 
 void main() {
-  open.overrideFor(
-      OperatingSystem.linux, () => DynamicLibrary.open('libsqlite3.so.0'));
 
   late AppDatabase db;
 

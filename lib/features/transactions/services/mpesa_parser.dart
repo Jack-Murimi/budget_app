@@ -1,11 +1,42 @@
 import '../models/mpesa_parse_result.dart';
 
+/// Result of splitting and parsing a multi-message M-Pesa text block.
+class MpesaBatchSplit {
+  final List<MpesaParseResult> valid;
+  final List<String> unparsedSegments;
+
+  const MpesaBatchSplit({
+    required this.valid,
+    required this.unparsedSegments,
+  });
+}
+
 /// Parses M-Pesa SMS messages into structured data.
 /// Auto-fills: ref, amount, cost, date/time, counterparty, type, balance.
 /// Never fills: header, category — user must set those.
 class MpesaParser {
   // Ref: 8-12 alphanumeric chars at message start (before first space)
   static final _refRe = RegExp(r'^([A-Z0-9]{8,12})\s+Confirmed', multiLine: false);
+
+  // Batch anchor: transaction reference followed by "Confirmed"
+  static final _batchAnchorRe = RegExp(
+    r'(?:^|[\s\n])([A-Z0-9]{8,12}\s+Confirmed\b)',
+    multiLine: true,
+  );
+
+  // Pure sender/timestamp prefix lines like "[12/11, 14:30] MPESA:" or "M-PESA:"
+  static final _senderPrefixLineRe = RegExp(
+    r'^\s*(?:\[?\d{1,2}/\d{1,2}(?:/\d{2,4})?(?:[,\s]+\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)?\]?\s*)?M-?PESA\s*:?\s*$',
+    caseSensitive: false,
+  );
+  static final _trailingSenderPrefixRe = RegExp(
+    r'(?:^|\n)\s*(?:\[?\d{1,2}/\d{1,2}(?:/\d{2,4})?(?:[,\s]+\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)?\]?\s*)?M-?PESA\s*:?\s*$',
+    caseSensitive: false,
+  );
+  static final _inlineSenderPrefixRe = RegExp(
+    r'^\s*(?:\[?\d{1,2}/\d{1,2}(?:/\d{2,4})?(?:[,\s]+\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)?\]?\s*)?M-?PESA\s*:?\s*$',
+    caseSensitive: false,
+  );
 
   // Amount: "Ksh 70.00" or "Ksh1000" or "KSH100.00"
   static final _amountRe = RegExp(r'[Kk][Ss][Hh]\s*([\d,]+\.?\d*)');
@@ -46,6 +77,76 @@ class MpesaParser {
   // apostrophes, dots, ampersands, and slashes.
   static const _nameChars = r"[A-Za-z0-9][A-Za-z0-9\s\-'.&/]+?";
   static const _phoneChars = r'\+?[\d*]{10,13}';
+
+  /// Splits a clipboard/shared text block containing one or more M-Pesa SMS
+  /// messages and parses each segment individually.
+  static MpesaBatchSplit parseBatch(String rawBlock, {DateTime? fallbackDate}) {
+    final normalized = rawBlock.replaceAll('\r\n', '\n').trim();
+    if (normalized.isEmpty) {
+      return const MpesaBatchSplit(valid: [], unparsedSegments: []);
+    }
+
+    final valid = <MpesaParseResult>[];
+    final unparsed = <String>[];
+
+    final matches = _batchAnchorRe.allMatches(normalized).toList();
+    if (matches.isEmpty) {
+      final chunks = normalized
+          .split(RegExp(r'\n\s*\n+'))
+          .map((c) => c.trim())
+          .where((c) => c.isNotEmpty);
+      for (final chunk in chunks) {
+        final parsed = parse(chunk, fallbackDate: fallbackDate);
+        if (parsed.isValid) {
+          valid.add(parsed);
+        } else {
+          unparsed.add(chunk);
+        }
+      }
+      return MpesaBatchSplit(valid: valid, unparsedSegments: unparsed);
+    }
+
+    int group1Start(RegExpMatch m) {
+      final full = m.group(0)!;
+      final g1 = m.group(1)!;
+      return m.start + full.indexOf(g1);
+    }
+
+    final firstStart = group1Start(matches.first);
+    if (firstStart > 0) {
+      final leading = normalized.substring(0, firstStart).trim();
+      if (leading.isNotEmpty &&
+          !_senderPrefixLineRe.hasMatch(leading) &&
+          !_inlineSenderPrefixRe.hasMatch(leading)) {
+        final parsedLeading = parse(leading, fallbackDate: fallbackDate);
+        if (parsedLeading.isValid) {
+          valid.add(parsedLeading);
+        } else {
+          unparsed.add(leading);
+        }
+      }
+    }
+
+    for (var i = 0; i < matches.length; i++) {
+      final start = group1Start(matches[i]);
+      final end = (i + 1 < matches.length)
+          ? group1Start(matches[i + 1])
+          : normalized.length;
+      var slice = normalized.substring(start, end).trim();
+      if (i + 1 < matches.length) {
+        slice = slice.replaceFirst(_trailingSenderPrefixRe, '').trim();
+      }
+      if (slice.isEmpty) continue;
+      final parsed = parse(slice, fallbackDate: fallbackDate);
+      if (parsed.isValid) {
+        valid.add(parsed);
+      } else {
+        unparsed.add(slice);
+      }
+    }
+
+    return MpesaBatchSplit(valid: valid, unparsedSegments: unparsed);
+  }
 
   static MpesaParseResult parse(String message, {DateTime? fallbackDate}) {
     final msg = message.trim();

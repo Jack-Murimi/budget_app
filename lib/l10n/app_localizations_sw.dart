@@ -1951,4 +1951,300 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get dismiss => 'Puuza';
+
+  @override
+  String get categories => 'Kategoria';
+
+  @override
+  String get selectCategories => 'Chagua Kategoria';
+
+  @override
+  String get searchCategoriesHint => 'Tafuta kategoria...';
+
+  @override
+  String categoriesSelectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Kategoria $count zimechaguliwa',
+      one: 'Kategoria 1 imechaguliwa',
+      zero: 'Bajeti ya Jumla (Matumizi Yote)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String allSubcategoriesCount(int count) {
+    return 'Kategoria ndogo zote $count';
+  }
+
+  @override
+  String selectedOfTotalSubcategories(int selected, int total) {
+    return '$selected kati ya $total zimechaguliwa';
+  }
+
+  @override
+  String subcategoriesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Kategoria ndogo $count',
+      one: 'Kategoria ndogo 1',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get clearSelection => 'Futa';
+
+  @override
+  String get includedCategories => 'Kategoria Zilizojumuishwa';
+
+  @override
+  String get chooseProvider => 'Chagua Mtoa Huduma';
+
+  @override
+  String get kenyanBanks => 'Benki za Kenya';
+
+  @override
+  String get mobileMoney => 'Pesa za Simu';
+
+  @override
+  String get cashAndCustom => 'Taslimu & Maalum';
+
+  @override
+  String get customAccount => 'Akaunti Maalum';
+
+  @override
+  String get customAccountSub => 'Unda pochi au benki yako';
+
+  @override
+  String get searchProvidersHint => 'Tafuta benki au pochi...';
+
+  @override
+  String get addYourBank => 'Ongeza Benki Yako';
+
+  @override
+  String get addYourBankSubtitle =>
+      'Chagua benki ya Kenya unayotumia — Equity, KCB, Co-op, NCBA na nyinginezo';
+
+  @override
+  String get moreBanks => 'Benki zaidi';
+
+  @override
+  String get changeBrand => 'Badilisha Benki / Chapa';
+
+  @override
+  String get pasteMpesaSmsAction => 'Bandika SMS ya M-Pesa';
+
+  @override
+  String get addBankQuick => 'Ongeza Benki';
+
+  @override
+  String get addManuallyQuick => 'Ongeza Kwa Mkono';
+
+  @override
+  String get accountProviderLabel => 'Chapa / Mtoa Huduma';
+
+  @override
+  String get brandPreview => 'Hakikisho la Kadi';
+
+  @override
+  String get batchPasteTitle => 'Ingiza SMS Nyingi za M-Pesa';
+
+  @override
+  String get batchPasteHint =>
+      'Bandika ujumbe mmoja au zaidi wa M-Pesa hapa...';
+
+  @override
+  String get pasteFromClipboard => 'Bandika';
+
+  @override
+  String get parseMessages => 'Changanua Ujumbe';
+
+  @override
+  String batchReadyCount(int count) {
+    return '$count tayari';
+  }
+
+  @override
+  String batchDuplicateCount(int count) {
+    return '$count nakala';
+  }
+
+  @override
+  String batchUnparsedCount(int count) {
+    return '$count hazikutambulika';
+  }
+
+  @override
+  String get duplicateBadge => 'Nakala';
+
+  @override
+  String importSelectedCount(int count) {
+    return 'Ingiza $count';
+  }
+
+  @override
+  String batchImportSuccess(int count) {
+    return 'Imeingiza miamala $count';
+  }
+
+  @override
+  String batchImportSuccessWithSkipped(int count, int skipped) {
+    return 'Imeingiza miamala $count ($skipped zimerukwa)';
+  }
+
+  @override
+  String get batchImportNothingNew => 'Hakuna miamala mipya ya kuingiza';
+
+  @override
+  String get batchImportAction => 'Ingiza Nyingi';
+
+  @override
+  String get sharedTextNotMpesa => 'Maandishi yaliyoshirikiwa si SMS ya M-Pesa';
+
+  @override
+  String get categoryBreakdownTitle => 'Mgawanyo wa Kategoria';
+
+  @override
+  String categoryBreakdownShare(int percent) {
+    return '$percent% ya matumizi';
+  }
+
+  @override
+  String categoryTxnCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Matumizi $count',
+      one: 'Matumizi 1',
+      zero: 'Hakuna matumizi',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pinnedBudgets => 'Bajeti Zilizobandikwa';
+
+  @override
+  String get pinToHome => 'Bandika Nyumbani';
+
+  @override
+  String get unpinFromHome => 'Ondoa Nyumbani';
+
+  @override
+  String get budgetPinnedToHome => 'Imebandikwa Nyumbani';
+
+  @override
+  String get budgetUnpinnedFromHome => 'Imeondolewa Nyumbani';
+
+  @override
+  String maxPinnedBudgetsReached(int max) {
+    return 'Unaweza kubandika hadi bajeti $max Nyumbani';
+  }
+
+  @override
+  String budgetWarning80Alert(String name, int percent) {
+    return 'Tahadhari: Bajeti ya $name imefikia $percent%';
+  }
+
+  @override
+  String budgetExceededAlert(String name, int percent) {
+    return 'Bajeti imezidi: $name sasa iko $percent%';
+  }
+
+  @override
+  String get remindBeforeDue => 'Nikumbushe ikikaribia';
+
+  @override
+  String get remindBeforeDueDesc =>
+      'Tuma kikumbusho bili hii inapokaribia au kuchelewa';
+
+  @override
+  String debtDueSoonBanner(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Madeni/Fuliza $count yanakaribia',
+      one: 'Deni 1 au Fuliza linakaribia',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String debtOverdueBanner(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Malipo $count ya madeni/Fuliza yamechelewa',
+      one: 'Malipo 1 ya deni au Fuliza yamechelewa',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get splitAcrossCategories => 'Gawanya kategoria';
+
+  @override
+  String get splitAcrossCategoriesDesc =>
+      'Gawanya malipo haya katika kategoria nyingi';
+
+  @override
+  String get addSplitRow => 'Ongeza mgawanyo';
+
+  @override
+  String get splitNoteHint => 'Maelezo (si lazima)';
+
+  @override
+  String splitBalanced(String total) {
+    return 'Mgawanyo umelingana ($total)';
+  }
+
+  @override
+  String splitRemainingAmount(String amount) {
+    return '$amount imebaki kugawanywa';
+  }
+
+  @override
+  String splitOverAllocated(String amount) {
+    return 'Imezidi kwa $amount';
+  }
+
+  @override
+  String get fillRemaining => 'Jaza iliyobaki';
+
+  @override
+  String get splitRequiresTwoRows => 'Ongeza angalau kategoria 2 za mgawanyo';
+
+  @override
+  String get splitSelectAllCategories =>
+      'Chagua kategoria kwa kila safu ya mgawanyo';
+
+  @override
+  String get splitAmountsMustMatch =>
+      'Kiasi cha mgawanyo lazima kilingane na jumla ya muamala';
+
+  @override
+  String splitCountBadge(int count) {
+    return 'Imegawanywa ($count)';
+  }
+
+  @override
+  String get backupReminderTitle => 'Hifadhi nakala ya data yako';
+
+  @override
+  String get backupReminderNever =>
+      'Bado hujatengeneza nakala iliyosimbwa. Hifadhi nakala ili kulinda kumbukumbu zako.';
+
+  @override
+  String backupReminderDaysAgo(int days) {
+    return 'Nakala ya mwisho ilikuwa siku $days zilizopita. Hamisha nakala mpya ili uendelee kulindwa.';
+  }
+
+  @override
+  String get backupNow => 'Hifadhi';
+
+  @override
+  String get dismissBackupReminder => 'Funga';
 }

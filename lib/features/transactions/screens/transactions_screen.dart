@@ -10,6 +10,7 @@ import '../../../shared/widgets/motion.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../../categories/providers/category_providers.dart';
 import '../../categories/widgets/category_picker.dart';
+import '../../home/widgets/floating_action_buttons.dart';
 import '../../home/widgets/transaction_list_item.dart';
 import '../models/transaction_model.dart';
 import '../providers/transaction_providers.dart';
@@ -206,6 +207,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.playlist_add_rounded),
+            tooltip: l10n.batchPasteTitle,
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              HomeFloatingActionButtons.openBatchPaste(context, ref);
+            },
+          ),
           // Search toggle
           IconButton(
             icon: AnimatedSwitcher(

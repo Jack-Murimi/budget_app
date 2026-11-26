@@ -49,6 +49,31 @@ flutter run
 flutter test
 ```
 
+## Automated Releases (GitHub Actions)
+
+Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml) to verify Play Protect safety (no `READ_SMS`/`RECEIVE_SMS`), run `flutter gen-l10n`, `flutter analyze`, and `flutter test`, build all 4 signed APKs + `SHA256SUMS.txt`, and publish the GitHub Release.
+
+### Required GitHub Repository Secrets
+
+Configure these 4 secrets under **Settings → Secrets and variables → Actions**:
+
+- `RELEASE_KEYSTORE_BASE64`: Base64-encoded release `.jks` file:
+  ```bash
+  base64 -w 0 android/release-keystore.jks
+  ```
+- `KEYSTORE_PASSWORD`: Release keystore store password
+- `KEY_ALIAS`: Release key alias (e.g., `budgetke`)
+- `KEY_PASSWORD`: Release key password
+
+### Cutting a Release
+
+```bash
+# 1. Bump version in pubspec.yaml (e.g., version: 1.0.3+4) and commit
+# 2. Tag and push to trigger the release workflow
+git tag -a v1.0.3 -m "Budget KE v1.0.3"
+git push origin v1.0.3
+```
+
 ## Project Structure
 
 ```text

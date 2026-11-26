@@ -1,17 +1,11 @@
-import 'dart:ffi';
-import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/recurring/models/recurring_model.dart';
 import 'package:budget_app/features/recurring/repositories/recurring_repository.dart';
 import 'package:budget_app/features/recurring/services/recurrence_engine.dart';
-import 'package:sqlite3/open.dart';
 
 void main() {
-  if (Platform.isLinux) {
-    open.overrideFor(OperatingSystem.linux, () => DynamicLibrary.open('libsqlite3.so.0'));
-  }
 
   group('RecurrenceEngine', () {
     test('calculateNextDate advances daily correctly', () {

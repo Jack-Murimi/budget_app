@@ -44,11 +44,13 @@ class TransactionListItem extends ConsumerWidget {
               : theme.colorScheme.secondary),
     );
 
-    final IconData icon = CategoryIconHelper.resolveCategoryIcon(
-      iconName: category?.icon,
-      categoryName: category?.name,
-      type: type,
-    );
+    final IconData icon = transaction.isSplit
+        ? Icons.call_split_rounded
+        : CategoryIconHelper.resolveCategoryIcon(
+            iconName: category?.icon,
+            categoryName: category?.name,
+            type: type,
+          );
 
     final fee = transaction.transactionCost + transaction.fulizaFee;
     final totalAmount =
@@ -60,7 +62,18 @@ class TransactionListItem extends ConsumerWidget {
         : (isTransfer ? theme.colorScheme.tertiary : theme.colorScheme.error);
 
     String? categoryLabel;
-    if (category != null) {
+    if (transaction.isSplit) {
+      final seenNames = <String>[];
+      for (final s in transaction.splits) {
+        final name = categoriesById[s.categoryId]?.name;
+        if (name != null && !seenNames.contains(name)) {
+          seenNames.add(name);
+        }
+      }
+      if (seenNames.isNotEmpty) {
+        categoryLabel = seenNames.join(' · ');
+      }
+    } else if (category != null) {
       if (category.parentId != null) {
         final parent = categoriesById[category.parentId!];
         categoryLabel = parent != null
@@ -199,6 +212,26 @@ class TransactionListItem extends ConsumerWidget {
                     ),
                   ),
                 ),
+              if (transaction.isSplit) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    l10n.splitCountBadge(transaction.splits.length),
+                    style: TextStyle(
+                      color: theme.colorScheme.onSecondaryContainer,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ],
               if (transaction.fulizaAmount > 0) ...[
                 const SizedBox(width: 6),
                 Container(

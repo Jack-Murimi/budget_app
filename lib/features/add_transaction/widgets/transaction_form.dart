@@ -4,10 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/database/converters/cents_converter.dart';
+import '../../../core/services/reminder_notification_service.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../accounts/providers/account_providers.dart';
+import '../../budgets/models/budget_model.dart';
+import '../../budgets/providers/budget_providers.dart';
+import '../../budgets/services/budget_alert_evaluator.dart';
 import '../../categories/models/category_system_keys.dart';
 import '../../categories/providers/category_providers.dart';
 import '../../categories/widgets/category_picker.dart';
@@ -21,6 +26,7 @@ import 'transaction_account_section.dart';
 import 'transaction_amount_section.dart';
 import 'transaction_header_autocomplete.dart';
 import 'transaction_loan_fields.dart';
+import 'transaction_split_section.dart';
 import 'transaction_when_section.dart';
 
 class TransactionForm extends ConsumerStatefulWidget {
@@ -62,10 +68,20 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
   bool _saving = false;
   bool _showFee = false;
   bool _dirty = false;
+  bool _isSplitMode = false;
+  final List<SplitDraftRow> _splitRows = [];
 
   bool get _isEdit => widget.transactionToEdit != null;
   double get _fee =>
       _type == 'income' ? 0.0 : (_parseMoney(_costCtrl.text) ?? 0.0);
+  bool get _isLoanSpecialCategory =>
+      _hasSystemKey(CategorySystemKeys.loanGiven, 'loan given') ||
+      _hasSystemKey(CategorySystemKeys.loanReceived, 'loan received') ||
+      _hasSystemKey(CategorySystemKeys.loanRepayment, 'loan repayment') ||
+      _hasSystemKey(
+        CategorySystemKeys.loanRepaymentReceived,
+        'loan repayment received',
+      );
 
   @override
   void initState() {
@@ -89,6 +105,18 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
       _selectedToAccountId = edit.toAccountId;
       _excludeFromBudget = edit.excludeFromBudget;
       _loadCategoryForEdit(edit.categoryId);
+      if (edit.isSplit) {
+        _isSplitMode = true;
+        for (final s in edit.splits) {
+          _splitRows.add(
+            SplitDraftRow(
+              initialAmount: s.amount.toStringAsFixed(2),
+              initialNote: s.note,
+            ),
+          );
+        }
+        _loadSplitCategories(edit.splits);
+      }
     } else {
       _headerCtrl = TextEditingController();
       _descCtrl = TextEditingController(text: p?.counterpartyName ?? '');
@@ -109,6 +137,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
     }
     _actualCreditedCtrl = TextEditingController();
     _descCtrl.addListener(_onDescChanged);
+    _amountCtrl.addListener(_onAmountChanged);
     _showFee = p != null || (edit != null && edit.transactionCost > 0);
 
     if (p != null && edit == null) {
@@ -121,6 +150,10 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
   @override
   void dispose() {
     _descDebounce?.cancel();
+    _amountCtrl.removeListener(_onAmountChanged);
+    for (final row in _splitRows) {
+      row.dispose();
+    }
     _headerFocusNode.dispose();
     _headerCtrl.dispose();
     _descCtrl.dispose();
@@ -260,6 +293,74 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
     );
   }
 
+  void _onAmountChanged() {
+    if (_isSplitMode && mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _loadSplitCategories(List<TransactionSplitModel> splits) async {
+    for (var i = 0; i < splits.length; i++) {
+      final cat = await _fetchCategory(splits[i].categoryId);
+      if (!mounted || i >= _splitRows.length) return;
+      if (cat != null) {
+        setState(() => _splitRows[i].category = cat);
+      }
+    }
+  }
+
+  void _toggleSplitMode(bool enable) {
+    _edit(() {
+      _isSplitMode = enable;
+      if (enable && _splitRows.isEmpty) {
+        final compatible = _selectedCategory != null &&
+                _selectedCategory!.transactionType == _type
+            ? _selectedCategory
+            : null;
+        _splitRows.add(SplitDraftRow(category: compatible));
+        _splitRows.add(SplitDraftRow());
+      }
+    });
+  }
+
+  Future<void> _pickSplitCategory(int index) async {
+    final cat = await showCategoryPicker(context, initialType: _type);
+    if (cat == null || !mounted || index >= _splitRows.length) return;
+    _edit(() => _splitRows[index].category = cat);
+  }
+
+  void _addSplitRow() {
+    _edit(() => _splitRows.add(SplitDraftRow()));
+  }
+
+  void _removeSplitRow(int index) {
+    if (_splitRows.length <= 2 || index >= _splitRows.length) return;
+    _edit(() {
+      final removed = _splitRows.removeAt(index);
+      removed.dispose();
+    });
+  }
+
+  void _fillRemainingSplit(int index) {
+    if (index < 0 || index >= _splitRows.length) return;
+    final total = _parseMoney(_amountCtrl.text);
+    if (total == null || total <= 0) return;
+    final totalCents = CentsConverter.toCents(total);
+    var otherCents = 0;
+    for (var i = 0; i < _splitRows.length; i++) {
+      if (i == index) continue;
+      otherCents += TransactionSplitSection.parseCents(
+        _splitRows[i].amountCtrl.text,
+      );
+    }
+    final remCents = totalCents - otherCents;
+    if (remCents <= 0) return;
+    _edit(() {
+      _splitRows[index].amountCtrl.text =
+          CentsConverter.fromCents(remCents).toStringAsFixed(2);
+    });
+  }
+
   Future<void> _pickCategory() async {
     final cat = await showCategoryPicker(context, initialType: _type);
     if (cat == null || !mounted) return;
@@ -303,12 +404,67 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
       return;
     }
 
+    List<TransactionSplitModel> splitsToSave = const [];
+    if (_isSplitMode && _type != 'transfer') {
+      if (_splitRows.length < 2) {
+        _toast(l10n.splitRequiresTwoRows);
+        return;
+      }
+      final totalCents = CentsConverter.toCents(_parseMoney(_amountCtrl.text)!);
+      var sumCents = 0;
+      final built = <TransactionSplitModel>[];
+      for (final row in _splitRows) {
+        final cat = row.category;
+        if (cat == null) {
+          _toast(l10n.splitSelectAllCategories);
+          return;
+        }
+        final rowCents = TransactionSplitSection.parseCents(row.amountCtrl.text);
+        if (rowCents <= 0) {
+          _toast(l10n.splitAmountsMustMatch);
+          return;
+        }
+        sumCents += rowCents;
+        built.add(
+          TransactionSplitModel(
+            categoryId: cat.id,
+            amount: CentsConverter.fromCents(rowCents),
+            note: row.noteCtrl.text.trim(),
+          ),
+        );
+      }
+      if (sumCents != totalCents) {
+        _toast(l10n.splitAmountsMustMatch);
+        return;
+      }
+      splitsToSave = built;
+    }
+
     setState(() => _saving = true);
     try {
+      final shouldCheckBudgets = _type == 'expense' && !_excludeFromBudget;
+      final beforeBudgets = shouldCheckBudgets
+          ? (ref.read(budgetsWithProgressProvider).valueOrNull ??
+              const <BudgetWithProgress>[])
+          : const <BudgetWithProgress>[];
+
       if (_isEdit) {
-        await _saveEdit(widget.transactionToEdit!, acc.from!, acc.to);
+        await _saveEdit(
+          widget.transactionToEdit!,
+          acc.from!,
+          acc.to,
+          splits: splitsToSave,
+          beforeBudgets: beforeBudgets,
+          checkBudgets: shouldCheckBudgets,
+        );
       } else {
-        await _saveNew(acc.from!, acc.to);
+        await _saveNew(
+          acc.from!,
+          acc.to,
+          splits: splitsToSave,
+          beforeBudgets: beforeBudgets,
+          checkBudgets: shouldCheckBudgets,
+        );
       }
     } catch (e, st) {
       debugPrint('Save error: $e\n$st');
@@ -324,9 +480,16 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
     }
   }
 
-  Future<void> _saveEdit(TransactionModel edit, int from, int? to) async {
+  Future<void> _saveEdit(
+    TransactionModel edit,
+    int from,
+    int? to, {
+    required List<TransactionSplitModel> splits,
+    required List<BudgetWithProgress> beforeBudgets,
+    required bool checkBudgets,
+  }) async {
     final payee = _descCtrl.text.trim();
-    await ref.read(transactionRepositoryProvider).updateTransaction(
+    await ref.read(transactionRepositoryProvider).updateWithSplits(
           TransactionsCompanion(
             id: Value(edit.id),
             header: Value(_headerCtrl.text.trim()),
@@ -341,33 +504,45 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
             toAccountId: Value(to),
             excludeFromBudget: Value(_excludeFromBudget),
           ),
+          splits,
         );
     _learnPayee();
     if (!mounted) return;
     HapticFeedback.lightImpact();
-    _toast(context.l10n.transactionUpdated);
+    await _showPostSaveFeedback(
+      beforeBudgets: beforeBudgets,
+      checkBudgets: checkBudgets,
+      fallbackToast: context.l10n.transactionUpdated,
+    );
+    if (!mounted) return;
     _finish(true);
   }
 
-  Future<void> _saveNew(int from, int? to) async {
+  Future<void> _saveNew(
+    int from,
+    int? to, {
+    required List<TransactionSplitModel> splits,
+    required List<BudgetWithProgress> beforeBudgets,
+    required bool checkBudgets,
+  }) async {
     final l10n = context.l10n;
     final payee = _descCtrl.text.trim();
     final isLoanGiven =
-        _hasSystemKey(CategorySystemKeys.loanGiven, 'loan given');
+        !_isSplitMode && _hasSystemKey(CategorySystemKeys.loanGiven, 'loan given');
 
     if (isLoanGiven && payee.isEmpty) {
       _toast(l10n.addBorrowerInDesc);
       return;
     }
 
-    final isLoanReceived =
+    final isLoanReceived = !_isSplitMode &&
         _hasSystemKey(CategorySystemKeys.loanReceived, 'loan received');
     if (isLoanReceived && payee.isEmpty) {
       _toast(l10n.addLenderInDesc);
       return;
     }
 
-    final isLoanRepayment =
+    final isLoanRepayment = !_isSplitMode &&
         _hasSystemKey(CategorySystemKeys.loanRepayment, 'loan repayment');
     Debt? matchedBorrowedDebt;
     if (isLoanRepayment && _selectedRepayDebtId != null) {
@@ -378,10 +553,11 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
           ?.debt;
     }
 
-    final isLoanRepaymentReceived = _hasSystemKey(
-      CategorySystemKeys.loanRepaymentReceived,
-      'loan repayment received',
-    );
+    final isLoanRepaymentReceived = !_isSplitMode &&
+        _hasSystemKey(
+          CategorySystemKeys.loanRepaymentReceived,
+          'loan repayment received',
+        );
     if (isLoanRepaymentReceived && _selectedLoanDebtId == null) {
       _toast(l10n.selectWhoRepaying);
       return;
@@ -468,7 +644,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
     } else {
       id = await ref
           .read(transactionRepositoryProvider)
-          .insertOrIgnoreDuplicate(companion);
+          .insertWithSplits(companion, splits);
     }
 
     if (!mounted) return;
@@ -478,10 +654,65 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
       return;
     }
 
-    _learnPayee();
+    if (!_isSplitMode) {
+      _learnPayee();
+    }
     HapticFeedback.lightImpact();
-    _toast(l10n.transactionSaved);
+    await _showPostSaveFeedback(
+      beforeBudgets: beforeBudgets,
+      checkBudgets: checkBudgets,
+      fallbackToast: l10n.transactionSaved,
+    );
+    if (!mounted) return;
     _finish(true);
+  }
+
+  Future<void> _showPostSaveFeedback({
+    required List<BudgetWithProgress> beforeBudgets,
+    required bool checkBudgets,
+    required String fallbackToast,
+  }) async {
+    if (checkBudgets) {
+      try {
+        final afterBudgets = await ref
+            .read(budgetRepositoryProvider)
+            .watchBudgetsWithProgress()
+            .first;
+        final alerts = BudgetAlertEvaluator.evaluateCrossedThresholds(
+          before: beforeBudgets,
+          after: afterBudgets,
+        );
+        if (alerts.isNotEmpty && mounted) {
+          final top = alerts.first;
+          final pct = top.budget.percentage.round();
+          final l10n = context.l10n;
+          final theme = Theme.of(context);
+          final isExceeded = top.level == BudgetAlertLevel.exceeded100;
+          final msg = isExceeded
+              ? l10n.budgetExceededAlert(top.budget.name, pct)
+              : l10n.budgetWarning80Alert(top.budget.name, pct);
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(msg),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 5),
+                backgroundColor: isExceeded
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.tertiary,
+              ),
+            );
+          unawaited(
+            ref.read(reminderNotificationServiceProvider).showBudgetAlert(top),
+          );
+          return;
+        }
+      } catch (e) {
+        debugPrint('Budget threshold check failed: $e');
+      }
+    }
+    _toast(fallbackToast);
   }
 
   void _learnPayee() {
@@ -707,10 +938,19 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
               onChanged: (nextType) => _edit(() {
                 _type = nextType;
                 _selectedLoanDebtId = null;
+                if (_type == 'transfer') {
+                  _isSplitMode = false;
+                }
                 if (_selectedCategory != null &&
                     _selectedCategory!.transactionType != _type) {
                   _selectedCategory = null;
                   _categorySuggested = false;
+                }
+                for (final row in _splitRows) {
+                  if (row.category != null &&
+                      row.category!.transactionType != _type) {
+                    row.category = null;
+                  }
                 }
               }),
             ),
@@ -756,21 +996,50 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
               textInputAction: TextInputAction.next,
             ),
             _gap,
-            _buildCategoryField(theme, l10n),
-            if (_hasSystemKey(
-              CategorySystemKeys.loanRepaymentReceived,
-              'loan repayment received',
-            )) ...[
+            if (!_isSplitMode || _type == 'transfer')
+              _buildCategoryField(theme, l10n)
+            else
+              TransactionSplitSection(
+                totalAmountCents: () {
+                  final amt = _parseMoney(_amountCtrl.text);
+                  return (amt != null && amt > 0)
+                      ? CentsConverter.toCents(amt)
+                      : 0;
+                }(),
+                rows: _splitRows,
+                categoriesById: ref.watch(categoriesByIdProvider),
+                onPickCategory: _pickSplitCategory,
+                onAddRow: _addSplitRow,
+                onRemoveRow: _removeSplitRow,
+                onFillRemaining: _fillRemainingSplit,
+                onChanged: () => _edit(() {}),
+              ),
+            if (_type != 'transfer' && !_isLoanSpecialCategory) ...[
+              const SizedBox(height: 4),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(l10n.splitAcrossCategories),
+                subtitle: Text(l10n.splitAcrossCategoriesDesc),
+                value: _isSplitMode,
+                onChanged: _toggleSplitMode,
+              ),
+            ],
+            if (!_isSplitMode &&
+                _hasSystemKey(
+                  CategorySystemKeys.loanRepaymentReceived,
+                  'loan repayment received',
+                )) ...[
               _gap,
               BorrowerDropdownField(
                 selectedDebtId: _selectedLoanDebtId,
                 onChanged: (v) => _edit(() => _selectedLoanDebtId = v),
               ),
             ],
-            if (_hasSystemKey(
-              CategorySystemKeys.loanReceived,
-              'loan received',
-            )) ...[
+            if (!_isSplitMode &&
+                _hasSystemKey(
+                  CategorySystemKeys.loanReceived,
+                  'loan received',
+                )) ...[
               _gap,
               LoanReceivedCreditedField(
                 controller: _actualCreditedCtrl,
@@ -778,10 +1047,11 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
                 parseMoney: _parseMoney,
               ),
             ],
-            if (_hasSystemKey(
-              CategorySystemKeys.loanRepayment,
-              'loan repayment',
-            )) ...[
+            if (!_isSplitMode &&
+                _hasSystemKey(
+                  CategorySystemKeys.loanRepayment,
+                  'loan repayment',
+                )) ...[
               _gap,
               LenderRepayDropdownField(
                 selectedDebtId: _selectedRepayDebtId,

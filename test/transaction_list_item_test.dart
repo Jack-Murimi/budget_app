@@ -1,4 +1,3 @@
-import 'dart:ffi';
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/add_transaction/screens/add_transaction_screen.dart';
 import 'package:budget_app/features/home/widgets/transaction_list_item.dart';
@@ -9,12 +8,8 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-// ignore: depend_on_referenced_packages
-import 'package:sqlite3/open.dart';
 
 void main() {
-  open.overrideFor(
-      OperatingSystem.linux, () => DynamicLibrary.open('libsqlite3.so.0'));
 
   late AppDatabase db;
   late int groceriesId;

@@ -1,17 +1,11 @@
-import 'dart:ffi';
-import 'dart:io';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/budgets/models/budget_model.dart';
 import 'package:budget_app/features/budgets/repositories/budget_repository.dart';
-import 'package:sqlite3/open.dart';
 
 void main() {
-  if (Platform.isLinux) {
-    open.overrideFor(OperatingSystem.linux, () => DynamicLibrary.open('libsqlite3.so.0'));
-  }
 
   late AppDatabase db;
   late BudgetRepository repo;
@@ -465,6 +459,302 @@ void main() {
 
       expect(brandNew.rolloverAmount, 0.0);
       expect(brandNew.amount, 4000.0);
+    });
+
+    test('multi-category budget combines subcategories from different parents', () async {
+      final asOf = DateTime(2026, 11, 15);
+      final account = await db.into(db.accounts).insert(
+        AccountsCompanion.insert(name: 'M-Pesa'),
+      );
+      final foodParent = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(name: 'Food'),
+      );
+      final eatingOut = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Eating Out',
+          parentId: Value(foodParent),
+        ),
+      );
+      final snacks = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Snacks',
+          parentId: Value(foodParent),
+        ),
+      );
+      final giftsParent = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(name: 'Gifts'),
+      );
+      final friendTreats = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Treats',
+          parentId: Value(giftsParent),
+        ),
+      );
+
+      final budgetId = await repo.insertBudget(
+        BudgetsCompanion.insert(
+          name: 'Social & Snacks',
+          amount: 10000.0,
+          startDate: DateTime(2026, 11, 1),
+        ),
+        categoryIds: [eatingOut, friendTreats],
+      );
+      final budget = await (db.select(db.budgets)
+            ..where((b) => b.id.equals(budgetId)))
+          .getSingle();
+
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'Lunch',
+          amount: 1200.0,
+          type: const Value('expense'),
+          categoryId: Value(eatingOut),
+          transactionDate: DateTime(2026, 11, 4),
+          accountId: Value(account),
+        ),
+      );
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'Coffee for Friend',
+          amount: 600.0,
+          type: const Value('expense'),
+          categoryId: Value(friendTreats),
+          transactionDate: DateTime(2026, 11, 5),
+          accountId: Value(account),
+        ),
+      );
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'Other Snack',
+          amount: 900.0,
+          type: const Value('expense'),
+          categoryId: Value(snacks),
+          transactionDate: DateTime(2026, 11, 6),
+          accountId: Value(account),
+        ),
+      );
+
+      final progress =
+          (await repo.watchBudgetsWithProgress(asOf: asOf).first).single;
+      expect(progress.isOverall, false);
+      expect(progress.isMultiCategory, true);
+      expect(progress.spent, 1800.0);
+      expect(progress.categorySummary, 'Eating Out · Treats');
+
+      final txns = await repo.watchBudgetTransactions(budget, asOf: asOf).first;
+      expect(
+        txns.map((t) => t.header),
+        equals(['Coffee for Friend', 'Lunch']),
+      );
+    });
+
+    test('multi-category budget combines parent + subcategory without double-counting overlap',
+        () async {
+      final asOf = DateTime(2026, 11, 15);
+      final account = await db.into(db.accounts).insert(
+        AccountsCompanion.insert(name: 'M-Pesa'),
+      );
+      final foodParent = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(name: 'Food'),
+      );
+      final groceries = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Groceries',
+          parentId: Value(foodParent),
+        ),
+      );
+      final miscParent = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(name: 'Miscellaneous'),
+      );
+      final impulse = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Impulse',
+          parentId: Value(miscParent),
+        ),
+      );
+
+      final budgetId = await repo.insertBudget(
+        BudgetsCompanion.insert(
+          name: 'Food & Impulse',
+          amount: 12000.0,
+          startDate: DateTime(2026, 11, 1),
+        ),
+        // Intentionally include overlapping parent + child to verify deduplication.
+        categoryIds: [foodParent, groceries, impulse],
+      );
+      final budget = await (db.select(db.budgets)
+            ..where((b) => b.id.equals(budgetId)))
+          .getSingle();
+
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'Naivas',
+          amount: 2500.0,
+          type: const Value('expense'),
+          categoryId: Value(groceries),
+          transactionDate: DateTime(2026, 11, 3),
+          accountId: Value(account),
+        ),
+      );
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'Gadget',
+          amount: 1500.0,
+          type: const Value('expense'),
+          categoryId: Value(impulse),
+          transactionDate: DateTime(2026, 11, 4),
+          accountId: Value(account),
+        ),
+      );
+
+      final progress =
+          (await repo.watchBudgetsWithProgress(asOf: asOf).first).single;
+      expect(progress.spent, 4000.0);
+
+      final txns = await repo.watchBudgetTransactions(budget, asOf: asOf).first;
+      expect(txns, hasLength(2));
+    });
+
+    test('updateBudget transitions between overall, multi, single, and deleteBudget cascades',
+        () async {
+      final catA = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(name: 'Cat A'),
+      );
+      final catB = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(name: 'Cat B'),
+      );
+
+      final id = await repo.insertBudget(
+        BudgetsCompanion.insert(
+          name: 'Flexible Budget',
+          amount: 5000.0,
+          startDate: DateTime(2026, 11, 1),
+        ),
+      );
+      expect(await repo.getBudgetCategoryIds(id), isEmpty);
+
+      // overall -> multi
+      await repo.updateBudget(
+        BudgetsCompanion(id: Value(id)),
+        categoryIds: [catA, catB],
+      );
+      expect(await repo.getBudgetCategoryIds(id), unorderedEquals([catA, catB]));
+
+      // multi -> single
+      await repo.updateBudget(
+        BudgetsCompanion(id: Value(id)),
+        categoryIds: [catB],
+      );
+      expect(await repo.getBudgetCategoryIds(id), equals([catB]));
+
+      // single -> overall
+      await repo.updateBudget(
+        BudgetsCompanion(id: Value(id)),
+        categoryIds: const [],
+      );
+      expect(await repo.getBudgetCategoryIds(id), isEmpty);
+      final savedOverall = await (db.select(db.budgets)
+            ..where((b) => b.id.equals(id)))
+          .getSingle();
+      expect(savedOverall.categoryId, isNull);
+
+      // multi -> delete cascades
+      await repo.updateBudget(
+        BudgetsCompanion(id: Value(id)),
+        categoryIds: [catA, catB],
+      );
+      expect(await repo.getBudgetCategoryIds(id), hasLength(2));
+      await repo.deleteBudget(id);
+      expect(await db.select(db.budgetCategories).get(), isEmpty);
+    });
+
+    test('categoryBreakdown aggregates per-category spend, rolls up unselected subcategories, and sorts descending',
+        () async {
+      final asOf = DateTime(2026, 11, 15);
+      final account = await db.into(db.accounts).insert(
+        AccountsCompanion.insert(name: 'M-Pesa'),
+      );
+      final treats = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Treats',
+          colorHex: const Value('#E91E63'),
+        ),
+      );
+      final treatsCoffee = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Coffee Treats',
+          parentId: Value(treats),
+          colorHex: const Value('#F06292'),
+        ),
+      );
+      final misc = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Miscellaneous',
+          colorHex: const Value('#9C27B0'),
+        ),
+      );
+      final snacks = await db.into(db.categories).insert(
+        CategoriesCompanion.insert(
+          name: 'Snacks',
+          colorHex: const Value('#FF9800'),
+        ),
+      );
+
+      await repo.insertBudget(
+        BudgetsCompanion.insert(
+          name: 'Discretionary',
+          amount: 10000.0,
+          startDate: DateTime(2026, 11, 1),
+        ),
+        categoryIds: [treats, misc, snacks],
+      );
+
+      // Subcategory rolls up into selected parent Treats
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'Artcaffe',
+          amount: 1200.0,
+          transactionCost: const Value(20.0),
+          type: const Value('expense'),
+          categoryId: Value(treatsCoffee),
+          transactionDate: DateTime(2026, 11, 2),
+          accountId: Value(account),
+        ),
+      );
+      // Direct expense on Misc (largest total)
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'Phone Cable',
+          amount: 2000.0,
+          type: const Value('expense'),
+          categoryId: Value(misc),
+          transactionDate: DateTime(2026, 11, 3),
+          accountId: Value(account),
+        ),
+      );
+      await db.into(db.transactions).insert(
+        TransactionsCompanion.insert(
+          header: 'Adapter',
+          amount: 500.0,
+          type: const Value('expense'),
+          categoryId: Value(misc),
+          transactionDate: DateTime(2026, 11, 4),
+          accountId: Value(account),
+        ),
+      );
+
+      final progress =
+          (await repo.watchBudgetsWithProgress(asOf: asOf).first).single;
+      expect(progress.categoryBreakdown, hasLength(3));
+      expect(progress.categoryBreakdown[0].category.id, misc);
+      expect(progress.categoryBreakdown[0].spent, 2500.0);
+      expect(progress.categoryBreakdown[0].transactionCount, 2);
+      expect(progress.categoryBreakdown[1].category.id, treats);
+      expect(progress.categoryBreakdown[1].spent, 1220.0);
+      expect(progress.categoryBreakdown[1].transactionCount, 1);
+      expect(progress.categoryBreakdown[2].category.id, snacks);
+      expect(progress.categoryBreakdown[2].spent, 0.0);
+      expect(progress.categoryBreakdown[2].transactionCount, 0);
     });
   });
 }

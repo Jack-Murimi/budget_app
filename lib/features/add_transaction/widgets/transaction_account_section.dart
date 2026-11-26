@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../accounts/providers/account_providers.dart';
+import '../../accounts/widgets/account_brand_badge.dart';
 
 /// Single source of truth for which accounts are selected:
 /// - nothing picked yet -> [defaultId]
@@ -90,7 +91,15 @@ class TransactionAccountSection extends ConsumerWidget {
           l10n.account,
           Icons.account_balance_wallet_outlined,
         ),
-        child: Text(accounts.first.name, overflow: TextOverflow.ellipsis),
+        child: Row(
+          children: [
+            AccountBrandBadge.fromAccount(accounts.first, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(accounts.first.name, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
       );
     }
 
@@ -99,9 +108,17 @@ class TransactionAccountSection extends ConsumerWidget {
             if (a.id != except)
               DropdownMenuItem<int>(
                 value: a.id,
-                child: Text(
-                  '${a.name} (${CurrencyFormatter.format(a.balance)})',
-                  overflow: TextOverflow.ellipsis,
+                child: Row(
+                  children: [
+                    AccountBrandBadge.fromAccount(a, size: 22),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${a.name} (${CurrencyFormatter.format(a.balance)})',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
         ];

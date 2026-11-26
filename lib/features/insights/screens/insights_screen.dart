@@ -7,11 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/converters/cents_converter.dart';
 import '../../../l10n/l10n.dart';
-import '../../../shared/utils/cashflow_calculator.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/widgets/motion.dart';
 import '../../categories/providers/category_providers.dart';
 import '../../transactions/models/transaction_model.dart';
+import '../../transactions/models/transaction_split_allocator.dart';
 import '../../transactions/providers/transaction_providers.dart';
 import '../providers/insights_providers.dart';
 
@@ -464,11 +464,13 @@ class _CategoryChart extends StatelessWidget {
     final reduced = Motion.reduced(context);
     final groupedCents = <String, int>{};
     for (final item in items.where((item) => item.type == 'expense')) {
-      final name = item.categoryId == null
-          ? l10n.uncategorized
-          : (categoryNames[item.categoryId] ?? l10n.uncategorized);
-      groupedCents[name] =
-          (groupedCents[name] ?? 0) + CashflowCalculator.expenseTotalCents(item);
+      for (final alloc
+          in TransactionSplitAllocator.allocateForTransaction(item)) {
+        final name = alloc.categoryId == null
+            ? l10n.uncategorized
+            : (categoryNames[alloc.categoryId] ?? l10n.uncategorized);
+        groupedCents[name] = (groupedCents[name] ?? 0) + alloc.cents;
+      }
     }
     final sortedCents = groupedCents.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));

@@ -1,14 +1,16 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../l10n/l10n.dart';
-import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/widgets/motion.dart';
 import '../models/account_model.dart';
+import '../models/payment_provider.dart';
 import '../providers/account_providers.dart';
+import '../widgets/account_brand_badge.dart';
+import '../widgets/add_account_dialog.dart';
+import '../widgets/provider_picker_sheet.dart';
 import 'account_detail_screen.dart';
 
 class AccountsScreen extends ConsumerStatefulWidget {
@@ -19,27 +21,22 @@ class AccountsScreen extends ConsumerStatefulWidget {
 }
 
 class _AccountsScreenState extends ConsumerState<AccountsScreen> {
-  static const _typeOptions = ['mpesa', 'cash', 'bank', 'airtel', 'other'];
-  static const _colorOptions = {
-    '#1B5E20': 'Dark Green',
-    '#4CAF50': 'Green',
-    '#2196F3': 'Blue',
-    '#F44336': 'Red',
-    '#FF9800': 'Orange',
-    '#9C27B0': 'Purple',
-    '#009688': 'Teal',
-    '#795548': 'Brown',
-    '#607D8B': 'Grey',
-  };
+  Future<void> _showAddDialog({PaymentProvider? initialProvider}) async {
+    await showAddAccountDialog(context, initialProvider: initialProvider);
+  }
 
-  Future<void> _showAddDialog() async {
-    await showDialog<bool>(
-      context: context,
-      builder: (_) => const _AddAccountDialog(
-        typeOptions: _typeOptions,
-        colorOptions: _colorOptions,
-      ),
+  Future<void> _pickAndAddBank() async {
+    final picked = await showProviderPickerSheet(
+      context,
+      initialGroup: PaymentProviderGroup.bank,
     );
+    if (!mounted || picked == null) return;
+    switch (picked) {
+      case PickedProvider(:final provider):
+        await _showAddDialog(initialProvider: provider);
+      case PickedCustom():
+        await _showAddDialog();
+    }
   }
 
   Future<void> _showTransferDialog() async {
@@ -85,7 +82,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: _showAddDialog,
+            onPressed: () => _showAddDialog(),
             tooltip: l10n.addAccount,
           ),
         ],
@@ -96,6 +93,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
         data: (accounts) {
           final active = accounts.where((a) => !a.isArchived).toList();
           final archived = accounts.where((a) => a.isArchived).toList();
+          final hasBankAccount = active.any((a) => a.type == 'bank');
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -189,6 +187,18 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                     child: _AccountCard(account: a),
                   ),
 
+              if (!hasBankAccount) ...[
+                const SizedBox(height: 6),
+                FadeSlideIn(
+                  index: active.length + 1,
+                  child: _AddYourBankCard(
+                    onPickBank: (provider) =>
+                        _showAddDialog(initialProvider: provider),
+                    onMoreBanks: _pickAndAddBank,
+                  ),
+                ),
+              ],
+
               if (archived.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Padding(
@@ -203,7 +213,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                 ),
                 for (final (i, a) in archived.indexed)
                   FadeSlideIn(
-                    index: active.length + i + 1,
+                    index: active.length + i + 2,
                     child: _AccountCard(account: a, dimmed: true),
                   ),
               ],
@@ -215,148 +225,85 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
   }
 }
 
-class _AddAccountDialog extends ConsumerStatefulWidget {
-  final List<String> typeOptions;
-  final Map<String, String> colorOptions;
+class _AddYourBankCard extends StatelessWidget {
+  final ValueChanged<PaymentProvider> onPickBank;
+  final VoidCallback onMoreBanks;
 
-  const _AddAccountDialog({
-    required this.typeOptions,
-    required this.colorOptions,
+  const _AddYourBankCard({
+    required this.onPickBank,
+    required this.onMoreBanks,
   });
 
-  @override
-  ConsumerState<_AddAccountDialog> createState() => _AddAccountDialogState();
-}
-
-class _AddAccountDialogState extends ConsumerState<_AddAccountDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameCtrl = TextEditingController();
-  final _balanceCtrl = TextEditingController();
-  String _selectedType = 'mpesa';
-  String _selectedColor = '#4CAF50';
-  bool _isSaving = false;
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _balanceCtrl.dispose();
-    super.dispose();
-  }
+  static const _featuredBanks = [
+    PaymentProviders.equity,
+    PaymentProviders.kcb,
+    PaymentProviders.coop,
+    PaymentProviders.ncba,
+    PaymentProviders.absa,
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final l10n = context.l10n;
-    return AlertDialog(
-      title: Text(l10n.addAccount),
-      content: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _nameCtrl,
-                decoration: InputDecoration(
-                  labelText: l10n.nameRequired,
-                  border: const OutlineInputBorder(),
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.account_balance_rounded,
+                  size: 20,
+                  color: theme.colorScheme.primary,
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? l10n.enterAccountName
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                decoration: InputDecoration(
-                  labelText: l10n.type,
-                  border: const OutlineInputBorder(),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.addYourBank,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                initialValue: _selectedType,
-                items: widget.typeOptions
-                    .map(
-                      (t) => DropdownMenuItem(
-                        value: t,
-                        child: Text(t.toUpperCase()),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) {
-                  if (v != null) setState(() => _selectedType = v);
-                },
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              l10n.addYourBankSubtitle,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                decoration: InputDecoration(
-                  labelText: l10n.colorLabel,
-                  border: const OutlineInputBorder(),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final bank in _featuredBanks)
+                  ActionChip(
+                    avatar: AccountBrandBadge.fromProvider(bank, size: 22),
+                    label: Text(bank.name),
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      onPickBank(bank);
+                    },
+                  ),
+                ActionChip(
+                  avatar: const Icon(Icons.grid_view_rounded, size: 16),
+                  label: Text(l10n.moreBanks),
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    onMoreBanks();
+                  },
                 ),
-                initialValue: _selectedColor,
-                items: widget.colorOptions.entries
-                    .map(
-                      (e) => DropdownMenuItem(
-                        value: e.key,
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 16,
-                              height: 16,
-                              margin: const EdgeInsets.only(right: 8),
-                              decoration: BoxDecoration(
-                                color: parseHexColor(e.key),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            Text(e.value),
-                          ],
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) {
-                  if (v != null) setState(() => _selectedColor = v);
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _balanceCtrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: l10n.openingBalance,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _isSaving ? null : () => Navigator.pop(context, false),
-          child: Text(l10n.cancel),
-        ),
-        FilledButton(
-          onPressed: _isSaving ? null : _submit,
-          child: Text(l10n.add),
-        ),
-      ],
     );
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _isSaving = true);
-    await ref.read(accountRepositoryProvider).insertAccount(
-          AccountsCompanion.insert(
-            name: _nameCtrl.text.trim(),
-            type: Value(_selectedType),
-            initialBalance: Value(
-              double.tryParse(_balanceCtrl.text.replaceAll(',', '').trim()) ??
-                  0.0,
-            ),
-            colorHex: Value(_selectedColor),
-          ),
-        );
-    if (mounted) Navigator.pop(context, true);
   }
 }
 
@@ -528,15 +475,18 @@ class _AccountCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final l10n = context.l10n;
-    final color = parseHexColor(
-      account.colorHex,
-      fallback: theme.colorScheme.primary,
+    final gradientColors = accountCardGradientColors(account);
+    final provider = PaymentProviders.resolve(
+      icon: account.icon,
+      name: account.name,
+      type: account.type,
     );
+    final subtitle = provider?.subtitle ?? account.type.toUpperCase();
 
     return Opacity(
-      opacity: dimmed ? 0.5 : 1.0,
+      opacity: dimmed ? 0.55 : 1.0,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.only(bottom: 12),
         child: Pressable(
           haptic: true,
           onTap: () => Navigator.push(
@@ -545,129 +495,167 @@ class _AccountCard extends ConsumerWidget {
               builder: (_) => AccountDetailScreen(account: account),
             ),
           ),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradientColors,
+                ),
+              ),
+              child: Stack(
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Center(
-                      child: Text(
-                        account.name.isNotEmpty
-                            ? account.name[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 18,
-                        ),
+                  Positioned(
+                    right: -18,
+                    top: -22,
+                    child: Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.09),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                    child: Row(
                       children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                account.name,
-                                style: theme.textTheme.titleSmall,
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: AccountBrandBadge.fromAccount(
+                            account,
+                            size: 46,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      account.name,
+                                      style:
+                                          theme.textTheme.titleMedium?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (account.isDefault) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.22),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
+                                      ),
+                                      child: Text(
+                                        l10n.defaultLabel,
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  if (account.isArchived) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.25),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
+                                      ),
+                                      child: Text(
+                                        l10n.archived,
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  letterSpacing: 0.3,
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            if (account.isDefault) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  l10n.defaultLabel,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: theme.colorScheme.onPrimaryContainer,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
                             ],
-                            if (account.isArchived) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      theme.colorScheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  l10n.archived,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          account.type.toUpperCase(),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            letterSpacing: 0.6,
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        if (account.isArchived)
+                          IconButton(
+                            icon: const Icon(
+                              Icons.unarchive_outlined,
+                              color: Colors.white,
+                            ),
+                            tooltip: l10n.unarchive,
+                            onPressed: () {
+                              HapticFeedback.selectionClick();
+                              ref
+                                  .read(accountRepositoryProvider)
+                                  .archiveAccount(account.id, archive: false);
+                            },
+                          )
+                        else
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                CurrencyFormatter.format(account.balance),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 18,
+                                color: Colors.white.withValues(alpha: 0.8),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
-                  if (account.isArchived)
-                    IconButton(
-                      icon: const Icon(Icons.unarchive_outlined),
-                      tooltip: l10n.unarchive,
-                      onPressed: () {
-                        HapticFeedback.selectionClick();
-                        ref
-                            .read(accountRepositoryProvider)
-                            .archiveAccount(account.id, archive: false);
-                      },
-                    )
-                  else
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          CurrencyFormatter.format(account.balance),
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 18,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ],
-                    ),
                 ],
               ),
             ),

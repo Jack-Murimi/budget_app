@@ -11,22 +11,159 @@ class TransactionRepository {
   final AppDatabase db;
   const TransactionRepository(this.db);
 
-  Stream<List<TransactionModel>> watchRecent({int limit = 50}) =>
-      (db.select(db.transactions)
-            ..orderBy([(t) => OrderingTerm.desc(t.transactionDate)])
-            ..limit(limit))
-          .map((row) => row.toModel())
-          .watch();
+  Future<List<TransactionModel>> _attachSplits(List<Transaction> rows) async {
+    if (rows.isEmpty) return const [];
+    final ids = [for (final r in rows) r.id];
+    final splitRows = await (db.select(db.transactionSplits)
+          ..where((s) => s.transactionId.isIn(ids))
+          ..orderBy([(s) => OrderingTerm.asc(s.id)]))
+        .get();
+    final byTxn = <int, List<TransactionSplitModel>>{};
+    for (final s in splitRows) {
+      byTxn.putIfAbsent(s.transactionId, () => []).add(s.toModel());
+    }
+    return [
+      for (final r in rows) r.toModel(splits: byTxn[r.id] ?? const []),
+    ];
+  }
 
-  Stream<List<TransactionModel>> watchMonthSummary({required int year, required int month}) {
+  Future<List<TransactionSplitModel>> getSplitsForTransaction(
+    int transactionId,
+  ) async {
+    final rows = await (db.select(db.transactionSplits)
+          ..where((s) => s.transactionId.equals(transactionId))
+          ..orderBy([(s) => OrderingTerm.asc(s.id)]))
+        .get();
+    return [for (final s in rows) s.toModel()];
+  }
+
+  Stream<List<TransactionModel>> watchRecent({int limit = 50}) => db
+      .customSelect(
+        'SELECT 1',
+        readsFrom: {db.transactions, db.transactionSplits},
+      )
+      .watch()
+      .asyncMap((_) async {
+        final rows = await (db.select(db.transactions)
+              ..orderBy([(t) => OrderingTerm.desc(t.transactionDate)])
+              ..limit(limit))
+            .get();
+        return _attachSplits(rows);
+      });
+
+  Stream<List<TransactionModel>> watchMonthSummary({
+    required int year,
+    required int month,
+  }) {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 1);
-    return (db.select(db.transactions)
-          ..where((t) =>
-              t.transactionDate.isBiggerOrEqualValue(start) &
-              t.transactionDate.isSmallerThanValue(end)))
-        .map((row) => row.toModel())
-        .watch();
+    return db
+        .customSelect(
+          'SELECT 1',
+          readsFrom: {db.transactions, db.transactionSplits},
+        )
+        .watch()
+        .asyncMap((_) async {
+      final rows = await (db.select(db.transactions)
+            ..where((t) =>
+                t.transactionDate.isBiggerOrEqualValue(start) &
+                t.transactionDate.isSmallerThanValue(end)))
+          .get();
+      return _attachSplits(rows);
+    });
+  }
+
+  void _validateSplits(
+    TransactionsCompanion transaction,
+    List<TransactionSplitModel> splits,
+  ) {
+    if (splits.length < 2) {
+      throw ArgumentError('Split transactions require at least 2 rows');
+    }
+    var sumCents = 0;
+    for (final s in splits) {
+      final c = CentsConverter.toCents(s.amount);
+      if (c <= 0) {
+        throw ArgumentError('Each split amount must be greater than zero');
+      }
+      sumCents += c;
+    }
+    final totalCents = CentsConverter.toCents(transaction.amount.value);
+    if (sumCents != totalCents) {
+      throw ArgumentError(
+        'Split amounts ($sumCents cents) must equal transaction amount ($totalCents cents)',
+      );
+    }
+  }
+
+  /// Inserts a transaction along with optional [splits] atomically.
+  /// When [splits] is non-empty, validates at least 2 positive rows matching
+  /// the transaction amount and sets the parent `categoryId` to the first split.
+  Future<int?> insertWithSplits(
+    TransactionsCompanion transaction,
+    List<TransactionSplitModel> splits,
+  ) {
+    if (splits.isEmpty) return insertOrIgnoreDuplicate(transaction);
+    _validateSplits(transaction, splits);
+    return db.transaction(() async {
+      final id = await insertOrIgnoreDuplicate(
+        transaction.copyWith(categoryId: Value(splits.first.categoryId)),
+      );
+      if (id == null) return null;
+      await db.batch((b) {
+        b.insertAll(
+          db.transactionSplits,
+          [
+            for (final s in splits)
+              TransactionSplitsCompanion.insert(
+                transactionId: id,
+                categoryId: s.categoryId,
+                amount: s.amount,
+                note: Value(s.note),
+              ),
+          ],
+        );
+      });
+      return id;
+    });
+  }
+
+  /// Updates a transaction and replaces its split rows atomically.
+  Future<bool> updateWithSplits(
+    TransactionsCompanion transaction,
+    List<TransactionSplitModel> splits,
+  ) {
+    if (splits.isNotEmpty) {
+      _validateSplits(transaction, splits);
+    }
+    return db.transaction(() async {
+      final txnId = transaction.id.value;
+      final effective = splits.isNotEmpty
+          ? transaction.copyWith(categoryId: Value(splits.first.categoryId))
+          : transaction;
+      final updated = await updateTransaction(effective);
+      if (!updated) return false;
+      await (db.delete(db.transactionSplits)
+            ..where((s) => s.transactionId.equals(txnId)))
+          .go();
+      if (splits.isNotEmpty) {
+        await db.batch((b) {
+          b.insertAll(
+            db.transactionSplits,
+            [
+              for (final s in splits)
+                TransactionSplitsCompanion.insert(
+                  transactionId: txnId,
+                  categoryId: s.categoryId,
+                  amount: s.amount,
+                  note: Value(s.note),
+                ),
+            ],
+          );
+        });
+      }
+      return true;
+    });
   }
 
   /// Insert a transaction. Normalizes blank mpesaRef to null. If mpesaRef is
@@ -221,11 +358,18 @@ class TransactionRepository {
     });
   }
 
-  Stream<List<TransactionModel>> watchAll() =>
-      (db.select(db.transactions)
-            ..orderBy([(t) => OrderingTerm.desc(t.transactionDate)]))
-          .map((row) => row.toModel())
-          .watch();
+  Stream<List<TransactionModel>> watchAll() => db
+      .customSelect(
+        'SELECT 1',
+        readsFrom: {db.transactions, db.transactionSplits},
+      )
+      .watch()
+      .asyncMap((_) async {
+        final rows = await (db.select(db.transactions)
+              ..orderBy([(t) => OrderingTerm.desc(t.transactionDate)]))
+            .get();
+        return _attachSplits(rows);
+      });
 
   /// Updates a transaction and reconciles linked goal contributions,
   /// debt repayments, and debt disbursement amounts atomically.

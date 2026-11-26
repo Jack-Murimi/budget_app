@@ -1,0 +1,207 @@
+name: Release Android APKs
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag name, e.g. v1.0.3'
+        required: true
+        type: string
+      draft:
+        description: 'Create release as a draft'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Verify Play Protect safety (no SMS permissions)
+        run: |
+          if grep -Eq 'android\.permission\.(READ_SMS|RECEIVE_SMS)' android/app/src/main/AndroidManifest.xml; then
+            echo "::error::AndroidManifest.xml must not declare READ_SMS or RECEIVE_SMS."
+            exit 1
+          fi
+
+      - name: Verify tag matches pubspec.yaml version
+        run: |
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          BASE_VER="${TAG#v}"
+          BASE_VER="${BASE_VER%%-*}"
+          if [ -z "$BASE_VER" ]; then
+            echo "::error::Invalid release tag '$TAG'."
+            exit 1
+          fi
+          if ! grep -Eq "^version:[[:space:]]*${BASE_VER}(\+|$)" pubspec.yaml; then
+            ACTUAL_VER="$(grep -E '^version:' pubspec.yaml | head -n 1)"
+            echo "::error::Tag '$TAG' (expected $BASE_VER) does not match pubspec.yaml ($ACTUAL_VER)."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      - name: Analyze codebase
+        run: flutter analyze
+
+      - name: Run test suite
+        run: flutter test
+
+  build-and-release:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Configure Gradle memory and accept Android SDK licenses
+        run: |
+          mkdir -p "$HOME/.gradle"
+          printf '%s\n' 'org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=512m -XX:+HeapDumpOnOutOfMemoryError' >> "$HOME/.gradle/gradle.properties"
+          if [ -n "${ANDROID_HOME:-}" ] && [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          fi
+
+      - name: Install dependencies and generate localizations
+        run: |
+          flutter pub get
+          flutter gen-l10n
+
+      - name: Decode and verify release keystore
+        id: keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "$RELEASE_KEYSTORE_BASE64" ] && [ -z "$KEYSTORE_PASSWORD" ] && [ -z "$KEY_ALIAS" ] && [ -z "$KEY_PASSWORD" ]; then
+            echo "::notice::Signing secrets (RELEASE_KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD) are not configured yet; skipping CI APK build and GitHub Release upload."
+            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          for var_name in RELEASE_KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!var_name}" ]; then
+              echo "::error::Missing required GitHub secret: $var_name"
+              exit 1
+            fi
+          done
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > "$RUNNER_TEMP/release-keystore.jks"
+          chmod 600 "$RUNNER_TEMP/release-keystore.jks"
+          keytool -list \
+            -keystore "$RUNNER_TEMP/release-keystore.jks" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" > /dev/null
+          echo "has_secrets=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed split and universal release APKs
+        if: steps.keystore.outputs.has_secrets == 'true'
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/release-keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          flutter build apk --release --split-per-abi
+          flutter build apk --release
+
+      - name: Stage release artifacts and generate notes
+        id: stage
+        if: steps.keystore.outputs.has_secrets == 'true'
+        run: |
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          rm -rf dist
+          mkdir -p dist
+
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "dist/budget-ke-${TAG}-arm64-v8a.apk"
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk "dist/budget-ke-${TAG}-armeabi-v7a.apk"
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk "dist/budget-ke-${TAG}-x86_64.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/budget-ke-${TAG}-universal.apk"
+
+          (cd dist && sha256sum "budget-ke-${TAG}-"*.apk > SHA256SUMS.txt)
+
+          mb_size() {
+            awk -v bytes="$(wc -c < "$1")" 'BEGIN { printf "~%.1f MB", bytes / 1048576 }'
+          }
+
+          ARM64_SIZE="$(mb_size "dist/budget-ke-${TAG}-arm64-v8a.apk")"
+          ARMEABI_SIZE="$(mb_size "dist/budget-ke-${TAG}-armeabi-v7a.apk")"
+          X86_64_SIZE="$(mb_size "dist/budget-ke-${TAG}-x86_64.apk")"
+          UNIVERSAL_SIZE="$(mb_size "dist/budget-ke-${TAG}-universal.apk")"
+
+          cat > dist-notes.md <<EOF
+          ## Budget KE ${TAG}
+
+          Offline-first M-Pesa & personal budget tracker for Kenya.
+
+          ### Which APK should I download?
+
+          | File | Size | Recommended For |
+          |---|---|---|
+          | \`budget-ke-${TAG}-arm64-v8a.apk\` | ${ARM64_SIZE} | Most modern Android phones (64-bit ARM) |
+          | \`budget-ke-${TAG}-armeabi-v7a.apk\` | ${ARMEABI_SIZE} | Older 32-bit Android devices |
+          | \`budget-ke-${TAG}-x86_64.apk\` | ${X86_64_SIZE} | Android emulators / x86_64 tablets |
+          | \`budget-ke-${TAG}-universal.apk\` | ${UNIVERSAL_SIZE} | Any Android device (if unsure which ABI) |
+
+          Checksums are included in \`SHA256SUMS.txt\`.
+          EOF
+
+          IS_PRERELEASE="false"
+          if [[ "$TAG" == *-* ]]; then
+            IS_PRERELEASE="true"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=${IS_PRERELEASE}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        if: steps.keystore.outputs.has_secrets == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.stage.outputs.tag }}
+          name: Budget KE ${{ steps.stage.outputs.tag }}
+          body_path: dist-notes.md
+          generate_release_notes: true
+          draft: ${{ github.event_name == 'workflow_dispatch' && inputs.draft || false }}
+          prerelease: ${{ steps.stage.outputs.is_prerelease == 'true' }}
+          fail_on_unmatched_files: true
+          files: dist/*
+
+      - name: Clean up temporary keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release-keystore.jks"

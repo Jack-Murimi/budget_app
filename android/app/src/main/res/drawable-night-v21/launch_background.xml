@@ -5,9 +5,9 @@
             <solid android:color="#0E1510" />
         </shape>
     </item>
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/ic_launcher" />
-    </item>
+    <item
+        android:width="240dp"
+        android:height="240dp"
+        android:drawable="@drawable/splash_logo"
+        android:gravity="center" />
 </layer-list>

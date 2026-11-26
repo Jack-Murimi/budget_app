@@ -7,16 +7,28 @@ import '../../../shared/providers/theme_provider.dart';
 import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/currency_formatter.dart';
 import '../../../shared/widgets/motion.dart';
+import '../../accounts/models/payment_provider.dart';
 import '../../accounts/providers/account_providers.dart';
 import '../../accounts/screens/account_detail_screen.dart';
+import '../../accounts/widgets/account_brand_badge.dart';
+import '../../accounts/widgets/add_account_dialog.dart';
+import '../../accounts/widgets/provider_picker_sheet.dart';
+import '../../add_transaction/screens/add_transaction_screen.dart';
 import '../../budgets/providers/budget_providers.dart';
+import '../../budgets/screens/budget_detail_screen.dart';
 import '../../budgets/screens/budgets_screen.dart';
+import '../../debts/providers/debt_providers.dart';
+import '../../debts/screens/debts_screen.dart';
+import '../../fuliza/providers/fuliza_providers.dart';
+import '../../fuliza/screens/fuliza_screen.dart';
+import '../../portability/widgets/backup_reminder_banner.dart';
 import '../../recurring/providers/recurring_providers.dart';
 import '../../recurring/screens/recurring_screen.dart';
 import '../../transactions/providers/transaction_providers.dart';
 import '../providers/navigation_providers.dart';
-import '../widgets/spending_summary_card.dart';
 import '../widgets/category_pie_chart.dart';
+import '../widgets/floating_action_buttons.dart';
+import '../widgets/spending_summary_card.dart';
 import '../widgets/transaction_list_item.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -229,6 +241,160 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Consumer(
                     builder: (context, ref, _) {
                       final theme = Theme.of(context);
+                      final debts = ref.watch(debtsProvider).valueOrNull ?? const [];
+                      final fuliza = ref.watch(latestFulizaProvider).valueOrNull;
+                      final now = DateTime.now();
+                      final today = DateTime(now.year, now.month, now.day);
+                      final cutoff = today.add(const Duration(days: 3));
+
+                      var overdueCount = 0;
+                      var dueSoonCount = 0;
+                      var hasDebtDue = false;
+                      var hasFulizaDue = false;
+
+                      for (final entry in debts) {
+                        final d = entry.debt;
+                        if (entry.isSettled || d.dueDate == null) continue;
+                        final dueDay = DateTime(
+                          d.dueDate!.year,
+                          d.dueDate!.month,
+                          d.dueDate!.day,
+                        );
+                        if (dueDay.isBefore(today)) {
+                          overdueCount++;
+                          hasDebtDue = true;
+                        } else if (!dueDay.isAfter(cutoff)) {
+                          dueSoonCount++;
+                          hasDebtDue = true;
+                        }
+                      }
+
+                      if (fuliza != null &&
+                          fuliza.outstandingTotal > 0 &&
+                          fuliza.dueDate != null) {
+                        final fDue = fuliza.dueDate!;
+                        final dueDay =
+                            DateTime(fDue.year, fDue.month, fDue.day);
+                        if (dueDay.isBefore(today)) {
+                          overdueCount++;
+                          hasFulizaDue = true;
+                        } else if (!dueDay.isAfter(cutoff)) {
+                          dueSoonCount++;
+                          hasFulizaDue = true;
+                        }
+                      }
+
+                      final totalDue = overdueCount + dueSoonCount;
+                      if (totalDue == 0) return const SizedBox.shrink();
+
+                      final isAlert = overdueCount > 0;
+                      return FadeSlideIn(
+                        index: 1,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                          child: Pressable(
+                            haptic: true,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    (!hasDebtDue && hasFulizaDue)
+                                        ? const FulizaScreen()
+                                        : const DebtsScreen(),
+                              ),
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isAlert
+                                    ? theme.colorScheme.errorContainer
+                                        .withValues(alpha: 0.7)
+                                    : theme.colorScheme.tertiaryContainer
+                                        .withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: (isAlert
+                                          ? theme.colorScheme.error
+                                          : theme.colorScheme.tertiary)
+                                      .withValues(alpha: 0.35),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: (isAlert
+                                              ? theme.colorScheme.error
+                                              : theme.colorScheme.tertiary)
+                                          .withValues(alpha: 0.16),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      isAlert
+                                          ? Icons.event_busy_rounded
+                                          : Icons.event_available_rounded,
+                                      color: isAlert
+                                          ? theme.colorScheme.error
+                                          : theme
+                                              .colorScheme.onTertiaryContainer,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      isAlert
+                                          ? l10n.debtOverdueBanner(overdueCount)
+                                          : l10n.debtDueSoonBanner(totalDue),
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: isAlert
+                                            ? theme
+                                                .colorScheme.onErrorContainer
+                                            : theme.colorScheme
+                                                .onTertiaryContainer,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    l10n.view,
+                                    style:
+                                        theme.textTheme.labelMedium?.copyWith(
+                                      color: isAlert
+                                          ? theme.colorScheme.error
+                                          : theme
+                                              .colorScheme.onTertiaryContainer,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 18,
+                                    color: isAlert
+                                        ? theme.colorScheme.error
+                                        : theme
+                                            .colorScheme.onTertiaryContainer,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const BackupReminderBanner(),
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final theme = Theme.of(context);
                       final budgetAsync = ref.watch(overallBudgetProvider);
                       return budgetAsync.when(
                         data: (budget) {
@@ -330,6 +496,128 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Consumer(
                     builder: (context, ref, _) {
                       final theme = Theme.of(context);
+                      final pinned =
+                          ref.watch(pinnedBudgetsProvider).valueOrNull ??
+                              const [];
+                      if (pinned.isEmpty) return const SizedBox.shrink();
+
+                      return FadeSlideIn(
+                        index: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.push_pin_rounded,
+                                    size: 15,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    l10n.pinnedBudgets,
+                                    style:
+                                        theme.textTheme.labelLarge?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              for (final budget in pinned) ...[
+                                Pressable(
+                                  haptic: true,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => BudgetDetailScreen(
+                                        budgetWithProgress: budget,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Card(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 12,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  budget.name,
+                                                  style: theme
+                                                      .textTheme.titleSmall,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                '${budget.percentage.toStringAsFixed(0)}%',
+                                                style: theme
+                                                    .textTheme.labelMedium
+                                                    ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                  color: budget.isOverBudget
+                                                      ? theme.colorScheme.error
+                                                      : budget.progress >= 0.75
+                                                          ? theme.colorScheme
+                                                              .tertiary
+                                                          : theme.colorScheme
+                                                              .primary,
+                                                  fontFeatures: const [
+                                                    FontFeature.tabularFigures()
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${CurrencyFormatter.format(budget.spent)} / ${CurrencyFormatter.format(budget.amount)}',
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                              color: theme.colorScheme
+                                                  .onSurfaceVariant,
+                                              fontFeatures: const [
+                                                FontFeature.tabularFigures()
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          AnimatedProgressBar(
+                                            value: budget.progress,
+                                            color: budget.isOverBudget
+                                                ? theme.colorScheme.error
+                                                : budget.progress >= 0.75
+                                                    ? theme.colorScheme.tertiary
+                                                    : theme.colorScheme.primary,
+                                            minHeight: 6,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final theme = Theme.of(context);
                       final accountsAsync =
                           ref.watch(accountsWithBalanceProvider);
                       return accountsAsync.when(
@@ -391,13 +679,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                               ),
                                               child: Row(
                                                 children: [
-                                                  Container(
-                                                    width: 10,
-                                                    height: 10,
-                                                    decoration: BoxDecoration(
-                                                      shape: BoxShape.circle,
-                                                      color: accountColor,
-                                                    ),
+                                                  AccountBrandBadge.fromAccount(
+                                                    a,
+                                                    size: 28,
+                                                    borderRadius: 8,
                                                   ),
                                                   const SizedBox(width: 10),
                                                   Column(
@@ -558,46 +843,98 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-class _EmptyState extends StatelessWidget {
+class _EmptyState extends ConsumerWidget {
   const _EmptyState();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     return FadeSlideIn(
       index: 3,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 44),
-        child: Column(
-          children: [
-            Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.receipt_long_rounded,
-                size: 36,
-                color: theme.colorScheme.primary,
-              ),
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              children: [
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer
+                        .withValues(alpha: 0.55),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.receipt_long_rounded,
+                    size: 32,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  l10n.noTransactionsYet,
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.pasteOrAddHint,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () =>
+                          HomeFloatingActionButtons.pasteFromClipboard(
+                        context,
+                        ref,
+                      ),
+                      icon: const Icon(Icons.content_paste_rounded, size: 18),
+                      label: Text(l10n.pasteMpesaSmsAction),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: () async {
+                        final picked = await showProviderPickerSheet(
+                          context,
+                          initialGroup: PaymentProviderGroup.bank,
+                        );
+                        if (!context.mounted || picked == null) return;
+                        switch (picked) {
+                          case PickedProvider(:final provider):
+                            await showAddAccountDialog(
+                              context,
+                              initialProvider: provider,
+                            );
+                          case PickedCustom():
+                            await showAddAccountDialog(context);
+                        }
+                      },
+                      icon: const Icon(Icons.account_balance_rounded, size: 18),
+                      label: Text(l10n.addBankQuick),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                          builder: (_) => const AddTransactionScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: Text(l10n.addManuallyQuick),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(height: 18),
-            Text(
-              l10n.noTransactionsYet,
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              l10n.pasteOrAddHint,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+          ),
         ),
       ),
     );

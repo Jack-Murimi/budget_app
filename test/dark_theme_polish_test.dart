@@ -1,6 +1,3 @@
-import 'dart:ffi';
-import 'dart:io';
-
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/debts/screens/bridge_charges_screen.dart';
 import 'package:budget_app/features/debts/screens/debts_screen.dart';
@@ -18,15 +15,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqlite3/open.dart';
 
 void main() {
-  if (Platform.isLinux) {
-    open.overrideFor(
-      OperatingSystem.linux,
-      () => DynamicLibrary.open('libsqlite3.so.0'),
-    );
-  }
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -55,7 +45,12 @@ void main() {
 
     // Home tab (0) shows HomeFloatingActionButtons and logo_dark.svg
     expect(find.byType(HomeFloatingActionButtons), findsOneWidget);
-    final svg = tester.widget<SvgPicture>(find.byType(SvgPicture).first);
+    final svg = tester.widget<SvgPicture>(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byType(SvgPicture),
+      ).first,
+    );
     expect(
       (svg.bytesLoader as SvgAssetLoader).assetName,
       'assets/logo_dark.svg',

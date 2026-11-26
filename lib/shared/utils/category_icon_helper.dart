@@ -78,6 +78,7 @@ class CategoryIconHelper {
       'help_outline' => Icons.help_outline,
       'repeat' => Icons.repeat,
       'sync_problem' => Icons.sync_problem,
+      'widgets' => Icons.widgets_outlined,
       _ => Icons.category_outlined,
     };
   }
@@ -128,6 +129,12 @@ class CategoryIconHelper {
     if (lower.contains('income') || lower.contains('salary')) return 'attach_money';
     if (lower.contains('loan')) return 'handshake';
     if (lower.contains('transfer')) return 'swap_horiz';
+    if (lower.contains('gift') ||
+        lower.contains('treat') ||
+        lower.contains('friend')) {
+      return 'card_giftcard';
+    }
+    if (lower.contains('misc') || lower.contains('impulse')) return 'widgets';
     return 'category';
   }
 }

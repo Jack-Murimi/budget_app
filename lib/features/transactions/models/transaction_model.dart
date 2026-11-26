@@ -1,5 +1,21 @@
 import '../../../core/database/app_database.dart';
 
+class TransactionSplitModel {
+  final int id;
+  final int transactionId;
+  final int categoryId;
+  final double amount;
+  final String note;
+
+  const TransactionSplitModel({
+    this.id = 0,
+    this.transactionId = 0,
+    required this.categoryId,
+    required this.amount,
+    this.note = '',
+  });
+}
+
 class TransactionModel {
   final int id;
   final String header;
@@ -19,6 +35,7 @@ class TransactionModel {
   final int? accountId;
   final int? toAccountId;
   final bool excludeFromBudget;
+  final List<TransactionSplitModel> splits;
 
   const TransactionModel({
     required this.id,
@@ -39,28 +56,43 @@ class TransactionModel {
     this.accountId,
     this.toAccountId,
     this.excludeFromBudget = false,
+    this.splits = const [],
   });
+
+  bool get isSplit => splits.length >= 2;
+}
+
+extension TransactionSplitToModel on TransactionSplit {
+  TransactionSplitModel toModel() => TransactionSplitModel(
+        id: id,
+        transactionId: transactionId,
+        categoryId: categoryId,
+        amount: amount,
+        note: note,
+      );
 }
 
 extension TransactionToModel on Transaction {
-  TransactionModel toModel() => TransactionModel(
-    id: id,
-    header: header,
-    description: description,
-    amount: amount,
-    transactionCost: transactionCost,
-    fulizaAmount: fulizaAmount,
-    fulizaFee: fulizaFee,
-    type: type,
-    categoryId: categoryId,
-    transactionDate: transactionDate,
-    mpesaRef: mpesaRef,
-    counterpartyName: counterpartyName,
-    counterpartyAccount: counterpartyAccount,
-    isParsed: isParsed,
-    createdAt: createdAt,
-    accountId: accountId,
-    toAccountId: toAccountId,
-    excludeFromBudget: excludeFromBudget,
-  );
+  TransactionModel toModel({List<TransactionSplitModel> splits = const []}) =>
+      TransactionModel(
+        id: id,
+        header: header,
+        description: description,
+        amount: amount,
+        transactionCost: transactionCost,
+        fulizaAmount: fulizaAmount,
+        fulizaFee: fulizaFee,
+        type: type,
+        categoryId: categoryId,
+        transactionDate: transactionDate,
+        mpesaRef: mpesaRef,
+        counterpartyName: counterpartyName,
+        counterpartyAccount: counterpartyAccount,
+        isParsed: isParsed,
+        createdAt: createdAt,
+        accountId: accountId,
+        toAccountId: toAccountId,
+        excludeFromBudget: excludeFromBudget,
+        splits: splits,
+      );
 }

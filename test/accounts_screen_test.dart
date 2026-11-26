@@ -1,19 +1,17 @@
-import 'dart:ffi';
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/accounts/models/account_model.dart';
+import 'package:budget_app/features/accounts/models/payment_provider.dart';
 import 'package:budget_app/features/accounts/screens/account_detail_screen.dart';
 import 'package:budget_app/features/accounts/screens/accounts_screen.dart';
+import 'package:budget_app/features/accounts/widgets/account_brand_badge.dart';
 import 'package:budget_app/main.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-// ignore: depend_on_referenced_packages
-import 'package:sqlite3/open.dart';
 
 void main() {
-  open.overrideFor(OperatingSystem.linux, () => DynamicLibrary.open('libsqlite3.so.0'));
 
   late AppDatabase db;
 
@@ -49,7 +47,8 @@ void main() {
     expect(find.text('Total Balance'), findsOneWidget);
     expect(find.text('M-Pesa'), findsOneWidget);
     expect(find.text('Cash'), findsOneWidget);
-    expect(find.text('Bank'), findsOneWidget);
+    expect(find.text('Add Your Bank'), findsOneWidget);
+    expect(find.text('Bank'), findsNothing);
     expect(find.text('Default'), findsOneWidget);
   });
 
@@ -174,6 +173,10 @@ void main() {
 
     await pumpAccountsScreen(tester, container);
 
+    // Scroll down past the Add Your Bank prompt to see the archived account
+    await tester.scrollUntilVisible(find.text('Old Mattress'), 200);
+    await tester.pumpAndSettle();
+
     // Archived account visible and can be unarchived
     expect(find.text('Archived'), findsWidgets);
     expect(find.byTooltip('Unarchive'), findsOneWidget);
@@ -202,5 +205,57 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('+KES 500.00'), findsOneWidget);
+  });
+
+  testWidgets('adds branded Kenyan bank account from Add Your Bank quick chips',
+      (tester) async {
+    final container = ProviderContainer(overrides: [dbProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
+
+    await pumpAccountsScreen(tester, container);
+
+    await tester.tap(find.widgetWithText(ActionChip, 'Equity Bank'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add Account'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Equity Bank'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Opening Balance'),
+      '25000',
+    );
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Equity Bank'), findsOneWidget);
+    expect(find.text('KES 25,000.00'), findsNWidgets(2));
+    // Once a bank exists, the Add Your Bank prompt disappears.
+    expect(find.text('Add Your Bank'), findsNothing);
+
+    final accounts = await db.select(db.accounts).get();
+    final equity = accounts.firstWhere((a) => a.name == 'Equity Bank');
+    expect(equity.type, 'bank');
+    expect(equity.icon, 'brand_equity');
+    expect(equity.colorHex, '#A32A29');
+  });
+
+  testWidgets('renders all 15 provider brand badges without asset errors',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Wrap(
+            children: [
+              for (final p in PaymentProviders.all)
+                AccountBrandBadge.fromProvider(p, size: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AccountBrandBadge), findsNWidgets(15));
+    expect(tester.takeException(), isNull);
   });
 }

@@ -12,11 +12,13 @@ class DatabaseBackupService {
     'categories',
     'accounts',
     'budgets',
+    'budget_categories',
     'fuliza_records',
     'recurring_transactions',
     'debts',
     'savings_goals',
     'transactions',
+    'transaction_splits',
     'debt_repayments',
     'goal_contributions',
     'payee_category_rules',
@@ -33,6 +35,7 @@ class DatabaseBackupService {
     'savings_goals': {'target_amount', 'current_amount'},
     'goal_contributions': {'amount'},
     'transactions': {'amount', 'transaction_cost', 'fuliza_amount', 'fuliza_fee'},
+    'transaction_splits': {'amount'},
     'sms_inbox_items': {'parsed_amount'},
   };
 
@@ -40,7 +43,7 @@ class DatabaseBackupService {
     final tables = <String, dynamic>{};
     for (final table in _tables) {
       final rows = await _db.customSelect('SELECT * FROM $table').get();
-      tables[table] = rows.map((row) => row.data).toList();
+      tables[table] = rows.map((row) => Map<String, dynamic>.from(row.data)).toList();
     }
     return {'version': _currentVersion, 'tables': tables};
   }
@@ -95,6 +98,12 @@ class DatabaseBackupService {
         }
       }
       await _db.backfillCategorySystemKeys();
+      if (tables['budget_categories'] == null) {
+        await _db.customStatement(
+          'INSERT OR IGNORE INTO budget_categories (budget_id, category_id) '
+          'SELECT id, category_id FROM budgets WHERE category_id IS NOT NULL',
+        );
+      }
     });
     _db.markTablesUpdated(_db.allTables);
   }

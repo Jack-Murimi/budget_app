@@ -1,6 +1,3 @@
-import 'dart:ffi';
-import 'dart:io';
-
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/accounts/repositories/account_repository.dart';
 import 'package:budget_app/features/accounts/screens/account_detail_screen.dart';
@@ -10,15 +7,8 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/open.dart';
 
 void main() {
-  if (Platform.isLinux) {
-    open.overrideFor(
-      OperatingSystem.linux,
-      () => DynamicLibrary.open('libsqlite3.so.0'),
-    );
-  }
 
   late AppDatabase db;
   late AccountRepository repo;
@@ -40,9 +30,17 @@ void main() {
 
   testWidgets('AccountDetailScreen displays incoming/outgoing transfers, adjusts balance, edits, sets default, and handles delete guard',
       (tester) async {
+    final bankId = await repo.insertAccount(
+      AccountsCompanion.insert(
+        name: 'KCB Bank',
+        type: const Value('bank'),
+        colorHex: const Value('#003D4C'),
+        icon: const Value('brand_kcb'),
+      ),
+    );
     final accounts = await db.select(db.accounts).get();
     final mpesa = accounts.firstWhere((a) => a.name == 'M-Pesa');
-    final bank = accounts.firstWhere((a) => a.name == 'Bank');
+    final bank = accounts.firstWhere((a) => a.id == bankId);
 
     await db.into(db.transactions).insert(
           TransactionsCompanion.insert(
@@ -163,7 +161,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Set as Default'));
     await tester.pumpAndSettle();
-    expect(find.text('Bank set as default'), findsOneWidget);
+    expect(find.text('KCB Bank set as default'), findsOneWidget);
     expect(find.text('Default'), findsOneWidget);
 
     ScaffoldMessenger.of(tester.element(find.byType(AccountDetailScreen)))
@@ -175,7 +173,7 @@ void main() {
     await tester.tap(find.text('Archive'));
     await tester.pumpAndSettle();
     expect(find.byType(AccountDetailScreen), findsNothing);
-    expect(find.text('Bank archived'), findsOneWidget);
+    expect(find.text('KCB Bank archived'), findsOneWidget);
 
     await unmountTree(tester);
   });

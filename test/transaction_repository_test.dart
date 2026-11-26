@@ -1,4 +1,3 @@
-import 'dart:ffi';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:budget_app/core/database/app_database.dart';
@@ -6,11 +5,8 @@ import 'package:budget_app/features/debts/repositories/debt_repository.dart';
 import 'package:budget_app/features/goals/repositories/goal_repository.dart';
 import 'package:budget_app/features/transactions/repositories/transaction_repository.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
-// ignore: depend_on_referenced_packages
-import 'package:sqlite3/open.dart';
 
 void main() {
-  open.overrideFor(OperatingSystem.linux, () => DynamicLibrary.open('libsqlite3.so.0'));
 
   late AppDatabase db;
   late TransactionRepository repo;

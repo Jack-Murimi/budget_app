@@ -408,4 +408,69 @@ void main() {
       expect(res.newBalance, 0.0);
     });
   });
+
+  group('MpesaParser.parseBatch', () {
+    test('splits newline-separated multi-message block', () {
+      const block = '''
+UK3QX11U87 Confirmed. Ksh70.00 sent to JOHN DOE 0712345678 on 3/12/26 at 10:41 PM. New M-PESA balance is Ksh500.00. Transaction cost, Ksh0.00
+VK4QX22V99 Confirmed. Ksh500.00 paid to KPLC PREPAID. on 15/10/26 at 8:00 PM. New M-PESA balance is Ksh2,000.00. Transaction cost, Ksh0.00
+XM6SZ44X77 Confirmed. You have received Ksh1,500.00 from ALICE MWANGI 0733222333 on 5/11/26 at 11:20 AM. New M-PESA balance is Ksh3,200.00. Transaction cost, Ksh0.00
+''';
+      final split = MpesaParser.parseBatch(block);
+      expect(split.valid, hasLength(3));
+      expect(split.unparsedSegments, isEmpty);
+      expect(split.valid[0].mpesaRef, 'UK3QX11U87');
+      expect(split.valid[1].mpesaRef, 'VK4QX22V99');
+      expect(split.valid[2].mpesaRef, 'XM6SZ44X77');
+    });
+
+    test('splits single-line space-separated messages', () {
+      const block =
+          'UK3QX11U87 Confirmed. Ksh70.00 sent to JOHN DOE 0712345678 on 3/12/26 at 10:41 PM. New M-PESA balance is Ksh500.00. '
+          'VK4QX22V99 Confirmed. Ksh500.00 paid to KPLC PREPAID. on 15/10/26 at 8:00 PM. New M-PESA balance is Ksh2,000.00.';
+      final split = MpesaParser.parseBatch(block);
+      expect(split.valid, hasLength(2));
+      expect(split.unparsedSegments, isEmpty);
+      expect(split.valid[0].counterpartyName, 'JOHN DOE');
+      expect(split.valid[1].counterpartyName, 'KPLC PREPAID');
+    });
+
+    test('strips WhatsApp/SMS sender headers cleanly', () {
+      const block = '''
+[12/11, 14:30] MPESA:
+UK3QX11U87 Confirmed. Ksh70.00 sent to JOHN DOE 0712345678 on 3/12/26 at 10:41 PM. New M-PESA balance is Ksh500.00.
+[12/11, 15:10] M-PESA: VK4QX22V99 Confirmed. Ksh500.00 paid to KPLC PREPAID. on 15/10/26 at 8:00 PM. New M-PESA balance is Ksh2,000.00.
+''';
+      final split = MpesaParser.parseBatch(block);
+      expect(split.valid, hasLength(2));
+      expect(split.unparsedSegments, isEmpty);
+      expect(split.valid[0].mpesaRef, 'UK3QX11U87');
+      expect(split.valid[1].mpesaRef, 'VK4QX22V99');
+    });
+
+    test('preserves paired Send Money and Fuliza Drawdown sharing same mpesaRef', () {
+      const block = '''
+FZ1AA22B33 Confirmed. Ksh1,000.00 sent to MARY WANJIKU 0712345678 on 10/11/26 at 1:00 PM. New M-PESA balance is Ksh0.00. Transaction cost, Ksh13.00
+FZ1AA22B33 Confirmed. Fuliza M-PESA amount is Ksh400.00. Access Fee charged Ksh4.00. Total Fuliza M-PESA outstanding amount is Ksh404.00 due on 10/12/26.
+''';
+      final split = MpesaParser.parseBatch(block);
+      expect(split.valid, hasLength(2));
+      expect(split.valid[0].mpesaRef, 'FZ1AA22B33');
+      expect(split.valid[0].type, MpesaTransactionType.sendMoney);
+      expect(split.valid[1].mpesaRef, 'FZ1AA22B33');
+      expect(split.valid[1].type, MpesaTransactionType.fulizaDrawdown);
+    });
+
+    test('records unparsed noise segments alongside valid messages', () {
+      const block = '''
+Hello, here are my receipts for today:
+UK3QX11U87 Confirmed. Ksh70.00 sent to JOHN DOE 0712345678 on 3/12/26 at 10:41 PM. New M-PESA balance is Ksh500.00.
+ZZ99999999 Confirmed. This message has no amount at all.
+''';
+      final split = MpesaParser.parseBatch(block);
+      expect(split.valid, hasLength(1));
+      expect(split.valid.first.mpesaRef, 'UK3QX11U87');
+      expect(split.unparsedSegments, hasLength(2));
+    });
+  });
 }

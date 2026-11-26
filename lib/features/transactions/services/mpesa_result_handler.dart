@@ -35,6 +35,22 @@ class BulkImportSummary {
   int get totalImported => importedTransactions + importedFuliza;
 }
 
+class BatchPreviewItem {
+  final MpesaParseResult result;
+  final bool isDuplicate;
+  final int? suggestedCategoryId;
+
+  const BatchPreviewItem({
+    required this.result,
+    required this.isDuplicate,
+    this.suggestedCategoryId,
+  });
+
+  bool get isFulizaEvent =>
+      result.type == MpesaTransactionType.fulizaDrawdown ||
+      result.type == MpesaTransactionType.fulizaRepayment;
+}
+
 class MpesaResultHandler {
   final TransactionRepository transactionRepo;
   final FulizaRepository fulizaRepo;
@@ -110,103 +126,175 @@ class MpesaResultHandler {
     return (duplicate: null, enriched: enriched);
   }
 
+  /// Prepares a batch of parsed M-Pesa results for preview by marking
+  /// duplicates (both against the DB and within the batch) and resolving
+  /// payee category suggestions.
+  Future<List<BatchPreviewItem>> prepareBatchPreview(
+    List<MpesaParseResult> results,
+  ) async {
+    final seenKeys = <(String, bool)>{};
+    final items = <BatchPreviewItem>[];
+
+    for (final r in results) {
+      if (!r.isValid) continue;
+      final isFuliza = r.type == MpesaTransactionType.fulizaDrawdown ||
+          r.type == MpesaTransactionType.fulizaRepayment;
+      final ref = r.mpesaRef.trim();
+
+      var isDuplicate = false;
+      if (ref.isNotEmpty) {
+        if (!seenKeys.add((ref, isFuliza))) {
+          isDuplicate = true;
+        } else if (isFuliza) {
+          isDuplicate = await fulizaRepo.getByRef(ref) != null;
+        } else {
+          isDuplicate = await transactionRepo.getByRef(ref) != null;
+        }
+      }
+
+      int? suggestedCatId;
+      if (!isDuplicate && !isFuliza) {
+        final payee = r.counterpartyName.trim();
+        if (payee.isNotEmpty) {
+          suggestedCatId = await payeeRepo.suggest(payee);
+        }
+      }
+
+      items.add(
+        BatchPreviewItem(
+          result: r,
+          isDuplicate: isDuplicate,
+          suggestedCategoryId: suggestedCatId,
+        ),
+      );
+    }
+
+    return items;
+  }
+
+  /// Atomically imports a batch of parsed M-Pesa messages with optional
+  /// per-item category overrides (drawdowns first so paired transactions
+  /// attach Fuliza details, then regular/reversal transactions, then Fuliza
+  /// repayments chronologically).
+  Future<BulkImportSummary> bulkImportWithOverrides(
+    List<({MpesaParseResult result, int? categoryId})> items,
+  ) async {
+    return fulizaRepo.db.transaction(() async {
+      final defaultAcc = await accountRepo.getDefaultAccount();
+      final accountId = defaultAcc?.id;
+
+      final drawdowns = items
+          .where((i) =>
+              i.result.isValid &&
+              i.result.type == MpesaTransactionType.fulizaDrawdown)
+          .toList()
+        ..sort((a, b) =>
+            a.result.transactionDate.compareTo(b.result.transactionDate));
+
+      final repayments = items
+          .where((i) =>
+              i.result.isValid &&
+              i.result.type == MpesaTransactionType.fulizaRepayment)
+          .toList()
+        ..sort((a, b) =>
+            a.result.transactionDate.compareTo(b.result.transactionDate));
+
+      final regular = items
+          .where((i) =>
+              i.result.isValid &&
+              i.result.type != MpesaTransactionType.fulizaDrawdown &&
+              i.result.type != MpesaTransactionType.fulizaRepayment)
+          .toList()
+        ..sort((a, b) =>
+            a.result.transactionDate.compareTo(b.result.transactionDate));
+
+      var importedTxns = 0;
+      var importedFuliza = 0;
+      var skipped = 0;
+
+      for (final d in drawdowns) {
+        final outcome = await handleNonFormResult(d.result);
+        if (outcome.isDuplicate) {
+          skipped++;
+        } else {
+          importedFuliza++;
+        }
+      }
+
+      for (final item in regular) {
+        final r = item.result;
+        final prep = await prepareForForm(r);
+        if (prep.duplicate != null || prep.enriched == null) {
+          skipped++;
+          continue;
+        }
+        final enriched = prep.enriched!;
+        final payee = enriched.counterpartyName.trim();
+        final suggestedCatId =
+            payee.isNotEmpty ? await payeeRepo.suggest(payee) : null;
+        final chosenCategoryId = item.categoryId ?? suggestedCatId;
+        final normalizedRef =
+            enriched.mpesaRef.trim().isEmpty ? null : enriched.mpesaRef.trim();
+        final isReversal = enriched.type == MpesaTransactionType.reversal;
+
+        final companion = TransactionsCompanion.insert(
+          header: enriched.autoDescription,
+          description: Value(payee),
+          amount: enriched.amount,
+          transactionCost: Value(enriched.transactionCost),
+          fulizaAmount: Value(enriched.fulizaAmount),
+          fulizaFee: Value(enriched.fulizaAccessFee),
+          type: Value(enriched.resolvedTransactionType),
+          categoryId: Value(chosenCategoryId),
+          transactionDate: enriched.transactionDate,
+          mpesaRef: Value(normalizedRef),
+          counterpartyName: Value(payee),
+          counterpartyAccount: Value(enriched.counterpartyAccount),
+          isParsed: const Value(true),
+          accountId: Value(accountId),
+          excludeFromBudget: Value(isReversal),
+        );
+
+        final id = isReversal
+            ? await transactionRepo.insertReversalAndMarkOriginal(
+                companion,
+                enriched.counterpartyAccount,
+              )
+            : await transactionRepo.insertOrIgnoreDuplicate(companion);
+
+        if (id == null) {
+          skipped++;
+        } else {
+          importedTxns++;
+          if (item.categoryId != null && payee.isNotEmpty) {
+            await payeeRepo.learn(payee, item.categoryId!);
+          }
+        }
+      }
+
+      for (final rep in repayments) {
+        final outcome = await handleNonFormResult(rep.result);
+        if (outcome.isDuplicate) {
+          skipped++;
+        } else {
+          importedFuliza++;
+        }
+      }
+
+      return BulkImportSummary(
+        importedTransactions: importedTxns,
+        importedFuliza: importedFuliza,
+        skippedDuplicates: skipped,
+      );
+    });
+  }
+
   /// Imports a batch of valid parsed M-Pesa messages (drawdowns first so
   /// paired transactions attach Fuliza details, then regular/reversal
   /// transactions, then Fuliza repayments chronologically).
-  Future<BulkImportSummary> bulkImport(List<MpesaParseResult> results) async {
-    final defaultAcc = await accountRepo.getDefaultAccount();
-    final accountId = defaultAcc?.id;
-
-    final drawdowns = results
-        .where((r) => r.isValid && r.type == MpesaTransactionType.fulizaDrawdown)
-        .toList()
-      ..sort((a, b) => a.transactionDate.compareTo(b.transactionDate));
-
-    final repayments = results
-        .where((r) => r.isValid && r.type == MpesaTransactionType.fulizaRepayment)
-        .toList()
-      ..sort((a, b) => a.transactionDate.compareTo(b.transactionDate));
-
-    final regular = results
-        .where((r) =>
-            r.isValid &&
-            r.type != MpesaTransactionType.fulizaDrawdown &&
-            r.type != MpesaTransactionType.fulizaRepayment)
-        .toList()
-      ..sort((a, b) => a.transactionDate.compareTo(b.transactionDate));
-
-    var importedTxns = 0;
-    var importedFuliza = 0;
-    var skipped = 0;
-
-    for (final d in drawdowns) {
-      final outcome = await handleNonFormResult(d);
-      if (outcome.isDuplicate) {
-        skipped++;
-      } else {
-        importedFuliza++;
-      }
-    }
-
-    for (final r in regular) {
-      final prep = await prepareForForm(r);
-      if (prep.duplicate != null || prep.enriched == null) {
-        skipped++;
-        continue;
-      }
-      final enriched = prep.enriched!;
-      final payee = enriched.counterpartyName.trim();
-      final suggestedCatId =
-          payee.isNotEmpty ? await payeeRepo.suggest(payee) : null;
-      final normalizedRef =
-          enriched.mpesaRef.trim().isEmpty ? null : enriched.mpesaRef.trim();
-      final isReversal = enriched.type == MpesaTransactionType.reversal;
-
-      final companion = TransactionsCompanion.insert(
-        header: enriched.autoDescription,
-        description: Value(payee),
-        amount: enriched.amount,
-        transactionCost: Value(enriched.transactionCost),
-        fulizaAmount: Value(enriched.fulizaAmount),
-        fulizaFee: Value(enriched.fulizaAccessFee),
-        type: Value(enriched.resolvedTransactionType),
-        categoryId: Value(suggestedCatId),
-        transactionDate: enriched.transactionDate,
-        mpesaRef: Value(normalizedRef),
-        counterpartyName: Value(payee),
-        counterpartyAccount: Value(enriched.counterpartyAccount),
-        isParsed: const Value(true),
-        accountId: Value(accountId),
-        excludeFromBudget: Value(isReversal),
-      );
-
-      final id = isReversal
-          ? await transactionRepo.insertReversalAndMarkOriginal(
-              companion,
-              enriched.counterpartyAccount,
-            )
-          : await transactionRepo.insertOrIgnoreDuplicate(companion);
-
-      if (id == null) {
-        skipped++;
-      } else {
-        importedTxns++;
-      }
-    }
-
-    for (final rep in repayments) {
-      final outcome = await handleNonFormResult(rep);
-      if (outcome.isDuplicate) {
-        skipped++;
-      } else {
-        importedFuliza++;
-      }
-    }
-
-    return BulkImportSummary(
-      importedTransactions: importedTxns,
-      importedFuliza: importedFuliza,
-      skippedDuplicates: skipped,
+  Future<BulkImportSummary> bulkImport(List<MpesaParseResult> results) {
+    return bulkImportWithOverrides(
+      results.map((r) => (result: r, categoryId: null)).toList(),
     );
   }
 }

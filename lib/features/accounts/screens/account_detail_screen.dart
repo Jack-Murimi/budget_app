@@ -10,24 +10,16 @@ import '../../../shared/widgets/motion.dart';
 import '../../add_transaction/screens/add_transaction_screen.dart';
 import '../../transactions/models/transaction_model.dart';
 import '../models/account_model.dart';
+import '../models/payment_provider.dart';
 import '../providers/account_providers.dart';
+import '../widgets/account_brand_badge.dart';
+import '../widgets/add_account_dialog.dart';
+import '../widgets/provider_picker_sheet.dart';
 
 class AccountDetailScreen extends ConsumerWidget {
   final AccountWithBalance account;
 
   const AccountDetailScreen({super.key, required this.account});
-
-  static const _colorOptions = {
-    '#1B5E20': 'Dark Green',
-    '#4CAF50': 'Green',
-    '#2196F3': 'Blue',
-    '#F44336': 'Red',
-    '#FF9800': 'Orange',
-    '#9C27B0': 'Purple',
-    '#009688': 'Teal',
-    '#795548': 'Brown',
-    '#607D8B': 'Grey',
-  };
 
   String _formatDate(DateTime dt, AppLocalizations l10n) {
     final now = DateTime.now();
@@ -77,7 +69,7 @@ class AccountDetailScreen extends ConsumerWidget {
       context: context,
       builder: (_) => _EditAccountDialog(
         account: currentAccount,
-        colorOptions: _colorOptions,
+        colorOptions: accountColorOptions,
       ),
     );
   }
@@ -146,10 +138,13 @@ class AccountDetailScreen extends ConsumerWidget {
     final currentAccount =
         allAccounts.where((a) => a.id == account.id).firstOrNull ?? account;
     final txnsAsync = ref.watch(accountTransactionsProvider(currentAccount.id));
-    final accountColor = parseHexColor(
-      currentAccount.colorHex,
-      fallback: theme.colorScheme.primary,
+    final gradientColors = accountCardGradientColors(currentAccount);
+    final provider = PaymentProviders.resolve(
+      icon: currentAccount.icon,
+      name: currentAccount.name,
+      type: currentAccount.type,
     );
+    final subtitle = provider?.subtitle ?? currentAccount.type.toUpperCase();
 
     return Scaffold(
       appBar: AppBar(
@@ -270,10 +265,7 @@ class AccountDetailScreen extends ConsumerWidget {
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [
-                            accountColor,
-                            Color.lerp(accountColor, Colors.black, 0.25)!,
-                          ],
+                          colors: gradientColors,
                         ),
                       ),
                       child: Stack(
@@ -297,17 +289,15 @@ class AccountDetailScreen extends ConsumerWidget {
                               children: [
                                 Row(
                                   children: [
-                                    CircleAvatar(
-                                      backgroundColor: Colors.white24,
-                                      child: Text(
-                                        currentAccount.name.isNotEmpty
-                                            ? currentAccount.name[0]
-                                                .toUpperCase()
-                                            : '?',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                    Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white24,
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: AccountBrandBadge.fromAccount(
+                                        currentAccount,
+                                        size: 44,
                                       ),
                                     ),
                                     const SizedBox(width: 12),
@@ -324,11 +314,11 @@ class AccountDetailScreen extends ConsumerWidget {
                                           ),
                                         ),
                                         Text(
-                                          currentAccount.type.toUpperCase(),
+                                          subtitle,
                                           style: const TextStyle(
                                             color: Colors.white70,
                                             fontSize: 11,
-                                            letterSpacing: 0.8,
+                                            letterSpacing: 0.4,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
@@ -524,18 +514,23 @@ class _EditAccountDialog extends ConsumerStatefulWidget {
 }
 
 class _EditAccountDialogState extends ConsumerState<_EditAccountDialog> {
-  static const _validTypes = ['mpesa', 'cash', 'bank', 'airtel', 'other'];
+  static const _validTypes = accountTypeOptions;
 
   late final TextEditingController _nameCtrl =
       TextEditingController(text: widget.account.name);
+  late PaymentProvider? _selectedProvider = PaymentProviders.resolve(
+    icon: widget.account.icon,
+    name: widget.account.name,
+    type: widget.account.type,
+  );
+  late String _selectedIcon = widget.account.icon;
   late String _selectedType =
       _validTypes.contains(widget.account.type.toLowerCase())
           ? widget.account.type.toLowerCase()
           : 'other';
-  late String _selectedColor =
-      widget.colorOptions.containsKey(widget.account.colorHex)
-          ? widget.account.colorHex
-          : widget.colorOptions.keys.first;
+  late String _selectedColor = widget.account.colorHex.isNotEmpty
+      ? widget.account.colorHex
+      : widget.colorOptions.keys.first;
   bool _isSaving = false;
 
   @override
@@ -544,15 +539,81 @@ class _EditAccountDialogState extends ConsumerState<_EditAccountDialog> {
     super.dispose();
   }
 
+  Future<void> _changeProvider() async {
+    final picked = await showProviderPickerSheet(
+      context,
+      initialGroup: PaymentProviderGroup.bank,
+    );
+    if (!mounted || picked == null) return;
+    final prevName = _selectedProvider?.name;
+    setState(() {
+      switch (picked) {
+        case PickedProvider(:final provider):
+          _selectedProvider = provider;
+          if (_nameCtrl.text.trim().isEmpty ||
+              _nameCtrl.text == prevName ||
+              _nameCtrl.text.trim().toLowerCase() == 'bank') {
+            _nameCtrl.text = provider.name;
+          }
+          _selectedType = provider.type;
+          _selectedColor = provider.primaryColorHex;
+          _selectedIcon = provider.id;
+        case PickedCustom():
+          _selectedProvider = null;
+          _selectedIcon = 'account_balance_wallet';
+          if (!widget.colorOptions.containsKey(_selectedColor)) {
+            _selectedColor = widget.colorOptions.keys.first;
+          }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final colorMap = <String, String>{
+      ...widget.colorOptions,
+      if (!widget.colorOptions.containsKey(_selectedColor))
+        _selectedColor: _selectedProvider?.name ?? _selectedColor,
+    };
+
     return AlertDialog(
       title: Text(l10n.editAccount),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: _changeProvider,
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: l10n.accountProviderLabel,
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                  suffixIcon: const Icon(Icons.expand_more_rounded),
+                ),
+                child: Row(
+                  children: [
+                    AccountBrandBadge(
+                      icon: _selectedIcon,
+                      name: _nameCtrl.text.trim(),
+                      type: _selectedType,
+                      colorHex: _selectedColor,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _selectedProvider?.name ?? l10n.customAccount,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _nameCtrl,
               decoration: InputDecoration(
@@ -586,7 +647,7 @@ class _EditAccountDialogState extends ConsumerState<_EditAccountDialog> {
                 border: const OutlineInputBorder(),
               ),
               initialValue: _selectedColor,
-              items: widget.colorOptions.entries
+              items: colorMap.entries
                   .map(
                     (e) => DropdownMenuItem(
                       value: e.key,
@@ -636,6 +697,7 @@ class _EditAccountDialogState extends ConsumerState<_EditAccountDialog> {
             name: Value(_nameCtrl.text.trim()),
             type: Value(_selectedType),
             colorHex: Value(_selectedColor),
+            icon: Value(_selectedIcon),
           ),
         );
     if (mounted) Navigator.pop(context, true);

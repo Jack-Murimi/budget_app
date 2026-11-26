@@ -1,7 +1,3 @@
-import 'dart:ffi';
-// ignore: depend_on_referenced_packages
-import 'package:sqlite3/open.dart';
-
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +5,6 @@ import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/accounts/repositories/account_repository.dart';
 
 void main() {
-  open.overrideFor(OperatingSystem.linux, () => DynamicLibrary.open('libsqlite3.so.0'));
 
   late AppDatabase db;
   late AccountRepository repo;
@@ -27,10 +22,18 @@ void main() {
   group('AccountRepository', () {
     test('default accounts seeded on DB creation', () async {
       final accounts = await repo.getAll();
-      expect(accounts.length, 3);
-      expect(accounts.any((a) => a.name == 'M-Pesa' && a.isDefault), true);
-      expect(accounts.any((a) => a.name == 'Cash'), true);
-      expect(accounts.any((a) => a.name == 'Bank'), true);
+      expect(accounts.length, 2);
+      expect(
+        accounts.any(
+          (a) => a.name == 'M-Pesa' && a.isDefault && a.icon == 'brand_mpesa',
+        ),
+        true,
+      );
+      expect(
+        accounts.any((a) => a.name == 'Cash' && a.icon == 'brand_cash'),
+        true,
+      );
+      expect(accounts.any((a) => a.type == 'bank'), false);
     });
 
     test('getDefaultAccount returns M-Pesa', () async {
@@ -149,9 +152,17 @@ void main() {
     });
 
     test('createTransfer creates transfer transaction', () async {
+      final bankId = await repo.insertAccount(
+        AccountsCompanion.insert(
+          name: 'KCB Bank',
+          type: const Value('bank'),
+          colorHex: const Value('#003D4C'),
+          icon: const Value('brand_kcb'),
+        ),
+      );
       final accounts = await repo.getAll();
       final mpesa = accounts.firstWhere((a) => a.name == 'M-Pesa');
-      final bank = accounts.firstWhere((a) => a.name == 'Bank');
+      final bank = accounts.firstWhere((a) => a.id == bankId);
 
       // Add initial balance to M-Pesa
       await db.into(db.transactions).insert(
@@ -184,7 +195,7 @@ void main() {
 
       final accountsWithBalance = await repo.watchAccountsWithBalance().first;
       final mpesaWithBalance = accountsWithBalance.firstWhere((a) => a.name == 'M-Pesa');
-      final bankWithBalance = accountsWithBalance.firstWhere((a) => a.name == 'Bank');
+      final bankWithBalance = accountsWithBalance.firstWhere((a) => a.name == 'KCB Bank');
 
       // M-Pesa: 100000 - (20000 + 50) = 79950
       expect(mpesaWithBalance.balance, 79950);
@@ -207,14 +218,22 @@ void main() {
     });
 
     test('watchAccountsWithBalance sorts default first then by name', () async {
+      await repo.insertAccount(
+        AccountsCompanion.insert(
+          name: 'Equity Bank',
+          type: const Value('bank'),
+          colorHex: const Value('#A32A29'),
+          icon: const Value('brand_equity'),
+        ),
+      );
       final accountsWithBalance = await repo.watchAccountsWithBalance().first;
       
       expect(accountsWithBalance.first.name, 'M-Pesa');
       expect(accountsWithBalance.first.isDefault, true);
       
-      // Next should be alphabetically sorted: Bank, Cash
-      expect(accountsWithBalance[1].name, 'Bank');
-      expect(accountsWithBalance[2].name, 'Cash');
+      // Next should be alphabetically sorted: Cash, Equity Bank
+      expect(accountsWithBalance[1].name, 'Cash');
+      expect(accountsWithBalance[2].name, 'Equity Bank');
     });
 
     test('correctBalance marks adjustment transactions excludeFromBudget', () async {
@@ -235,10 +254,18 @@ void main() {
 
     test('deleteAccount guards default, linked, and last accounts; deletes unused non-default',
         () async {
+      final bankId = await repo.insertAccount(
+        AccountsCompanion.insert(
+          name: 'KCB Bank',
+          type: const Value('bank'),
+          colorHex: const Value('#003D4C'),
+          icon: const Value('brand_kcb'),
+        ),
+      );
       final accounts = await repo.getAll();
       final mpesa = accounts.firstWhere((a) => a.isDefault);
       final cash = accounts.firstWhere((a) => a.name == 'Cash');
-      final bank = accounts.firstWhere((a) => a.name == 'Bank');
+      final bank = accounts.firstWhere((a) => a.id == bankId);
 
       // Cannot delete default account.
       await expectLater(repo.deleteAccount(mpesa.id), throwsStateError);

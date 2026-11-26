@@ -1,20 +1,10 @@
-import 'dart:ffi';
-import 'dart:io';
-
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/portability/services/csv_portability_service.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/open.dart';
 
 void main() {
-  if (Platform.isLinux) {
-    open.overrideFor(
-      OperatingSystem.linux,
-      () => DynamicLibrary.open('libsqlite3.so.0'),
-    );
-  }
 
   test(
       'exports date-filtered transactions and skips timestamp amount payee duplicates',
@@ -68,6 +58,21 @@ Salary,,1000,income,2026-11-09T09:00:00.000Z,REF100,Employer,
     final dst = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(src.close);
     addTearDown(dst.close);
+
+    await src.into(src.accounts).insert(
+          AccountsCompanion.insert(
+            name: 'Bank',
+            type: const Value('bank'),
+            colorHex: const Value('#1976D2'),
+          ),
+        );
+    await dst.into(dst.accounts).insert(
+          AccountsCompanion.insert(
+            name: 'Bank',
+            type: const Value('bank'),
+            colorHex: const Value('#1976D2'),
+          ),
+        );
 
     final srcAccounts = await src.select(src.accounts).get();
     final mpesa = srcAccounts.firstWhere((a) => a.name == 'M-Pesa');

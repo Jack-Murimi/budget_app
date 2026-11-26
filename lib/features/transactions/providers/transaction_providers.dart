@@ -96,9 +96,13 @@ final filteredTransactionsProvider = Provider<AsyncValue<List<TransactionModel>>
         return false;
       }
 
-      if (matchingCategoryIds != null &&
-          !matchingCategoryIds.contains(t.categoryId)) {
-        return false;
+      if (matchingCategoryIds != null) {
+        final matchesParent = matchingCategoryIds.contains(t.categoryId);
+        final matchesSplit =
+            t.splits.any((s) => matchingCategoryIds.contains(s.categoryId));
+        if (!matchesParent && !matchesSplit) {
+          return false;
+        }
       }
 
       if (accountId != null && t.accountId != accountId && t.toAccountId != accountId) {

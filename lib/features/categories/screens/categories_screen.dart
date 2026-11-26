@@ -307,7 +307,7 @@ class _CategoryEditDialogState extends ConsumerState<_CategoryEditDialog> {
     'laptop', 'savings', 'work', 'attach_money', 'trending_up',
     'account_balance', 'payments', 'credit_card', 'handshake',
     'groups', 'send', 'card_giftcard', 'repeat', 'sync', 'build',
-    'flight', 'more_horiz',
+    'flight', 'widgets', 'more_horiz',
   ];
 
   @override

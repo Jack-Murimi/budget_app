@@ -4,6 +4,7 @@ import 'package:drift_flutter/drift_flutter.dart';
 import '../../features/categories/models/category_system_keys.dart';
 import 'converters/cents_converter.dart';
 import 'tables/accounts_table.dart';
+import 'tables/budget_categories_table.dart';
 import 'tables/budgets_table.dart';
 import 'tables/categories_table.dart';
 import 'tables/debts_table.dart';
@@ -12,16 +13,19 @@ import 'tables/payee_category_rules_table.dart';
 import 'tables/recurring_transactions_table.dart';
 import 'tables/savings_goals_table.dart';
 import 'tables/sms_inbox_items_table.dart';
+import 'tables/transaction_splits_table.dart';
 import 'tables/transactions_table.dart';
 
 part 'app_database.g.dart';
 
 @DriftDatabase(tables: [
   Transactions,
+  TransactionSplits,
   Categories,
   FulizaRecords,
   Accounts,
   Budgets,
+  BudgetCategories,
   RecurringTransactions,
   Debts,
   DebtRepayments,
@@ -37,7 +41,15 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 19;
+  int get schemaVersion => 22;
+
+  Future<bool> _tableExists(String table) async {
+    final rows = await customSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      variables: [Variable.withString(table)],
+    ).get();
+    return rows.isNotEmpty;
+  }
 
   Future<bool> _columnExists(String table, String column) async {
     final rows = await customSelect('PRAGMA table_info("$table")').get();
@@ -60,6 +72,15 @@ class AppDatabase extends _$AppDatabase {
           await _createPerformanceIndexes();
           await customStatement(
             'CREATE INDEX IF NOT EXISTS idx_categories_system_key ON categories (system_key)',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_budget_categories_category_id ON budget_categories (category_id)',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_transaction_splits_transaction_id ON transaction_splits (transaction_id)',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_transaction_splits_category_id ON transaction_splits (category_id)',
           );
           await _seedDefaultCategories();
           await _seedDefaultAccounts();
@@ -356,6 +377,104 @@ class AppDatabase extends _$AppDatabase {
             );
             await backfillCategorySystemKeys();
           }
+          if (from < 20) {
+            if (await _tableExists('budgets')) {
+              await m.createTable(budgetCategories);
+              await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_budget_categories_category_id ON budget_categories (category_id)',
+              );
+              await customStatement(
+                'INSERT OR IGNORE INTO budget_categories (budget_id, category_id) '
+                'SELECT id, category_id FROM budgets WHERE category_id IS NOT NULL',
+              );
+            }
+            await _seedV20Categories();
+          }
+          if (from < 21) {
+            if (await _tableExists('accounts')) {
+              await customStatement(
+                "UPDATE accounts SET icon = 'brand_mpesa', color_hex = '#008A45' "
+                "WHERE LOWER(name) = 'm-pesa' AND (icon = 'phone_android' OR color_hex = '#1B5E20')",
+              );
+              await customStatement(
+                "UPDATE accounts SET icon = 'brand_cash', color_hex = '#2E7D32' "
+                "WHERE LOWER(name) = 'cash' AND (icon = 'payments' OR color_hex = '#4CAF50')",
+              );
+
+              final bankRows = await customSelect(
+                "SELECT id FROM accounts WHERE name = 'Bank' AND type = 'bank' AND is_default = 0 AND initial_balance = 0",
+              ).get();
+              if (bankRows.isNotEmpty) {
+                final hasTxnTable = await _tableExists('transactions');
+                final hasRecurringTable =
+                    await _tableExists('recurring_transactions');
+                final hasDebtsTable = await _tableExists('debts');
+                final hasRepaymentsTable =
+                    await _tableExists('debt_repayments');
+                final hasGoalsTable = await _tableExists('goal_contributions');
+
+                for (final row in bankRows) {
+                  final bankId = row.read<int>('id');
+                  var isReferenced = false;
+                  if (hasTxnTable) {
+                    final ref = await customSelect(
+                      'SELECT 1 FROM transactions WHERE account_id = ? OR to_account_id = ? LIMIT 1',
+                      variables: [
+                        Variable.withInt(bankId),
+                        Variable.withInt(bankId),
+                      ],
+                    ).getSingleOrNull();
+                    if (ref != null) isReferenced = true;
+                  }
+                  if (!isReferenced && hasRecurringTable) {
+                    final ref = await customSelect(
+                      'SELECT 1 FROM recurring_transactions WHERE account_id = ? LIMIT 1',
+                      variables: [Variable.withInt(bankId)],
+                    ).getSingleOrNull();
+                    if (ref != null) isReferenced = true;
+                  }
+                  if (!isReferenced && hasDebtsTable) {
+                    final ref = await customSelect(
+                      'SELECT 1 FROM debts WHERE account_id = ? LIMIT 1',
+                      variables: [Variable.withInt(bankId)],
+                    ).getSingleOrNull();
+                    if (ref != null) isReferenced = true;
+                  }
+                  if (!isReferenced && hasRepaymentsTable) {
+                    final ref = await customSelect(
+                      'SELECT 1 FROM debt_repayments WHERE account_id = ? LIMIT 1',
+                      variables: [Variable.withInt(bankId)],
+                    ).getSingleOrNull();
+                    if (ref != null) isReferenced = true;
+                  }
+                  if (!isReferenced && hasGoalsTable) {
+                    final ref = await customSelect(
+                      'SELECT 1 FROM goal_contributions WHERE account_id = ? LIMIT 1',
+                      variables: [Variable.withInt(bankId)],
+                    ).getSingleOrNull();
+                    if (ref != null) isReferenced = true;
+                  }
+                  if (!isReferenced) {
+                    await customStatement(
+                      'DELETE FROM accounts WHERE id = ?',
+                      [bankId],
+                    );
+                  }
+                }
+              }
+            }
+          }
+          if (from < 22) {
+            if (await _tableExists('transactions')) {
+              await m.createTable(transactionSplits);
+              await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_transaction_splits_transaction_id ON transaction_splits (transaction_id)',
+              );
+              await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_transaction_splits_category_id ON transaction_splits (category_id)',
+              );
+            }
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
@@ -555,6 +674,8 @@ class AppDatabase extends _$AppDatabase {
     final fees = await addParent('Fees & Charges', 'money_off', '#78909C');
     final debtRepay = await addParent('Debt Repayment', 'credit_card', '#C62828');
     final business = await addParent('Business', 'store', '#00ACC1');
+    final gifts = await addParent('Gifts & Treats', 'card_giftcard', '#FB8C00');
+    final misc = await addParent('Miscellaneous', 'widgets', '#5E35B1');
     final otherExp = await addParent('Other', 'more_horiz', '#757575');
     final investments = await addParent('Investments', 'savings', '#1B5E20', type: 'income');
 
@@ -638,7 +759,16 @@ class AppDatabase extends _$AppDatabase {
         cat('Staff', 'groups', '#00ACC1', parentId: business),
         cat('Licences & Taxes', 'account_balance', '#00ACC1', parentId: business),
 
-        // 12. Other (Expense)
+        // 12. Gifts & Treats
+        cat('Treats & Buying for Friends', 'volunteer_activism', '#FB8C00', parentId: gifts),
+        cat('Gifts & Presents', 'card_giftcard', '#FB8C00', parentId: gifts),
+        cat('Donations & Charity', 'favorite', '#FB8C00', parentId: gifts),
+
+        // 13. Miscellaneous
+        cat('Impulse / Unplanned', 'shopping_bag', '#5E35B1', parentId: misc),
+        cat('Random / One-off', 'more_horiz', '#5E35B1', parentId: misc),
+
+        // 14. Other (Expense)
         cat('Uncategorized', 'help_outline', '#757575', parentId: otherExp),
         cat(
           'Loan Given',
@@ -681,6 +811,60 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  Future<void> _seedV20Categories() async {
+    Future<int> ensureParent(String name, String icon, String color) async {
+      final existing = await customSelect(
+        "SELECT id FROM categories WHERE LOWER(name) = ? AND transaction_type = 'expense' LIMIT 1",
+        variables: [Variable.withString(name.toLowerCase())],
+      ).getSingleOrNull();
+      if (existing != null) return existing.read<int>('id');
+      return into(categories).insert(
+        CategoriesCompanion.insert(
+          name: name,
+          icon: Value(icon),
+          colorHex: Value(color),
+          transactionType: const Value('expense'),
+          isDefault: const Value(true),
+        ),
+      );
+    }
+
+    Future<void> ensureChild(
+      int parentId,
+      String name,
+      String icon,
+      String color,
+    ) async {
+      final existing = await customSelect(
+        'SELECT id FROM categories WHERE parent_id = ? AND LOWER(name) = ? LIMIT 1',
+        variables: [
+          Variable.withInt(parentId),
+          Variable.withString(name.toLowerCase()),
+        ],
+      ).getSingleOrNull();
+      if (existing != null) return;
+      await into(categories).insert(
+        CategoriesCompanion.insert(
+          name: name,
+          icon: Value(icon),
+          colorHex: Value(color),
+          transactionType: const Value('expense'),
+          isDefault: const Value(true),
+          parentId: Value(parentId),
+        ),
+      );
+    }
+
+    final giftsId = await ensureParent('Gifts & Treats', 'card_giftcard', '#FB8C00');
+    await ensureChild(giftsId, 'Treats & Buying for Friends', 'volunteer_activism', '#FB8C00');
+    await ensureChild(giftsId, 'Gifts & Presents', 'card_giftcard', '#FB8C00');
+    await ensureChild(giftsId, 'Donations & Charity', 'favorite', '#FB8C00');
+
+    final miscId = await ensureParent('Miscellaneous', 'widgets', '#5E35B1');
+    await ensureChild(miscId, 'Impulse / Unplanned', 'shopping_bag', '#5E35B1');
+    await ensureChild(miscId, 'Random / One-off', 'more_horiz', '#5E35B1');
+  }
+
   Future<void> _seedDefaultAccounts() async {
     final existing = await (select(accounts)..limit(1)).get();
     if (existing.isNotEmpty) return;
@@ -689,21 +873,15 @@ class AppDatabase extends _$AppDatabase {
         AccountsCompanion.insert(
           name: 'M-Pesa',
           type: const Value('mpesa'),
-          colorHex: const Value('#1B5E20'),
-          icon: const Value('phone_android'),
+          colorHex: const Value('#008A45'),
+          icon: const Value('brand_mpesa'),
           isDefault: const Value(true),
         ),
         AccountsCompanion.insert(
           name: 'Cash',
           type: const Value('cash'),
-          colorHex: const Value('#4CAF50'),
-          icon: const Value('payments'),
-        ),
-        AccountsCompanion.insert(
-          name: 'Bank',
-          type: const Value('bank'),
-          colorHex: const Value('#1976D2'),
-          icon: const Value('account_balance'),
+          colorHex: const Value('#2E7D32'),
+          icon: const Value('brand_cash'),
         ),
       ]);
     });

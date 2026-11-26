@@ -1,20 +1,10 @@
-import 'dart:ffi';
-import 'dart:io';
-
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/portability/services/database_backup_service.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/open.dart';
 
 void main() {
-  if (Platform.isLinux) {
-    open.overrideFor(
-      OperatingSystem.linux,
-      () => DynamicLibrary.open('libsqlite3.so.0'),
-    );
-  }
 
   test('snapshot restores transactions, accounts, and categories', () async {
     final source = AppDatabase.forTesting(NativeDatabase.memory());
@@ -145,6 +135,22 @@ void main() {
             transactionDate: DateTime.utc(2026, 11, 10),
           ),
         );
+    await source.into(source.transactionSplits).insert(
+          TransactionSplitsCompanion.insert(
+            transactionId: txnId,
+            categoryId: parentCatId,
+            amount: 300,
+            note: const Value('Groceries'),
+          ),
+        );
+    await source.into(source.transactionSplits).insert(
+          TransactionSplitsCompanion.insert(
+            transactionId: txnId,
+            categoryId: childCatId,
+            amount: 200,
+            note: const Value('Snacks'),
+          ),
+        );
     await source.into(source.debtRepayments).insert(
           DebtRepaymentsCompanion.insert(
             debtId: debtId,
@@ -177,6 +183,26 @@ void main() {
             createdAt: DateTime.utc(2026, 11, 10),
           ),
         );
+    final multiBudgetId = await source.into(source.budgets).insert(
+          BudgetsCompanion.insert(
+            name: 'Combined Budget',
+            amount: 10000,
+            categoryId: Value(parentCatId),
+            startDate: DateTime.utc(2026, 11, 1),
+          ),
+        );
+    await source.into(source.budgetCategories).insert(
+          BudgetCategoriesCompanion.insert(
+            budgetId: multiBudgetId,
+            categoryId: parentCatId,
+          ),
+        );
+    await source.into(source.budgetCategories).insert(
+          BudgetCategoriesCompanion.insert(
+            budgetId: multiBudgetId,
+            categoryId: childCatId,
+          ),
+        );
 
     final emissions = <List<Transaction>>[];
     final sub = destination
@@ -189,7 +215,12 @@ void main() {
     final snapshot = await DatabaseBackupService(source).snapshot();
     expect(
       (snapshot['tables'] as Map).keys,
-      containsAll(['payee_category_rules', 'sms_inbox_items']),
+      containsAll([
+        'payee_category_rules',
+        'sms_inbox_items',
+        'budget_categories',
+        'transaction_splits',
+      ]),
     );
 
     await DatabaseBackupService(destination).restore(snapshot);
@@ -213,5 +244,75 @@ void main() {
       (await destination.select(destination.goalContributions).get()).single.transactionId,
       txnId,
     );
+    final restoredBudgetCats =
+        await destination.select(destination.budgetCategories).get();
+    expect(restoredBudgetCats, hasLength(2));
+    expect(
+      restoredBudgetCats.map((r) => r.categoryId),
+      unorderedEquals([parentCatId, childCatId]),
+    );
+    final restoredSplits =
+        await destination.select(destination.transactionSplits).get();
+    expect(restoredSplits, hasLength(2));
+    expect(restoredSplits[0].transactionId, txnId);
+    expect(restoredSplits[0].amount, 300.0);
+    expect(restoredSplits[0].note, 'Groceries');
+    expect(restoredSplits[1].amount, 200.0);
+  });
+
+  test('restoring snapshot without budget_categories backfills from budgets.category_id',
+      () async {
+    final destination = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(destination.close);
+
+    final legacySnapshot = {
+      'version': 2,
+      'tables': {
+        'categories': [
+          {
+            'id': 10,
+            'name': 'Food',
+            'icon': 'restaurant',
+            'color_hex': '#E53935',
+            'transaction_type': 'expense',
+            'is_default': 1,
+            'is_archived': 0,
+            'sort_order': 0,
+            'created_at': 1730419200,
+          },
+        ],
+        'budgets': [
+          {
+            'id': 1,
+            'name': 'Food Budget',
+            'amount': 500000,
+            'period': 'monthly',
+            'category_id': 10,
+            'start_date': 1730419200,
+            'rollover': 0,
+            'is_archived': 0,
+            'created_at': 1730419200,
+          },
+          {
+            'id': 2,
+            'name': 'Overall',
+            'amount': 1000000,
+            'period': 'monthly',
+            'category_id': null,
+            'start_date': 1730419200,
+            'rollover': 0,
+            'is_archived': 0,
+            'created_at': 1730419200,
+          },
+        ],
+      },
+    };
+
+    await DatabaseBackupService(destination).restore(legacySnapshot);
+
+    final rows = await destination.select(destination.budgetCategories).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.budgetId, 1);
+    expect(rows.single.categoryId, 10);
   });
 }

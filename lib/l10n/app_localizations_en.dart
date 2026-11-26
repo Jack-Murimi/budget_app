@@ -1939,4 +1939,299 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dismiss => 'Dismiss';
+
+  @override
+  String get categories => 'Categories';
+
+  @override
+  String get selectCategories => 'Select Categories';
+
+  @override
+  String get searchCategoriesHint => 'Search categories...';
+
+  @override
+  String categoriesSelectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count categories selected',
+      one: '1 category selected',
+      zero: 'Overall Budget (All Expenses)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String allSubcategoriesCount(int count) {
+    return 'All $count subcategories';
+  }
+
+  @override
+  String selectedOfTotalSubcategories(int selected, int total) {
+    return '$selected of $total selected';
+  }
+
+  @override
+  String subcategoriesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count subcategories',
+      one: '1 subcategory',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get clearSelection => 'Clear';
+
+  @override
+  String get includedCategories => 'Included Categories';
+
+  @override
+  String get chooseProvider => 'Choose Provider';
+
+  @override
+  String get kenyanBanks => 'Kenyan Banks';
+
+  @override
+  String get mobileMoney => 'Mobile Money';
+
+  @override
+  String get cashAndCustom => 'Cash & Custom';
+
+  @override
+  String get customAccount => 'Custom Account';
+
+  @override
+  String get customAccountSub => 'Create your own wallet or bank';
+
+  @override
+  String get searchProvidersHint => 'Search banks or wallets...';
+
+  @override
+  String get addYourBank => 'Add Your Bank';
+
+  @override
+  String get addYourBankSubtitle =>
+      'Pick the Kenyan bank you actually use — Equity, KCB, Co-op, NCBA & more';
+
+  @override
+  String get moreBanks => 'More banks';
+
+  @override
+  String get changeBrand => 'Change Bank / Brand';
+
+  @override
+  String get pasteMpesaSmsAction => 'Paste M-Pesa SMS';
+
+  @override
+  String get addBankQuick => 'Add Bank';
+
+  @override
+  String get addManuallyQuick => 'Add Manually';
+
+  @override
+  String get accountProviderLabel => 'Brand / Provider';
+
+  @override
+  String get brandPreview => 'Card Preview';
+
+  @override
+  String get batchPasteTitle => 'Batch Import M-Pesa';
+
+  @override
+  String get batchPasteHint => 'Paste one or more M-Pesa SMS messages here...';
+
+  @override
+  String get pasteFromClipboard => 'Paste';
+
+  @override
+  String get parseMessages => 'Parse Messages';
+
+  @override
+  String batchReadyCount(int count) {
+    return '$count ready';
+  }
+
+  @override
+  String batchDuplicateCount(int count) {
+    return '$count duplicate';
+  }
+
+  @override
+  String batchUnparsedCount(int count) {
+    return '$count unparsed';
+  }
+
+  @override
+  String get duplicateBadge => 'Duplicate';
+
+  @override
+  String importSelectedCount(int count) {
+    return 'Import $count';
+  }
+
+  @override
+  String batchImportSuccess(int count) {
+    return 'Imported $count transactions';
+  }
+
+  @override
+  String batchImportSuccessWithSkipped(int count, int skipped) {
+    return 'Imported $count transactions ($skipped skipped)';
+  }
+
+  @override
+  String get batchImportNothingNew => 'No new transactions to import';
+
+  @override
+  String get batchImportAction => 'Batch Import';
+
+  @override
+  String get sharedTextNotMpesa => 'Shared text is not a recognized M-Pesa SMS';
+
+  @override
+  String get categoryBreakdownTitle => 'Category Breakdown';
+
+  @override
+  String categoryBreakdownShare(int percent) {
+    return '$percent% of spent';
+  }
+
+  @override
+  String categoryTxnCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count expenses',
+      one: '1 expense',
+      zero: 'No expenses',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pinnedBudgets => 'Pinned Budgets';
+
+  @override
+  String get pinToHome => 'Pin to Home';
+
+  @override
+  String get unpinFromHome => 'Unpin from Home';
+
+  @override
+  String get budgetPinnedToHome => 'Pinned to Home';
+
+  @override
+  String get budgetUnpinnedFromHome => 'Unpinned from Home';
+
+  @override
+  String maxPinnedBudgetsReached(int max) {
+    return 'You can pin up to $max budgets on Home';
+  }
+
+  @override
+  String budgetWarning80Alert(String name, int percent) {
+    return 'Heads up: $name budget reached $percent%';
+  }
+
+  @override
+  String budgetExceededAlert(String name, int percent) {
+    return 'Over budget: $name is now at $percent%';
+  }
+
+  @override
+  String get remindBeforeDue => 'Remind when due';
+
+  @override
+  String get remindBeforeDueDesc =>
+      'Send a local reminder when this bill is due or overdue';
+
+  @override
+  String debtDueSoonBanner(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count debts/Fuliza due soon',
+      one: '1 debt or Fuliza balance due soon',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String debtOverdueBanner(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count debt/Fuliza payments overdue',
+      one: '1 debt or Fuliza payment overdue',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get splitAcrossCategories => 'Split across categories';
+
+  @override
+  String get splitAcrossCategoriesDesc =>
+      'Divide this payment across multiple categories';
+
+  @override
+  String get addSplitRow => 'Add category split';
+
+  @override
+  String get splitNoteHint => 'Note (optional)';
+
+  @override
+  String splitBalanced(String total) {
+    return 'Split balanced ($total)';
+  }
+
+  @override
+  String splitRemainingAmount(String amount) {
+    return '$amount left to assign';
+  }
+
+  @override
+  String splitOverAllocated(String amount) {
+    return 'Over by $amount';
+  }
+
+  @override
+  String get fillRemaining => 'Fill remaining';
+
+  @override
+  String get splitRequiresTwoRows => 'Add at least 2 split categories';
+
+  @override
+  String get splitSelectAllCategories =>
+      'Select a category for every split row';
+
+  @override
+  String get splitAmountsMustMatch =>
+      'Split amounts must equal the transaction total';
+
+  @override
+  String splitCountBadge(int count) {
+    return 'Split ($count)';
+  }
+
+  @override
+  String get backupReminderTitle => 'Back up your data';
+
+  @override
+  String get backupReminderNever =>
+      'You haven\'t exported an encrypted backup yet. Save a copy to keep your records safe.';
+
+  @override
+  String backupReminderDaysAgo(int days) {
+    return 'Last backup was $days days ago. Export a fresh copy to stay protected.';
+  }
+
+  @override
+  String get backupNow => 'Back up';
+
+  @override
+  String get dismissBackupReminder => 'Dismiss';
 }

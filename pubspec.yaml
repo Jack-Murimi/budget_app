@@ -1,7 +1,7 @@
 name: budget_app
 description: M-Pesa budget tracker for Kenya
 publish_to: 'none'
-version: 1.0.2+3
+version: 1.0.3+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -12,8 +12,8 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_riverpod: ^2.5.1
-  drift: ^2.18.0
-  drift_flutter: ^0.2.1
+  drift: ^2.35.4
+  drift_flutter: ^0.3.1
   path: ^1.9.0
   intl: ^0.20.3
   fl_chart: ^0.68.0
@@ -24,15 +24,17 @@ dependencies:
   file_selector: ^1.0.3
   local_auth: ^3.0.2
   dynamic_color: ^1.9.0
+  flutter_local_notifications: ^23.0.4
+  timezone: ^0.11.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
-  build_runner: ^2.4.9
-  drift_dev: ^2.18.0
+  build_runner: ^2.17.1
+  drift_dev: ^2.35.3
   flutter_launcher_icons: ^0.13.1
-  sqlite3: ^2.4.6
+  sqlite3: ^3.9.2
 
 flutter:
   uses-material-design: true
@@ -40,6 +42,7 @@ flutter:
   assets:
     - assets/logo.svg
     - assets/logo_dark.svg
+    - assets/brands/
   fonts:
     - family: Poppins
       fonts:

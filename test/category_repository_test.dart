@@ -1,14 +1,10 @@
-import 'dart:ffi';
 import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:budget_app/core/database/app_database.dart';
 import 'package:budget_app/features/categories/repositories/category_repository.dart';
-// ignore: depend_on_referenced_packages
-import 'package:sqlite3/open.dart';
 
 void main() {
-  open.overrideFor(OperatingSystem.linux, () => DynamicLibrary.open('libsqlite3.so.0'));
 
   late AppDatabase db;
   late CategoryRepository repo;
@@ -28,6 +24,27 @@ void main() {
     expect(all.any((c) => c.name == 'Food & Groceries'), true);
     expect(all.any((c) => c.name == 'Transport'), true);
     expect(all.any((c) => c.name == 'Salary'), true);
+
+    final gifts = all.firstWhere((c) => c.name == 'Gifts & Treats');
+    final giftChildren = await repo.getChildren(gifts.id);
+    expect(
+      giftChildren.map((c) => c.name),
+      containsAll([
+        'Treats & Buying for Friends',
+        'Gifts & Presents',
+        'Donations & Charity',
+      ]),
+    );
+
+    final misc = all.firstWhere((c) => c.name == 'Miscellaneous');
+    final miscChildren = await repo.getChildren(misc.id);
+    expect(
+      miscChildren.map((c) => c.name),
+      containsAll([
+        'Impulse / Unplanned',
+        'Random / One-off',
+      ]),
+    );
   });
 
   test('getTopLevel returns only parent categories', () async {

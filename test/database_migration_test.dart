@@ -1,4 +1,3 @@
-import 'dart:ffi';
 import 'dart:io';
 
 import 'package:budget_app/core/database/app_database.dart';
@@ -6,16 +5,9 @@ import 'package:budget_app/features/accounts/repositories/account_repository.dar
 import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/open.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 
 void main() {
-  if (Platform.isLinux) {
-    open.overrideFor(
-      OperatingSystem.linux,
-      () => DynamicLibrary.open('libsqlite3.so.0'),
-    );
-  }
 
   Future<void> expectMoneyColumnsAreInteger(AppDatabase db) async {
     const moneyColumns = <String, List<String>>{
@@ -102,7 +94,7 @@ void main() {
           ('Micro B', 0.20, 0.0, 'income', 1, 1730419320, 'REF003');
       ''');
     } finally {
-      raw.dispose();
+      raw.close();
     }
 
     final db = AppDatabase.forTesting(NativeDatabase(dbFile));
@@ -113,7 +105,7 @@ void main() {
     expect(txns, hasLength(3));
 
     final versionRow = await db.customSelect('PRAGMA user_version').getSingle();
-    expect(versionRow.read<int>('user_version'), 19);
+    expect(versionRow.read<int>('user_version'), 22);
 
     final fkRow = await db.customSelect('PRAGMA foreign_keys').getSingle();
     expect(fkRow.read<int>('foreign_keys'), 1);
@@ -328,7 +320,7 @@ void main() {
         VALUES (1, 'Java House', 850.75, 13.00, 200.50, 2.05, 1, 1, 1730419200, 'TXN001');
       ''');
     } finally {
-      raw.dispose();
+      raw.close();
     }
 
     final db = AppDatabase.forTesting(NativeDatabase(dbFile));
@@ -482,7 +474,7 @@ void main() {
           ('Food & Groceries', 'expense', 1);
       ''');
     } finally {
-      raw.dispose();
+      raw.close();
     }
 
     final db = AppDatabase.forTesting(NativeDatabase(dbFile));
@@ -490,7 +482,7 @@ void main() {
 
     final cats = await db.select(db.categories).get();
     final versionRow = await db.customSelect('PRAGMA user_version').getSingle();
-    expect(versionRow.read<int>('user_version'), 19);
+    expect(versionRow.read<int>('user_version'), 22);
 
     String? keyFor(String name) =>
         cats.firstWhere((c) => c.name == name).systemKey;
@@ -499,5 +491,318 @@ void main() {
     expect(keyFor('Loan Repayment'), 'loan_repayment');
     expect(keyFor('Loan Repayment Received'), 'loan_repayment_received');
     expect(keyFor('Food & Groceries'), isNull);
+  });
+
+  test('migrates v19 -> v20 creating budget_categories, backfilling single budgets, and seeding Gifts & Treats + Miscellaneous',
+      () async {
+    final tempDir = await Directory.systemTemp.createTemp('budget_v19_to_v20_');
+    final dbFile = File('${tempDir.path}/test_v19_v20.sqlite');
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    final raw = sql.sqlite3.open(dbFile.path);
+    try {
+      raw.execute('PRAGMA user_version = 19;');
+      raw.execute('''
+        CREATE TABLE categories (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          icon TEXT NOT NULL DEFAULT 'category',
+          color_hex TEXT NOT NULL DEFAULT '#6750A4',
+          parent_id INTEGER REFERENCES categories(id),
+          transaction_type TEXT NOT NULL DEFAULT 'expense',
+          system_key TEXT,
+          is_default INTEGER NOT NULL DEFAULT 0,
+          is_archived INTEGER NOT NULL DEFAULT 0,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', CURRENT_TIMESTAMP))
+        );
+        CREATE TABLE budgets (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          amount INTEGER NOT NULL,
+          period TEXT NOT NULL DEFAULT 'monthly',
+          category_id INTEGER REFERENCES categories(id),
+          start_date INTEGER NOT NULL,
+          end_date INTEGER,
+          rollover INTEGER NOT NULL DEFAULT 0,
+          is_archived INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', CURRENT_TIMESTAMP))
+        );
+        INSERT INTO categories (id, name, transaction_type, is_default) VALUES
+          (1, 'Food & Groceries', 'expense', 1);
+        INSERT INTO budgets (id, name, amount, category_id, start_date) VALUES
+          (1, 'Food Budget', 1500000, 1, 1730419200),
+          (2, 'Overall Budget', 5000000, NULL, 1730419200);
+      ''');
+    } finally {
+      raw.close();
+    }
+
+    final db = AppDatabase.forTesting(NativeDatabase(dbFile));
+    addTearDown(db.close);
+
+    final versionRow = await db.customSelect('PRAGMA user_version').getSingle();
+    expect(versionRow.read<int>('user_version'), 22);
+
+    final bcRows = await db.select(db.budgetCategories).get();
+    expect(bcRows, hasLength(1));
+    expect(bcRows.single.budgetId, 1);
+    expect(bcRows.single.categoryId, 1);
+
+    final indexes = await db
+        .customSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND name IS NOT NULL",
+        )
+        .get();
+    expect(
+      indexes.map((r) => r.read<String>('name')),
+      contains('idx_budget_categories_category_id'),
+    );
+
+    final cats = await db.select(db.categories).get();
+    final gifts = cats.where((c) => c.name == 'Gifts & Treats').toList();
+    expect(gifts, hasLength(1));
+    final giftChildren = cats
+        .where((c) => c.parentId == gifts.single.id)
+        .map((c) => c.name)
+        .toSet();
+    expect(
+      giftChildren,
+      containsAll([
+        'Treats & Buying for Friends',
+        'Gifts & Presents',
+        'Donations & Charity',
+      ]),
+    );
+
+    final misc = cats.where((c) => c.name == 'Miscellaneous').toList();
+    expect(misc, hasLength(1));
+    final miscChildren = cats
+        .where((c) => c.parentId == misc.single.id)
+        .map((c) => c.name)
+        .toSet();
+    expect(
+      miscChildren,
+      containsAll([
+        'Impulse / Unplanned',
+        'Random / One-off',
+      ]),
+    );
+  });
+
+  test('migrates v20 -> v21 branding M-Pesa/Cash and cleaning up untouched generic Bank only',
+      () async {
+    final tempDir = await Directory.systemTemp.createTemp('budget_v20_to_v21_');
+    final dbFile = File('${tempDir.path}/test_v20_v21.sqlite');
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    final raw = sql.sqlite3.open(dbFile.path);
+    try {
+      raw.execute('PRAGMA user_version = 20;');
+      raw.execute('''
+        CREATE TABLE accounts (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL DEFAULT 'mpesa',
+          initial_balance INTEGER NOT NULL DEFAULT 0,
+          currency TEXT NOT NULL DEFAULT 'KES',
+          color_hex TEXT NOT NULL DEFAULT '#1B5E20',
+          icon TEXT NOT NULL DEFAULT 'account_balance_wallet',
+          is_default INTEGER NOT NULL DEFAULT 0,
+          is_archived INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', CURRENT_TIMESTAMP))
+        );
+        CREATE TABLE transactions (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          header TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          amount INTEGER NOT NULL,
+          transaction_cost INTEGER NOT NULL DEFAULT 0,
+          fuliza_amount INTEGER NOT NULL DEFAULT 0,
+          fuliza_fee INTEGER NOT NULL DEFAULT 0,
+          type TEXT NOT NULL DEFAULT 'expense',
+          category_id INTEGER,
+          transaction_date INTEGER NOT NULL,
+          mpesa_ref TEXT,
+          counterparty_name TEXT NOT NULL DEFAULT '',
+          counterparty_account TEXT NOT NULL DEFAULT '',
+          account_id INTEGER REFERENCES accounts(id),
+          to_account_id INTEGER REFERENCES accounts(id),
+          is_parsed INTEGER NOT NULL DEFAULT 0,
+          exclude_from_budget INTEGER NOT NULL DEFAULT 0,
+          recurrence_id INTEGER,
+          is_recurring INTEGER NOT NULL DEFAULT 0,
+          debt_id INTEGER,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', CURRENT_TIMESTAMP))
+        );
+        INSERT INTO accounts (id, name, type, color_hex, icon, is_default) VALUES
+          (1, 'M-Pesa', 'mpesa', '#1B5E20', 'phone_android', 1),
+          (2, 'Cash', 'cash', '#4CAF50', 'payments', 0),
+          (3, 'Bank', 'bank', '#1976D2', 'account_balance', 0);
+      ''');
+    } finally {
+      raw.close();
+    }
+
+    final db = AppDatabase.forTesting(NativeDatabase(dbFile));
+    addTearDown(db.close);
+
+    final accounts = await db.select(db.accounts).get();
+    expect(accounts.map((a) => a.name), unorderedEquals(['M-Pesa', 'Cash']));
+    final mpesa = accounts.firstWhere((a) => a.name == 'M-Pesa');
+    final cash = accounts.firstWhere((a) => a.name == 'Cash');
+    expect(mpesa.icon, 'brand_mpesa');
+    expect(mpesa.colorHex, '#008A45');
+    expect(cash.icon, 'brand_cash');
+    expect(cash.colorHex, '#2E7D32');
+
+    // Verify a Bank row WITH a linked transaction is preserved during v20 -> v21.
+    final tempDir2 =
+        await Directory.systemTemp.createTemp('budget_v20_to_v21_used_');
+    final dbFile2 = File('${tempDir2.path}/test_v20_v21_used.sqlite');
+    addTearDown(() async {
+      if (await tempDir2.exists()) {
+        await tempDir2.delete(recursive: true);
+      }
+    });
+    final raw2 = sql.sqlite3.open(dbFile2.path);
+    try {
+      raw2.execute('PRAGMA user_version = 20;');
+      raw2.execute('''
+        CREATE TABLE accounts (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL DEFAULT 'mpesa',
+          initial_balance INTEGER NOT NULL DEFAULT 0,
+          currency TEXT NOT NULL DEFAULT 'KES',
+          color_hex TEXT NOT NULL DEFAULT '#1B5E20',
+          icon TEXT NOT NULL DEFAULT 'account_balance_wallet',
+          is_default INTEGER NOT NULL DEFAULT 0,
+          is_archived INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', CURRENT_TIMESTAMP))
+        );
+        CREATE TABLE transactions (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          header TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          amount INTEGER NOT NULL,
+          transaction_cost INTEGER NOT NULL DEFAULT 0,
+          fuliza_amount INTEGER NOT NULL DEFAULT 0,
+          fuliza_fee INTEGER NOT NULL DEFAULT 0,
+          type TEXT NOT NULL DEFAULT 'expense',
+          category_id INTEGER,
+          transaction_date INTEGER NOT NULL,
+          mpesa_ref TEXT,
+          counterparty_name TEXT NOT NULL DEFAULT '',
+          counterparty_account TEXT NOT NULL DEFAULT '',
+          account_id INTEGER REFERENCES accounts(id),
+          to_account_id INTEGER REFERENCES accounts(id),
+          is_parsed INTEGER NOT NULL DEFAULT 0,
+          exclude_from_budget INTEGER NOT NULL DEFAULT 0,
+          recurrence_id INTEGER,
+          is_recurring INTEGER NOT NULL DEFAULT 0,
+          debt_id INTEGER,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', CURRENT_TIMESTAMP))
+        );
+        INSERT INTO accounts (id, name, type, color_hex, icon, is_default) VALUES
+          (1, 'M-Pesa', 'mpesa', '#1B5E20', 'phone_android', 1),
+          (2, 'Bank', 'bank', '#1976D2', 'account_balance', 0);
+        INSERT INTO transactions (header, amount, account_id, transaction_date)
+        VALUES ('Bank Fee', 5000, 2, 1730419200);
+      ''');
+    } finally {
+      raw2.close();
+    }
+    final db2 = AppDatabase.forTesting(NativeDatabase(dbFile2));
+    addTearDown(db2.close);
+    final preserved = await db2.select(db2.accounts).get();
+    expect(preserved.any((a) => a.name == 'Bank'), isTrue);
+  });
+
+  test('migrates v21 -> v22 creating transaction_splits table and indexes',
+      () async {
+    final tempDir = await Directory.systemTemp.createTemp('budget_v21_to_v22_');
+    final dbFile = File('${tempDir.path}/test_v21_v22.sqlite');
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    final raw = sql.sqlite3.open(dbFile.path);
+    try {
+      raw.execute('PRAGMA user_version = 21;');
+      raw.execute('''
+        CREATE TABLE categories (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          icon TEXT NOT NULL DEFAULT 'category',
+          color_hex TEXT NOT NULL DEFAULT '#6750A4',
+          parent_id INTEGER REFERENCES categories(id),
+          transaction_type TEXT NOT NULL DEFAULT 'expense',
+          system_key TEXT,
+          is_default INTEGER NOT NULL DEFAULT 0,
+          is_archived INTEGER NOT NULL DEFAULT 0,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', CURRENT_TIMESTAMP))
+        );
+        CREATE TABLE transactions (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          header TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          amount INTEGER NOT NULL,
+          transaction_cost INTEGER NOT NULL DEFAULT 0,
+          fuliza_amount INTEGER NOT NULL DEFAULT 0,
+          fuliza_fee INTEGER NOT NULL DEFAULT 0,
+          type TEXT NOT NULL DEFAULT 'expense',
+          category_id INTEGER REFERENCES categories(id),
+          transaction_date INTEGER NOT NULL,
+          mpesa_ref TEXT,
+          counterparty_name TEXT NOT NULL DEFAULT '',
+          counterparty_account TEXT NOT NULL DEFAULT '',
+          account_id INTEGER,
+          to_account_id INTEGER,
+          is_parsed INTEGER NOT NULL DEFAULT 0,
+          exclude_from_budget INTEGER NOT NULL DEFAULT 0,
+          recurrence_id INTEGER,
+          is_recurring INTEGER NOT NULL DEFAULT 0,
+          debt_id INTEGER,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', CURRENT_TIMESTAMP))
+        );
+      ''');
+    } finally {
+      raw.close();
+    }
+
+    final db = AppDatabase.forTesting(NativeDatabase(dbFile));
+    addTearDown(db.close);
+
+    final tables = await db
+        .customSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'transaction_splits'",
+        )
+        .get();
+    expect(tables, hasLength(1));
+
+    final indexes = await db
+        .customSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'transaction_splits'",
+        )
+        .get();
+    expect(
+      indexes.map((r) => r.read<String>('name')),
+      containsAll([
+        'idx_transaction_splits_transaction_id',
+        'idx_transaction_splits_category_id',
+      ]),
+    );
   });
 }

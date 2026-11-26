@@ -4,11 +4,13 @@ import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../core/database/app_database.dart';
 import '../../../l10n/l10n.dart';
 import '../../../shared/widgets/motion.dart';
+import '../providers/backup_reminder_provider.dart';
 import '../services/csv_portability_service.dart';
 import '../services/database_backup_service.dart';
 import '../services/encrypted_backup_service.dart';
@@ -22,6 +24,7 @@ class DataPortabilityScreen extends StatefulWidget {
     this.pickSaveLocation,
     this.pickOpenFile,
     this.pickDirectoryPath,
+    this.onBackupCompleted,
   });
 
   final AppDatabase db;
@@ -30,6 +33,7 @@ class DataPortabilityScreen extends StatefulWidget {
   final Future<XFile?> Function({List<XTypeGroup> acceptedTypeGroups})?
       pickOpenFile;
   final Future<String?> Function()? pickDirectoryPath;
+  final VoidCallback? onBackupCompleted;
 
   @override
   State<DataPortabilityScreen> createState() => _DataPortabilityScreenState();
@@ -273,6 +277,7 @@ class _DataPortabilityScreenState extends State<DataPortabilityScreen> {
         await File(p.join(selectedDir, 'accounts.csv')).writeAsString(accCsv);
         await File(p.join(selectedDir, 'categories.csv'))
             .writeAsString(catCsv);
+        _notifyBackupCompleted();
         if (mounted) _message(l10n.exported3CsvFiles);
       }, errorMessage: l10n.couldNotWriteCsvFiles);
       return;
@@ -344,8 +349,23 @@ class _DataPortabilityScreenState extends State<DataPortabilityScreen> {
       final encrypted = await EncryptedBackupService()
           .encrypt(snapshot, passphrase: passphrase);
       final saved = await _save('budget-ke-backup.json', encrypted);
-      if (saved && mounted) _message(l10n.encryptedBackupSaved);
+      if (saved) {
+        _notifyBackupCompleted();
+        if (mounted) _message(l10n.encryptedBackupSaved);
+      }
     }, errorMessage: l10n.couldNotCreateBackup);
+  }
+
+  void _notifyBackupCompleted() {
+    if (widget.onBackupCompleted != null) {
+      widget.onBackupCompleted!();
+      return;
+    }
+    try {
+      ProviderScope.containerOf(context, listen: false)
+          .read(backupReminderProvider.notifier)
+          .markBackedUp();
+    } catch (_) {}
   }
 
   Future<void> _restore() async {

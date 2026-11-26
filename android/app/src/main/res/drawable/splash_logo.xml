@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+
+    <!-- Main badge centered strictly inside the 160dp safe zone of the 288dp Android 12+ icon -->
+    <path
+        android:fillColor="#1B5E20"
+        android:pathData="M110,82 L178,82 A28,28 0 0,1 206,110 L206,178 A28,28 0 0,1 178,206 L110,206 A28,28 0 0,1 82,178 L82,110 A28,28 0 0,1 110,82 Z" />
+
+    <!-- Subtle inner highlight -->
+    <path
+        android:fillAlpha="0.45"
+        android:fillColor="#2E7D32"
+        android:pathData="M114,90 L174,90 A24,24 0 0,1 198,114 L198,140 Q144,126 90,140 L90,114 A24,24 0 0,1 114,90 Z" />
+
+    <!-- Subtle upward growth arc behind monogram -->
+    <path
+        android:pathData="M106,158 Q144,114 182,158"
+        android:strokeAlpha="0.38"
+        android:strokeColor="#66BB6A"
+        android:strokeLineCap="round"
+        android:strokeWidth="5" />
+
+    <!-- Geometric 'K' -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M105,114 H115 V160 H105 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M115,137 L132,114 H143 L124,137 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M115,137 L124,135 L143,160 H132 Z" />
+
+    <!-- Geometric 'E' -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M149,114 H159 V160 H149 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M159,114 H183 V123 H159 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M159,132 H179 V141 H159 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M159,151 H183 V160 H159 Z" />
+
+    <!-- Bottom accent bar -->
+    <path
+        android:fillColor="#66BB6A"
+        android:pathData="M109,171 H179 A4,4 0 0,1 183,175 A4,4 0 0,1 179,179 H109 A4,4 0 0,1 105,175 A4,4 0 0,1 109,171 Z" />
+</vector>

@@ -8,11 +8,11 @@ import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/converters/cents_converter.dart';
 import '../../../l10n/l10n.dart';
-import '../../../shared/utils/cashflow_calculator.dart';
 import '../../../shared/utils/color_utils.dart';
 import '../../../shared/widgets/motion.dart';
 import '../../categories/providers/category_providers.dart';
 import '../../transactions/models/transaction_model.dart';
+import '../../transactions/models/transaction_split_allocator.dart';
 
 class _Slice {
   final String label;
@@ -68,17 +68,18 @@ class _CategoryPieChartSectionState
     for (final t in widget.transactions) {
       if (t.type != 'expense') continue;
 
-      var cat = t.categoryId != null ? byId[t.categoryId!] : null;
-      // Category mode: roll up to the parent AND use the parent's color,
-      // so the color doesn't depend on which child transaction came first.
-      if (cat != null && !_showSubcategories && cat.parentId != null) {
-        cat = byId[cat.parentId!] ?? cat;
-      }
+      for (final alloc in TransactionSplitAllocator.allocateForTransaction(t)) {
+        var cat = alloc.categoryId != null ? byId[alloc.categoryId!] : null;
+        // Category mode: roll up to the parent AND use the parent's color,
+        // so the color doesn't depend on which child transaction came first.
+        if (cat != null && !_showSubcategories && cat.parentId != null) {
+          cat = byId[cat.parentId!] ?? cat;
+        }
 
-      final key = cat?.id;
-      totalsCents[key] =
-          (totalsCents[key] ?? 0) + CashflowCalculator.expenseTotalCents(t);
-      cats[key] = cat;
+        final key = cat?.id;
+        totalsCents[key] = (totalsCents[key] ?? 0) + alloc.cents;
+        cats[key] = cat;
+      }
     }
 
     final entries = totalsCents.entries.toList()
